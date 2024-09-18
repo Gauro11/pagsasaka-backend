@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BaseController;
+use App\Http\Controllers\AccountController;
  
 
 /*
@@ -20,8 +21,16 @@ use App\Http\Controllers\BaseController;
 Route::controller(BaseController::class)->group(function () {
 Route::post('createCustomer', 'createCustomer');
 Route::post('createCustomer', 'updateCustomer');
-Route::get('getCustomers', 'getCustomers');
+Route::get('getUsers', 'getUsers');
 
+});
+
+Route::controller(AccountController::class)->group(function () {
+    Route::post('searchAccount', 'searchAccount');
+    Route::post('createAccoount', 'storeAccount');
+    Route::post('updateAccoount/{account}', 'updateAccount');
+    Route::post('deleteAccount/{account}','deleteAccount');
+    
 });
 
 

@@ -99,28 +99,28 @@ class BaseController extends Controller
 
     public function getUsers()
     {
-        try
-        {
-            $users = User::where('status', 'A')->get(); //can use
+        // try
+        // {
+        //     $users = User::where('status', 'A')->get(); //can use
 
-            $response = [
-                'isSuccess' => true,
-                'message' => "Customers:",
-                'data' => $customers ?? []
-            ];
-            $this->logAPICalls('getUsers', $userId, [], [$response]);
-            return response()->json($response, 200);
-        }
-        catch(Throwable $ex)
-        {
-            $response = [
-                'isSuccess' => false,
-                'message'=> "Unable to list users.",
-                'error'=> $e->getMessage()
-            ];
-            $this->logAPICalls('getUsers', "", [], [$response]);
-            return response()->json($response, 500);
-        }
+        //     $response = [
+        //         'isSuccess' => true,
+        //         'message' => "Customers:",
+        //         'data' => $customers ?? []
+        //     ];
+        //     $this->logAPICalls('getUsers', $userId, [], [$response]);
+        //     return response()->json($response, 200);
+        // }
+        // catch(Throwable $ex)
+        // {
+        //     $response = [
+        //         'isSuccess' => false,
+        //         'message'=> "Unable to list users.",
+        //         'error'=> $e->getMessage()
+        //     ];
+        //     $this->logAPICalls('getUsers', "", [], [$response]);
+        //     return response()->json($response, 500);
+        // }
     }
 
     public function insertSession(string $code, string $userId)
