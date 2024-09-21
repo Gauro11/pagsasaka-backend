@@ -15,7 +15,7 @@ class AccountController extends Controller
             
             $currentPage = $request->input('page', 1);
 
-            $data = Account::paginate(10, ['*'], 'page', $currentPage);
+            $data = Account::where('status', 'A')->paginate(10, ['*'], 'page', $currentPage);
 
             if ($data->isEmpty() && $currentPage > $data->lastPage()) {
                 $response = [
@@ -30,13 +30,19 @@ class AccountController extends Controller
                 'isSuccess' => true,
                 'data' => $data
             ];
+
+            $this->logAPICalls('getAccounts', "", $request->all(), [$response]);
             return response()->json($response,200);
 
         }catch(Throwable $ex){
-            return response()->json([
-                'message' => 'Please contact support.',
-                 'error' => $e->getMessage()
-            ]);
+            $response = [
+                'isSuccess' => false,
+                'message' => "UPlease contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+           ];
+
+           $this->logAPICalls('getAccounts', "", $request->all(), [$response]);
+           return response()->json($response, 500);
         }
 
     }
@@ -71,18 +77,19 @@ class AccountController extends Controller
 
     }
 
-    public function updateAccount(Request $request,Account $account){
+    public function updateAccount(Request $request){
 
         try{
           
            $validate = $request->validate([
                 'name' => 'required|min:5|max:150',
-                'entityid' => 'required',
+                'organization_id' => 'required',
                 'role' => 'required'
            ]);
 
+
            $exists = Account::where('name', $validate['name'])
-                  ->where('entityid', $validate['entityid'])
+                  ->where('organization_id', $validate['organization_id'])
                   ->where('role', $validate['role'])
                   ->exists();
 
@@ -96,7 +103,7 @@ class AccountController extends Controller
 
                 return response()->json($response, 422);
             }else{
-
+                $account = Account::find($request->id);
                 $account->update($validate);
                 $response = [
                           'isSuccess' => true,
@@ -121,28 +128,57 @@ class AccountController extends Controller
 
     }
 
-
-    public function deleteAccount(Account $account){
+    public function deleteAccount(Request $request){
 
         try{
 
-            $account->delete($account);
+            $organization = Account::find($request->id);
+            $organization->update(['status' => $request->status]);
             $response = [
-                      'isSuccess' => true,
-                       'message' => "Successfully deleted."
-                ];
-            $this->logAPICalls('deleteAccount', "",$account->toArray(), [$response]);
+                'isSuccess' => true,
+                'message' => "Successfully deleted."
+            ];
+
+            $this->logAPICalls('deleteAccount', "", $request->all(), [$response]);
             return response()->json($response);
 
         }catch(Exception $e){
 
             $response = [
                 'isSuccess' => false,
-                'message' => "Unsucessfully deleted. Please try again.",
+                'message' => "Unsuccessfully deleted. Please try again.",
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
            ];
 
             $this->logAPICalls('deleteAccount', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+
+        }
+        
+
+    }
+
+    public function editAccount(Request $request){
+
+        try{
+
+            $data = Account::find($request->id);
+            $response = [
+                'isSuccess' => true,
+                 'data' => $data
+            ];
+    
+            $this->logAPICalls('editAccount', "", $request->all(), [$response]);
+            return response()->json($response);
+
+        }catch(Exception $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Unsuccessfully edited. Please check your inputs.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+           ];
+            $this->logAPICalls('editAccount', "", $request->all(), [$response]);
             return response()->json($response, 500);
 
         }

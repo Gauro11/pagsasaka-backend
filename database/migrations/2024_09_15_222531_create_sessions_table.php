@@ -22,6 +22,8 @@ class CreateSessionsTable extends Migration
             $table->char('status',1)->default('A');
             $table->string('payload');
             $table->integer('last_activity');
+            $table->integer('ip_address');
+            $table->integer('user_agent');
             $table->timestamps();
         });
     }

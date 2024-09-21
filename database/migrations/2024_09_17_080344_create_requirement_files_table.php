@@ -15,10 +15,13 @@ class CreateRequirementFilesTable extends Migration
     {
         Schema::create('requirement_files', function (Blueprint $table) {
             $table->id();
-            $table->string('ID_Requirement');
-            $table->string('path');
-            $table->string('size');
-            $table->string('uploadedby');
+            $table->string('requirement_id');
+            $table->string('filename');
+            $table->string('path')->nullable();
+            $table->string('size')->nullable();
+            $table->string('folder_id')->nullable();
+            $table->string('org_log_id');
+            $table->string('status')->default('A');
             $table->timestamps();
         });
     }

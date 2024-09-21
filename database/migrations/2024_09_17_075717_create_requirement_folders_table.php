@@ -14,10 +14,13 @@ class CreateRequirementFoldersTable extends Migration
     public function up()
     {
         Schema::create('requirement_folders', function (Blueprint $table) {
+
             $table->id();
-            $table->string('ID_Reqfile');
+            $table->string('requirement_id');
             $table->string('name');
+            $table->string('status')->default('A');
             $table->timestamps();
+
         });
     }
 

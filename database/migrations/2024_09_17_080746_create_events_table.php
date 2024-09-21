@@ -16,12 +16,13 @@ class CreateEventsTable extends Migration
         Schema::create('events', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('program');
+            $table->string('org_log_id');
             $table->string('description');
             $table->string('academic_year');
             $table->string('submission_date');
-            $table->string('qtyfile');
-            $table->string('date_modified');
+            $table->string('qtyfile')->nullable();
+            $table->string('date_modified')->nullable();
+            $table->string('status')->default('A');
             $table->timestamps();
         });
     }
