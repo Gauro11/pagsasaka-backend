@@ -12,6 +12,7 @@ use App\Http\Controllers\OrgLogController;
 use App\Http\Controllers\userlistController;
 
 
+
  
 
     Route::post('create', [userlistController::class, 'create']); // Create a new user
@@ -48,6 +49,10 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
 });
 
    
+
+Route::post('/sample',function(Request $request){
+    return $request->requirements;
+});
 
 
 Route::controller(BaseController::class)->group(function () {
@@ -86,14 +91,14 @@ Route::controller(OrgLogController::class)->group(function () {
 
 
 
-Route::controller(RequestController::class)->group(function () {
-    Route::get('/','index');
+//Route::controller(RequestController::class)->group(function () {
+  //  Route::get('/','index');
  //   Route::post('searchAccount', 'searchAccount');
-      Route::post('createRequest', 'storeRequest');
+    //  Route::post('createRequest', 'storeRequest');
   //  Route::post('updateAccoount/{account}', 'updateAccount');
    // Route::post('deleteAccount/{account}','deleteAccount');
     
-});
+//});
 
 
 

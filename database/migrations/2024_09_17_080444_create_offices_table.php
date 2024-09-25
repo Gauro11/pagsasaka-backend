@@ -15,7 +15,7 @@ class CreateOfficesTable extends Migration
     {
         Schema::create('offices', function (Blueprint $table) {
             $table->id();
-            $table->string('ID_Office')->default();;
+            $table->string('ID_Office');
             $table->string('name');
             $table->string('acronym');
             $table->string('status');

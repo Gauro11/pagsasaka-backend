@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateRequirementFoldersTable extends Migration
+class CreateRequirementsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,14 +13,13 @@ class CreateRequirementFoldersTable extends Migration
      */
     public function up()
     {
-        Schema::create('requirement_folders', function (Blueprint $table) {
-
+        Schema::create('requirements', function (Blueprint $table) {
             $table->id();
-            $table->string('requirement_id');
+            $table->string('event_id');
             $table->string('name');
+            $table->string('org_log_id');
             $table->string('status')->default('A');
             $table->timestamps();
-
         });
     }
 
@@ -31,6 +30,6 @@ class CreateRequirementFoldersTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('requirement_folders');
+        Schema::dropIfExists('requirements');
     }
 }

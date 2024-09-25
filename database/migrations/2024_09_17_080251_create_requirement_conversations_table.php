@@ -15,7 +15,9 @@ class CreateRequirementConversationsTable extends Migration
     {
         Schema::create('requirement_conversations', function (Blueprint $table) {
             $table->id();
-            $table->string('ID_Requirement');
+            $table->string('requirement_id');
+            $table->string('account_id');
+            $table->string('org_log_id');
             $table->string('message');
             $table->string('date');
             $table->string('time');
