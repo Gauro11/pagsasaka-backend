@@ -5,8 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\OrganizationalLog;
 use App\Models\ApiLog;
-use App\Models\Program;
 use App\Http\Requests\OrgLogRequest;
+use Throwable;  
+use Exception; 
 
 
 class OrgLogController extends Controller
@@ -217,8 +218,7 @@ class OrgLogController extends Controller
 
         $response = [
             'isSuccess' => true,
-             'data' => $data,
-             'college_id' => $college
+             'data' => $data
         ];
 
         $this->logAPICalls('editOrgLog', "", $request->all(), [$response]);
