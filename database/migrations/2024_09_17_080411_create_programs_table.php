@@ -15,12 +15,9 @@ class CreateProgramsTable extends Migration
     {
         Schema::create('programs', function (Blueprint $table) {
             $table->id();
-            $table->string('ID_Program')->default();
-            $table->string('ID_College');
-            $table->string('name');
-            $table->string('acronym');
-            $table->string('status');
-            $table->string('archive');
+            $table->string('program_entity_id');
+            $table->string('college_entity_id');
+            $table->string('status')->default('A');
             $table->timestamps();
         });
     }

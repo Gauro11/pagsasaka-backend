@@ -35,7 +35,7 @@ class AccountRequest extends FormRequest
             ],
             'password' => 'required',
             'role' => 'required',
-            'entityid' => 'required'
+            'organization_id' => 'required'
         ];
     }
 }
