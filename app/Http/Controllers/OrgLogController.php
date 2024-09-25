@@ -16,39 +16,49 @@ class OrgLogController extends Controller
 
         try{
 
-            $data = OrganizationalLog::where('status', 'A')
-            ->where('entity_id', $request->entity_id)
-            ->orderBy('created_at', 'desc') // Palitan ang 'created_at' ng tamang column kung kinakailangan
-            ->take(10)
-            ->get();
+            $items = 2;
 
-            $response = [
-                'isSuccess' => true,
-                'data' => $data
-            ];
+            $validate = $request->validate([
+                'org_id' => 'required'
+            ]);
+
+            $perPage = $request->query('per_page', $items); 
+            $search = $request->input('search'); 
+
+            $query = OrganizationalLog::where('status', 'A')
+                ->where('org_id', $request->org_id);
+
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('acronym', 'LIKE', "%{$search}%");
+                });
+            }
+
+
+            if ($request->org_id == "3") {
+
+                $data = $query->with(['programs:program_entity_id,college_entity_id']) 
+                    ->orderBy('created_at', 'desc') 
+                    ->paginate($perPage);
+                
+                     // manipulate the respose to get the name of college.
+
+                $data->getCollection()->transform(function ($item) {
+                    foreach ($item->programs as $program) {
+                        $college = OrganizationalLog::find($program->college_entity_id);
+                        $program->college_name = $college ? $college->name : null; 
+                    }
+                    return $item;
+                });
+            } else {
+
+                $data = $query->orderBy('created_at', 'desc')->paginate($perPage);
+            }
 
             $this->logAPICalls('getOrgLog', "", $request->all(), [$response]);
-            return response()->json($response, 200);
+            return response()->json($data);
 
-            // $currentPage = $request->input('page', 1);
-
-            // $data = OrganizationalLog::where('status', 'A')->paginate(10, ['*'], 'page', $currentPage);
-        
-            // if ($data->isEmpty() && $currentPage > $data->lastPage()) {
-            //     $response = [
-            //         'isSuccess' => true,
-            //         'message' => 'The page you requested does not exist.'
-            //     ];
-            //     $this->logAPICalls('getOrgLog', "", $request->all(), [$response]);
-            //     return response()->json($response, 404);
-            // } 
-        
-            // $response = [
-            //     'isSuccess' => true,
-            //     'data' => $data
-            // ];
-            // $this->logAPICalls('getOrgLog', "", $request->all(), [$response]);
-            // return response()->json($response, 200);
 
         }catch(Throwable $ex){
 
@@ -58,38 +68,11 @@ class OrgLogController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
            ];
 
-            $this->logAPICalls('storeAccount', "", $request->all(), [$response]);
+            $this->logAPICalls('getOrgLog', "", $request->all(), [$response]);
             return response()->json($response, 500);
 
         }
     
-    }
-
-    public function paginateOrgLog(Request $request){
-
-        //  $currentPage = $request->input('page', 2);
-
-        //     $data = OrganizationalLog::where('status', 'A')
-        //     ->where('entity_id', $request->entity_id)
-        //     ->orderBy('created_at', 'desc')
-        //     ->paginate(2, ['*'], 'page', $currentPage);
-        
-        //     if ($data->isEmpty() && $currentPage > $data->lastPage()) {
-        //         $response = [
-        //             'isSuccess' => true,
-        //             'message' => 'The page you requested does not exist.'
-        //         ];
-        //         $this->logAPICalls('getOrgLog', "", $request->all(), [$response]);
-        //         return response()->json($response, 404);
-        //     } 
-        
-        //     $response = [
-        //         'isSuccess' => true,
-        //         'data' => $data
-        //     ];
-        //     $this->logAPICalls('getOrgLog', "", $request->all(), [$response]);
-        //     return response()->json($response, 200);
-
     }
 
     public function storeOrgLog(OrgLogRequest $request){
@@ -99,7 +82,7 @@ class OrgLogController extends Controller
            $validate = $request->validate([
                 'name' => 'required',
                 'acronym' => ['required','min:2'],
-                'entity_id' => ['required']
+                'org_id' => ['required', 'exists:organizations,id']
            ]);
 
             if ($this->isExist($validate)) {
@@ -119,7 +102,7 @@ class OrgLogController extends Controller
 
                 ////  CODE FOR STORE PROGRAMS ////
 
-                if($request->entity_id == '3'){
+                if($request->org_id == '3'){
                     $this->storePorgram($request->college_entity_id,$validate);
                 }
                 
@@ -154,14 +137,13 @@ class OrgLogController extends Controller
         try{
 
             $validate = $request->validate([
-                'id' => 'required',
-                'entity_id' => 'required',
+                'id' => 'required|exists:organizational_logs,id',
                 'name' => 'required',
                 'acronym' => 'required'
             ]);
             
 
-            if ($this->isExist($validate,$request->entity_id,$request->id,$request->college_entity_id)) {
+            if ($this->isExist($validate,$request->org_id,$request->id,$request->college_entity_id)) {
     
                 $response = [
                     'isSuccess'=> false,
@@ -176,15 +158,18 @@ class OrgLogController extends Controller
     
                 $organization = OrganizationalLog::find($request->id);
 
-                if($organization->entity_id == '3'){
-                   
-                    $validated = $request->validate([
+                if($organization->org_id == "3"){
+
+
+                    $valCollege_id = $request->validate([
                         'college_entity_id' => 'required'
                     ]);
                    
                     $program = Program::where('program_entity_id',$organization->id);
-                  
-                    $program->update($validated);
+
+                     $organization->update($validate);
+                     $program->update($valCollege_id);
+
                 }else{
 
                     $organization->update($validate);
@@ -215,10 +200,15 @@ class OrgLogController extends Controller
     public function editOrgLog(Request $request){
 
      try{
+
         $college  = "";
+        $request->validate( [
+                'id' => 'required|exists:organizational_logs,id'
+            ] );
+
         $data = OrganizationalLog::find($request->id);
 
-        if($data->entity_id == '3'){
+        if($data->org_id == '3'){
             $program  = Program::where('program_entity_id',$request->id)->get();
             if ($program->isNotEmpty()){
                 $college = OrganizationalLog::where('id',$program->first()->college_entity_id)->get();
@@ -252,8 +242,12 @@ class OrgLogController extends Controller
         
         try{
 
+            $request->validate( [
+                'id' => 'required|exists:organizational_logs,id'
+            ] );
+
             $organization = OrganizationalLog::find($request->id);
-            $organization->update(['status' => $request->status]);
+            $organization->update(['status' =>"I"]);
             $response = [
                 'isSuccess' => true,
                 'message' => "Successfully deleted."
@@ -277,65 +271,19 @@ class OrgLogController extends Controller
         
     }
 
-    public function isExist($validate,$entity_id=null,$program_id=null,$college_id=null){
+    public function isExist($validate){
 
-        if($entity_id == '3'){
-
-            return Program::where('program_entity_id',$program_id)
-                             ->where('college_entity_id', $college_id)
-                             ->exists();
-
-        }else{
             return OrganizationalLog::where('name', $validate['name'])
             ->where('acronym', $validate['acronym'])
-            ->where('entity_id', $validate['entity_id'])
             ->exists();
-        }
-      
+
     }
-
-    public function searchOrgLog(Request $request){
-
-        try{
-            
-            $query = $request->input('query');
-            $org_id = $request->input('organization_id');
-
-            $results = OrganizationalLog::where('organization_id', $org_id)
-            ->when($query, function ($q) use ($query) {
-                return $q->where(function ($queryBuilder) use ($query) {
-                    $queryBuilder->where('name', 'LIKE', "%{$query}%")
-                                 ->orWhere('acronym', 'LIKE', "%{$query}%");
-                });
-            })
-            ->get();
-
-            $response = [
-                'isSuccess' => true,
-                'results' => $results
-            ];
-
-            $this->logAPICalls('searchAccount', "",$request->all(), [$response]);
-            return response()->json($response);
-
-        }catch(Exception $e){
-            $response = [
-                'isSuccess' => false,
-                'message' => "Search failed. Please try again later.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
-            $this->logAPICalls('searchAccount', "", $request->all(), [$response]);
-            return response()->json($response, 500);
-        }
-        
-    }
-
+    
     public function storePorgram($college_id,$validate){
 
             $program = OrganizationalLog::where('name', $validate['name'])
                         ->where('acronym', $validate['acronym'])
-                        ->where('entity_id', $validate['entity_id'])
+                        ->where('org_id', $validate['org_id'])
                         ->first();
             
             Program::create([

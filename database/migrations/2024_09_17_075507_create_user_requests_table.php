@@ -15,10 +15,12 @@ class CreateUserRequestsTable extends Migration
     {
         Schema::create('user_requests', function (Blueprint $table) {
             $table->id();
-            $table->string('ID_Account');
+            $table->string('request_no');
+            $table->string('account_id');
+            $table->string('role');
             $table->string('purpose');
-            $table->string('date_requested');
-            $table->string('status');
+            $table->string('requested_date');
+            $table->string('status')->default('A');
             $table->timestamps();
         });
     }

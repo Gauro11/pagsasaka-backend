@@ -21,6 +21,7 @@ class CreateRequirementFilesTable extends Migration
             $table->string('size')->nullable();
             $table->string('folder_id')->nullable();
             $table->string('org_log_id');
+            $table->string('role');
             $table->string('status')->default('A');
             $table->timestamps();
         });
@@ -31,6 +32,7 @@ class CreateRequirementFilesTable extends Migration
      *
      * @return void
      */
+    
     public function down()
     {
         Schema::dropIfExists('requirement_files');
