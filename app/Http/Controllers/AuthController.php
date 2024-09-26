@@ -50,7 +50,7 @@ class AuthController extends Controller
                             break;
                         default:
                             $response = ['message' => 'Unauthorized'];
-                            $this->logAPICalls('login', $request->email, $request->all(), $response); 
+                            $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                             return response()->json($response, 403);
                     }
     
@@ -59,24 +59,25 @@ class AuthController extends Controller
     
                    
                     $response = [
+                        'isScucces' => true,
                         'message' => ucfirst($user->role) . ' logged in successfully',
                         'token' => $token,
                         'user' => $user->only(['id', 'email']),
                         'role' => $user->role,
                         'session' => $sessionResponse->getData(),
                     ];
-                    $this->logAPICalls('login', $user->id, $request->all(), $response); 
+                    $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                     return response()->json($response, 200);
     
                 } else {
                     
                     $response = ['message' => 'Invalid credentials'];
-                    $this->logAPICalls('login', $request->email, $request->all(), $response); 
+                    $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                     return response()->json($response, 401); 
                 }
             } else {
                 $response = ['message' => 'Invalid credentials'];
-                $this->logAPICalls('login', $request->email, $request->all(), $response);
+                $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                 return response()->json($response, 401); 
             }
         } catch (Throwable $e) {
@@ -149,7 +150,7 @@ public function logout(Request $request)
                 'logout_date' => null 
             ]);
 
-            return response()->json(['isSuccess' => true, 'message' => 'Session successfully created.', 'session_code' => $sessionCode], 201);
+            return response()->json([ 'message' => 'Session successfully created.', 'session_code' => $sessionCode], 201);
 
         } catch (Throwable $e) {
             return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.', 'error' => $e->getMessage()], 500);
@@ -173,6 +174,7 @@ public function logout(Request $request)
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'new_password' => 'required|min:8',
+            
         ]);
 
         if ($validator->fails()) {
@@ -220,6 +222,8 @@ public function logout(Request $request)
         return response()->json($response, 500);
     }
 }
+
+     
 
     // Method to log API calls
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)
