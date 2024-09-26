@@ -8,7 +8,11 @@ use Carbon\Carbon;
 use App\Models\Session;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use DB;
+
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB; 
+use Throwable;  
+
 
 
 class BaseController extends Controller
@@ -52,7 +56,7 @@ class BaseController extends Controller
             $this->logAPICalls('storeSection', "", $request->all(), [$response]);
             return response()->json($response, 500);
         }
-        catch(Throwable $ex)
+        catch(Throwable $e)
         {
             $response = [
                 'isSuccess' => false,
@@ -82,45 +86,45 @@ class BaseController extends Controller
                 'isSuccess' => true,
                 'message' => "You have successfully updated a user."
             ];
-            $this->logAPICalls('updateUser', $userId, $request->all(), [$response]);
+            $this->logAPICalls('updateUser', $user, $request->all(), [$response]);
             return response()->json($response, 200);
         }
-        catch(Throwable $ex)
+        catch(Throwable $e)
         {
             $response = [
                 'isSuccess' => false,
                 'message'=> "Unable to update a user. Please try again.",
                 'error'=> $e->getMessage()
             ];
-            $this->logAPICalls('updateUser', $userId, $request->all(), [$response]);
+            $this->logAPICalls('updateUser', $user, $request->all(), [$response]);
             return response()->json($response, 500);
         }
     }
 
     public function getUsers()
     {
-        try
-        {
-            $users = User::where('status', 'A')->get(); //can use
+        // try
+        // {
+        //     $users = User::where('status', 'A')->get(); //can use
 
-            $response = [
-                'isSuccess' => true,
-                'message' => "Customers:",
-                'data' => $customers ?? []
-            ];
-            $this->logAPICalls('getUsers', $userId, [], [$response]);
-            return response()->json($response, 200);
-        }
-        catch(Throwable $ex)
-        {
-            $response = [
-                'isSuccess' => false,
-                'message'=> "Unable to list users.",
-                'error'=> $e->getMessage()
-            ];
-            $this->logAPICalls('getUsers', "", [], [$response]);
-            return response()->json($response, 500);
-        }
+        //     $response = [
+        //         'isSuccess' => true,
+        //         'message' => "Customers:",
+        //         'data' => $customers ?? []
+        //     ];
+        //     $this->logAPICalls('getUsers', $userId, [], [$response]);
+        //     return response()->json($response, 200);
+        // }
+        // catch(Throwable $ex)
+        // {
+        //     $response = [
+        //         'isSuccess' => false,
+        //         'message'=> "Unable to list users.",
+        //         'error'=> $e->getMessage()
+        //     ];
+        //     $this->logAPICalls('getUsers', "", [], [$response]);
+        //     return response()->json($response, 500);
+        // }
     }
 
     public function insertSession(string $code, string $userId)
