@@ -19,16 +19,17 @@ use App\Http\Controllers\ProgramController;
 
 
 
+
      //connection//
      Route::options('/{any}', function (Request $request) {
         return response()->json(['status' => 'OK'], 200);
     })->where('any', '.*');
  
 
-    Route::post('create', [userlistController::class, 'create']); // Create a new user
+   /* Route::post('create', [userlistController::class, 'create']); // Create a new user
     Route::post('/users/{id}', [userlistController::class, 'edit']);
     Route::post('/delete/{id}', [userlistController::class, 'destroy']);
-    Route::post('searchuser', [userlistController::class, 'searchuser']); 
+    Route::post('searchuser', [userlistController::class, 'searchuser']); */
 
 
 ///////////////////////////////////LOGIN//////////////////////////////////////////
@@ -48,6 +49,18 @@ Route::controller(AuthController::class)->group(function () {
     
         // Add more protected routes here
     });
+
+    //create acc///
+Route::controller(AccountController::class)->group(function () {
+   
+    Route::get('getAccounts', 'getAccounts');
+    Route::post('searchAccount', 'searchAccount');
+    Route::post('createAccoount', 'createAccount');
+    Route::post('editAccount','editAccount');
+    Route::post('/updateAccoount/{id}', 'updateAccount');
+    Route::post('deleteAccount','deleteAccount');
+    
+});
 
 
 Route::middleware('auth:sanctum')->post('/logout/{id}', [AuthController::class, 'logout']);
