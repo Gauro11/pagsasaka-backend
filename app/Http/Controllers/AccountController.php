@@ -167,6 +167,7 @@ class AccountController extends Controller
               'name' => $request->name,
                 'email' => $request->email,
                 'role' => $request->role,
+                'org_log_id' => $request->org_log_id,
                 'password' => Hash::make($request->password),
                
             ]);

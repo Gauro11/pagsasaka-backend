@@ -13,6 +13,12 @@ use App\Http\Controllers\userlistController;
 
 
 
+
+
+     //connection//
+     Route::options('/{any}', function (Request $request) {
+        return response()->json(['status' => 'OK'], 200);
+    })->where('any', '.*');
  
 
     Route::post('create', [userlistController::class, 'create']); // Create a new user
