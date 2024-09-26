@@ -27,7 +27,7 @@ class OrgLogRequest extends FormRequest
             //
             'name' => 'required',
             'acronym' => ['required','min:2'],
-            'entity_id' => ['required']
+            'org_id' => ['required']
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Requirement;
 use App\Models\RequirementConversation;
 use App\Http\Requests\ConversationRequest;
 use Carbon\Carbon;
@@ -17,11 +18,17 @@ class ConversationController extends Controller
             $currentDate = Carbon::now()->format('m/d/Y');
             $currentTime = Carbon::now()->format('g:ia');
 
+            $validated = $request->validate([
+                'requirement_id' => 'required|exists:requirements,id'
+            ]);
+
+            $data  = Requirement::where('id', $validated['requirement_id'])->get();
+
             $data = RequirementConversation::create([
 
                 'requirement_id' => $request->requirement_id,
                 'account_id' => $request->account_id,
-                'org_log_id' => $request->org_log_id,
+                'org_log_id' =>  $data->first()->org_log_id,
                 'message' => $request->message,
                 'date' =>  $currentDate,
                 'time' =>  $currentTime
@@ -33,7 +40,8 @@ class ConversationController extends Controller
                     'message' => "Comment successfully",
                     'date' => $data
             ];
- 
+            
+            $this->logAPICalls('storeConverstation', "", $request->all(), [$response]);
             return response()->json($response);
           }catch (Exception $e) {
   
@@ -43,7 +51,7 @@ class ConversationController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
            ];
 
-            //$this->logAPICalls('storeAccount', "", $request->all(), [$response]);
+            $this->logAPICalls('storeConverstation', "", $request->all(), [$response]);
             return response()->json($response, 500);
 
   
@@ -56,7 +64,7 @@ class ConversationController extends Controller
         try{
 
             $request->validate([
-                'requirement_id' =>'required'
+                'requirement_id' =>'required|exists:requirements,id'
             ]);
 
             $data = RequirementConversation::where('requirement_id',$request->requirement_id)->get();
@@ -69,6 +77,15 @@ class ConversationController extends Controller
             return response()->json($response, 200);
 
         }catch(Exception $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+           ];
+
+            $this->logAPICalls('downloadFileRequirement', "", $request->all(), [$response]);
+            return response()->json($response, 500);
 
         }
     }

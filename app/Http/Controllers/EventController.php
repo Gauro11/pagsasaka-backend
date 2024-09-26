@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Requirement;
 use App\Models\Event;
+use App\Models\OrganizationLog;
+use App\Models\Program;
 use App\Models\ApiLog;
 use App\Models\AcademicYear;
 use App\Models\OrganizationalLog;
@@ -13,6 +15,54 @@ use App\Http\Requests\EventRequest;
 
 class EventController extends Controller
 {
+
+    public function getEvent(Request $request){
+
+        try{
+
+            $validated = $request->validate([
+                'org_log_id' => 'required|exists:organizational_logs,id',
+                'search' => 'nullable|string',
+                'academic_year' => 'nullable|string' 
+            ]);
+            
+            $query = Event::where('org_log_id', $validated['org_log_id'])
+                    ->orderBy('created_at', 'desc');
+            
+            if (!empty($validated['search'])) {
+                $query->where('name', 'like', '%' . $validated['search'] . '%')
+                ->orderBy('created_at', 'desc');
+            }
+            
+            if (!empty($validated['academic_year'])) {
+                $query->where('academic_year', $validated['academic_year'])
+                ->orderBy('created_at', 'desc');
+            }
+            
+            $data = $query->get();
+
+            $response = [
+                'isSuccess' => true,
+                'data' => $data
+           ];
+
+            $this->logAPICalls('getEvent', "", $request->all(), [$response]);
+            return response()->json($data);
+            
+        }catch(Throwable $ex){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+           ];
+
+            $this->logAPICalls('getEvent', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+
+        }
+
+    }
 
     public function storeEvent(EventRequest $request){
 
@@ -42,17 +92,26 @@ class EventController extends Controller
           
                 $eventid= $this->getEventID($request->name,$request->description,$request->academic_year,$request->submission_date);
 
-                foreach($request->requirements as $requirement){
-                    Requirement::create(['name' => $requirement['name'],
-                                        'org_log_id' => $requirement['org_log_id'],
-                                        'event_id' => $eventid
-                    ]);
+                $invalidRequirements = [];
 
+                foreach ($request->requirements as $requirement) {
+                    if (!OrganizationalLog::find($requirement['org_log_id'])) {
+              
+                        $invalidRequirements[] = $requirement;
+                        continue; 
+                    }
+
+                    Requirement::create([
+                        'name' => $requirement['name'],
+                        'org_log_id' => $requirement['org_log_id'],
+                        'event_id' => $eventid,
+                    ]);
                 }
                 
                  $response = [
                            'isSuccess' => true,
-                            'message' => "Successfully created."
+                            'message' => "Successfully created.",
+                            'invalid_requirements' => $invalidRequirements
                      ];
 
                  $this->logAPICalls('storeEvent', "", $request->all(), [$response]);
@@ -78,7 +137,14 @@ class EventController extends Controller
     public function editEvent(Request $request){
 
         try{
+
+            $request->validate([
+
+                'id' => 'required|exists:events'
+            ]);
+
             $data = Event::find($request->id);
+
             $response = [
                 'isSuccess' => true,
                     'data' => $data
@@ -105,13 +171,15 @@ class EventController extends Controller
 
         try{
 
-            $validate = $request->validate([
-                'org_log_id' => 'required',
+            $validated = $validate = $request->validate([
+                'id' => 'required|exists:events,id',
                 'name' => 'required'
             ]);
             
+            $data = Event::find($validated['id']);
+
             $exist = Event::where('name',$validate['name'])
-                            ->where('org_log_id',$validate['org_log_id'])
+                            ->where('org_log_id',$data->org_log_id)
                             ->exists();
             if($exist) {
     
@@ -121,13 +189,11 @@ class EventController extends Controller
                 ];
     
                 $this->logAPICalls('updateEvent', "", $request->all(), [$response]);
-    
                 return response()->json($response, 422);
     
             }else{
-    
-                $event = Event::find($request->id);
-                $event->update(['name' => $validate['name']]);
+
+                $data ->update(['name' => $validate['name']]);
            
                 $response = [
                           'isSuccess' => true,
@@ -155,6 +221,10 @@ class EventController extends Controller
 
         try{
 
+            $validated = $validate = $request->validate([
+                'id' => 'required|exists:events,id'
+            ]);
+
             $event = Event::find($request->id);
             $event->update(['status' => "I"]);
 
@@ -176,39 +246,6 @@ class EventController extends Controller
 
             $this->logAPICalls('deleteEvent', "", $request->all(), [$response]);
             return response()->json($response, 500);
-        }
-
-    }
-
-    public function getEvent(Request $request){
-
-        try{
-
-            $data = Event::where('status', 'A')
-            ->where('organizational_log_id', $request->organizational_log_id)
-            ->orderBy('created_at', 'desc') 
-            ->take(10)
-            ->get();
-    
-            $response = [
-                'isSuccess' => true,
-                'data' => $data
-            ];
-    
-            $this->logAPICalls('getOrgLog', "", $request->all(), [$response]);
-            return response()->json($response, 200);
-
-        }catch(Throwable $ex){
-
-            $response = [
-                'isSuccess' => false,
-                'message' => "Please contact support.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
-            $this->logAPICalls('getEvent', "", $request->all(), [$response]);
-            return response()->json($response, 500);
-
         }
 
     }
@@ -238,77 +275,24 @@ class EventController extends Controller
         }
     }
 
-    public function searchEvent(Request $request){
-        try{
-            
-            $query = $request->input('query');
-            $academic_year = $request->input('academic_year');
-            $org_id = $request->input('org_log_id');
-
-            if(!empty($query) && empty($academic_year) ){
-
-                $results = Event::where('org_log_id', $org_id)
-                ->when($query, function ($q) use ($query) {
-                    return $q->where(function ($queryBuilder) use ($query) {
-                        $queryBuilder->where('name', 'LIKE', "%{$query}%");
-                    });
-                })->get();
-
-                $response = [
-                    'isSuccess' => true,
-                    'results' => $results
-                ];
-
-        
-            }elseif(empty($query) && !empty($academic_year)){
-
-                $results = Event::where('organizational_log_id', $org_id)
-                                ->where('academic_year',$academic_year)
-                                ->get();
-
-                $response = [
-                    'isSuccess' => true,
-                    'results' => $results
-                ];
-
-            }else{
-
-                $results = Event::where('org_log_id', $org_id)
-                                ->where('academic_year', $academic_year)
-                ->when($query, function ($q) use ($query) {
-                    return $q->where(function ($queryBuilder) use ($query) {
-                        $queryBuilder->where('name', 'LIKE', "%{$query}%");
-                    });
-                })->get();
-
-                $response = [
-                    'isSuccess' => true,
-                    'results' => $results
-                ];
-
-            }
-            
-             // $this->logAPICalls('searchEvent', "",$request->all(), [$response]);
-            return response()->json($response);
-
-        }catch(Exception $e){
-            $response = [
-                'isSuccess' => false,
-                'message' => "Search failed. Please try again later.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
-            $this->logAPICalls('searchEvent', "", $request->all(), [$response]);
-            return response()->json($response, 500);
-        }
-    }
-
     public function viewEvent(Request $request){
 
         try{
+            $validated = $request->validate([
+                'id' => 'required|exists:events'
+            ]);
 
             $data = Event::find($request->id);
-            return $data;
+
+            $response = [
+                'isSuccess' => true,
+                'message' => "Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+           ];
+
+            $this->logAPICalls('viewEvent', "", $request->all(), [$response]);
+            return response()->json($response);
+       
 
         }catch(Exception $e){
             
@@ -324,7 +308,6 @@ class EventController extends Controller
         }
     }
     
-
     public function getEventID($name,$descrip,$acadyear,$submdate){
         $event= Event::where('name',$name)
                       ->where('description',$descrip)
@@ -334,7 +317,6 @@ class EventController extends Controller
 
         return $event->first()->id;
     }
-
 
     public function isExist($validate){
 

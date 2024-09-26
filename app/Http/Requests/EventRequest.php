@@ -24,13 +24,26 @@ class EventRequest extends FormRequest
     public function rules()
     {
         
+        $currentYear = now()->format('Y');
+
         return [
-            'org_log_id' => ['required'],
+            'org_log_id' => ['required', 'exists:organizational_logs,id'],
             'name' => ['required'],
             'description' => ['required'],
-            'academic_year' => ['required'],
-            'submission_date' => ['required']
+            'academic_year' => [
+                'required',
+                'string',
+                'regex:/^' . $currentYear . '-\d{4}$/',
+            ],
+            'submission_date' => [
+                'required',
+                'string',
+                'date_format:F j Y', 
+                'after_or_equal:' . now()->format('F j Y') 
+            ]
         ];
+        
+        
 
     }
 }

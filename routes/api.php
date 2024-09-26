@@ -9,7 +9,11 @@ use App\Http\Controllers\RequestController;
 use App\Http\Controllers\OrgController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\OrgLogController;
-use App\Http\Controllers\userlistController;
+use App\Http\Controllers\EventController;
+use App\Http\Controllers\RequirementController;
+use App\Http\Controllers\FileRequirementController;
+use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\ProgramController;
 
 
 
@@ -61,27 +65,10 @@ Route::post('/sample',function(Request $request){
 });
 
 
-Route::controller(BaseController::class)->group(function () {
-Route::post('createCustomer', 'createCustomer');
-Route::post('createCustomer', 'updateCustomer');
-Route::get('getUsers', 'getUsers');
-
-});
-//create acc///
-Route::controller(AccountController::class)->group(function () {
-   
-    Route::get('getAccounts', 'getAccounts');
-    Route::post('searchAccount', 'searchAccount');
-    Route::post('createAccoount', 'createAccount');
-    Route::post('editAccount','editAccount');
-    Route::post('/updateAccoount/{id}', 'updateAccount');
-    Route::post('deleteAccount','deleteAccount');
-    
-});
 
 Route::controller(OrgLogController::class)->group(function () {
 
-    Route::get('getOrgLog','getOrgLog');
+    Route::post('getOrgLog','getOrgLog');
     Route::post('storeOrgLog','storeOrgLog');
     Route::post('editOrgLog','editOrgLog');
     Route::post('updateOrgLog','updateOrgLog');
@@ -90,35 +77,49 @@ Route::controller(OrgLogController::class)->group(function () {
   
 });
 
+Route::controller(ProgramController::class)->group(function () {
 
+    Route::post('getProgram','getProgram');
 
-
-
-
-
-
-//Route::controller(RequestController::class)->group(function () {
-  //  Route::get('/','index');
- //   Route::post('searchAccount', 'searchAccount');
-    //  Route::post('createRequest', 'storeRequest');
-  //  Route::post('updateAccoount/{account}', 'updateAccount');
-   // Route::post('deleteAccount/{account}','deleteAccount');
-    
-//});
-
-
-
-Route::controller(OrgController::class)->group(function () {
-
-      Route::post('storeOrg', 'storeOrg');
-    
 });
 
+Route::controller(EventController::class)->group(function () {
 
-Route::controller(RoleController::class)->group(function () {
-
-    Route::post('storeRole', 'storeRole');
+    Route::post('getEvent','getEvent');
+    Route::get('getAcademicYear','getAcademicYear');
+    Route::post('viewEvent','viewEvent');
+    Route::post('storeEvent','storeEvent');
+    Route::post('editEvent','editEvent');
+    Route::post('updateEvent','updateEvent');
+    Route::post('deleteEvent','deleteEvent');
+    Route::post('searchEvent','searchEvent');
   
 });
+
+Route::controller(RequirementController::class)->group(function () {
+
+    Route::post('getRequirement','getRequirement');
+    Route::post('deleteRequirement','deleteRequirement');
+});
+
+Route::controller(FileRequirementController::class)->group(function () {
+
+    Route::post('getFileRequirement','getFileRequirement');
+    Route::post('storeFileRequirement','storeFileRequirement');
+    Route::post('storeFolderRequirement','storeFolderRequirement');
+    Route::post('downloadFileRequirement','downloadFileRequirement');    
+  
+});
+
+Route::controller(ConversationController::class)->group(function () {
+    Route::post('storeConverstation','storeConverstation');
+    Route::post('getConvesation','getConvesation');
+});
+
+
+
+
+
+
 
 

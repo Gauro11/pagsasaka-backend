@@ -24,10 +24,9 @@ class requestUser extends FormRequest
     public function rules()
     {
         return [
-            'ID_Account' => ['required'],
+            'account_id' => ['required'],
             'purpose' => ['required'],
-            'date_requested' => ['required'],
-            'status' => ['required']
+            'files' => ['required','array']
         ];
     }
 }
