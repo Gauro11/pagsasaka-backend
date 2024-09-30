@@ -10,8 +10,9 @@ use App\Models\Program;
 use App\Models\ApiLog;
 use App\Models\AcademicYear;
 use App\Models\OrganizationalLog;
-
+use Throwable;
 use App\Http\Requests\EventRequest;
+use Exception;
 
 class EventController extends Controller
 {
@@ -49,7 +50,7 @@ class EventController extends Controller
             $this->logAPICalls('getEvent', "", $request->all(), [$response]);
             return response()->json($data);
             
-        }catch(Throwable $ex){
+        }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
@@ -217,96 +218,124 @@ class EventController extends Controller
         
     }
 
-    public function deleteEvent(Request $request){
-
-        try{
-
-            $validated = $validate = $request->validate([
+    public function deleteEvent(Request $request)
+    {
+        try {
+            // Validate the incoming request
+            $validated = $request->validate([
                 'id' => 'required|exists:events,id'
             ]);
-
+    
+            // Find the event by ID
             $event = Event::find($request->id);
-            $event->update(['status' => "I"]);
-
+    
+            // Check if the event exists (although validation should handle this)
+            if (!$event) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => "Event not found."
+                ], 404);
+            }
+    
+            // Hard delete the event from the database
+            $event->delete();
+    
+            // Return success response
             $response = [
                 'isSuccess' => true,
-                'message' => "Successfully deleted."
+                'message' => "Event successfully deleted."
             ];
-
+    
+            // Log API call
             $this->logAPICalls('deleteEvent', "", $request->all(), [$response]);
+    
             return response()->json($response);
-
-        }catch(Exception $e){
-
+    
+        } catch (Exception $e) {
+            // Handle exceptions
             $response = [
                 'isSuccess' => false,
                 'message' => "Unsuccessfully deleted. Please try again.",
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
+            ];
+    
             $this->logAPICalls('deleteEvent', "", $request->all(), [$response]);
+    
             return response()->json($response, 500);
         }
-
     }
+    
 
-    public function getAcademicYear(){
-        try{
+    public function getAcademicYear() {
+        try {
             $data = AcademicYear::all();
             $response = [
                 'isSuccess' => true,
                 'data' => $data
             ];
     
-            $this->logAPICalls('getAcademicYear', "", [], [$response]);
+            $this->logAPICalls('getAcademicYear', "", [], [$response]);  // No $request data needed here
             return response()->json($response, 200);
-
-        }catch(Throwable $ex){
-
+    
+        } catch (Exception $e) {  // Use Exception instead of Throwable for consistency
+    
             $response = [
                 'isSuccess' => false,
                 'message' => "Please contact support.",
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
-            $this->logAPICalls('getAcademicYear', "", $request->all(), [$response]);
+            ];
+    
+            // Removed the undefined $request variable
+            $this->logAPICalls('getAcademicYear', "", [], [$response]);
             return response()->json($response, 500);
-
         }
     }
+    
 
-    public function viewEvent(Request $request){
-
-        try{
+    public function viewEvent(Request $request) {
+        try {
+            // Validate the incoming request
             $validated = $request->validate([
-                'id' => 'required|exists:events'
+                'id' => 'required|exists:events,id'  // Ensure the event ID exists in validation
             ]);
-
-            $data = Event::find($request->id);
-
+    
+            // Fetch only the specified fields from the event
+            $eventData = Event::where('id', $request->id)
+                ->select('name', 'org_log_id', 'description', 'academic_year', 'submission_date')
+                ->first();
+    
+            if (!$eventData) {
+                // Return response if the event is not found (shouldn't happen due to validation)
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => "Event not found."
+                ], 404);
+            }
+    
+            // Success response with the selected fields
             $response = [
                 'isSuccess' => true,
-                'message' => "Please contact support.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
+                'data' => $eventData  // Return the event data with the specified fields
+            ];
+    
+            // Log the API call
             $this->logAPICalls('viewEvent', "", $request->all(), [$response]);
             return response()->json($response);
-       
-
-        }catch(Exception $e){
-            
+    
+        } catch (Exception $e) {
+            // Handle the exception and return an error response
             $response = [
                 'isSuccess' => false,
-                'message' => "Please contact support.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
+                'message' => "An unexpected error occurred. Please contact support.",
+                'error' => $e->getMessage()  // Return the actual error message
+            ];
+    
+            // Log the API call with the error response
             $this->logAPICalls('viewEvent', "", $request->all(), [$response]);
             return response()->json($response, 500);
-
         }
     }
+    
     
     public function getEventID($name,$descrip,$acadyear,$submdate){
         $event= Event::where('name',$name)
@@ -339,10 +368,12 @@ class EventController extends Controller
                 'api_response' =>  json_encode($resp)
             ]);
         }
-        catch(Throwable $ex){
+        catch(Throwable $e){
             return false;
         }
         return true;
     }
 
 }
+
+
