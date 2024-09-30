@@ -122,7 +122,7 @@ class AccountController extends Controller
         try {
          // perpage = $request->input('per_page' 10)
           //  userAccounts =Account::paginate
-            $Accounts = Account::select('id', 'name', 'email', 'role', 'status', 'org_log_id',)
+            $Accounts = Account::select( 'name', 'email', 'role', 'status', 'org_log_id',)
             ->get();
             $response = [
                 'isSuccess' => true,
@@ -145,51 +145,60 @@ class AccountController extends Controller
 
     /**
      * Update an existing user account.
-     */
+     */ 
     public function updateAccount(Request $request, $id)
-    {
-        try {
-            $Account = Account::findOrFail($id);
+{
+    try {
+        $account = Account::findOrFail($id);
 
-            $validator = Account::validateAccount($request->all());
+        // Define validation rules
+        $rules = [
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255', // Change here to make email optional
+            'role' => 'required|string',
+            'org_log_id' => 'required|integer',
+            
+        ];
 
-            if ($validator->fails()) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors()
-                ];
-                $this->logAPICalls('updateAccount', $id, $request->all(), $response);
-                return response()->json($response, 422);
-            }
+        // Validate the request
+        $validator = Validator::make($request->all(), $rules);
 
-            $Account->update([
-              'name' => $request->name,
-                'email' => $request->email,
-                'role' => $request->role,
-                'org_log_id' => $request->org_log_id,
-                'password' => Hash::make($request->password),
-               
-            ]);
-
-            $response = [
-                'isSuccess' => true,
-                'message' => 'Account successfully updated.',
-                'data' => $Account
-            ];
-            $this->logAPICalls('updateAccount', $id, $request->all(), $response);
-            return response()->json($response, 200);
-        }
-        catch (Throwable $e) {
+        if ($validator->fails()) {
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to update the Account.',
-                'error' => $e->getMessage()
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors()
             ];
             $this->logAPICalls('updateAccount', $id, $request->all(), $response);
-            return response()->json($response, 500);
+            return response()->json($response, 422);
         }
+
+        // Update account details, only update fields that are present in the request
+        $account->update(array_filter([
+            'name' => $request->name,
+            'email' => $request->email,
+            'role' => $request->role,
+            'org_log_id' => $request->org_log_id,
+            'password' => $request->password ? Hash::make($request->password) : null, // Hash password only if provided
+        ]));
+
+        $response = [
+            'isSuccess' => true,
+            'message' => 'Account successfully updated.',
+            'data' => $account
+        ];
+        $this->logAPICalls('updateAccount', $id, $request->all(), $response);
+        return response()->json($response, 200);
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => 'Failed to update the Account.',
+            'error' => $e->getMessage()
+        ];
+        $this->logAPICalls('updateAccount', $id, $request->all(), $response);
+        return response()->json($response, 500);
     }
+}
 
     /**
      * Delete a user account.
@@ -198,15 +207,18 @@ class AccountController extends Controller
     {
         try {
             $userAccount = Account::findOrFail($id);
-
+    
             $userAccount->delete();
-
+    
             $response = [
                 'isSuccess' => true,
                 'message' => 'Account successfully deleted.'
             ];
+    
             $this->logAPICalls('deleteUserAccount', $id, [], $response);
-            return response()->json($response, 204);
+    
+            // Use 200 status to return the response with a message
+            return response()->json($response, 200);
         }
         catch (Throwable $e) {
             $response = [
@@ -214,10 +226,12 @@ class AccountController extends Controller
                 'message' => 'Failed to delete the Account.',
                 'error' => $e->getMessage()
             ];
+    
             $this->logAPICalls('deleteAccount', $id, [], $response);
             return response()->json($response, 500);
         }
     }
+    
 
     /**
      * Log all API calls.
@@ -238,4 +252,32 @@ class AccountController extends Controller
         }
         return true;
     }
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+   /* public function __construct(Request $request)
+    {
+        // Retrieve the authenticated user
+        $user = $request->user();
+
+        // Apply middleware based on the user type
+        if ($user && $user->user_type === 'Admin') {
+            $this->middleware('UserTypeAuth:Admin')->only(['createAccount', 'createAccount']);
+        }
+
+        if ($user && $user->user_type === 'Programchair') {
+            $this->middleware('UserTypeAuth:Progamchair')->only(['updateAccount','getAccounts']);
+        }
+
+        if ($user && $user->user_type === 'Head') {
+            $this->middleware('UserTypeAuth:Head')->only(['updateReview','getReviews']);
+        }
+
+        if ($user && $user->user_type === 'Dean') {
+            $this->middleware('UserTypeAuth:Dean')->only(['updateReview','getReviews']);
+        }
+
+        if ($user && $user->user_type === 'Staff') {
+            $this->middleware('UserTypeAuth:Staff')->only(['getReviews']);
+        }
+    }*/
 }

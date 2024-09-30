@@ -62,7 +62,7 @@ class AuthController extends Controller
                         'isScucces' => true,
                         'message' => ucfirst($user->role) . ' logged in successfully',
                         'token' => $token,
-                        'user' => $user->only(['id', 'email']),
+                        'user' => $user->only(['org_log_id', 'email']),
                         'role' => $user->role,
                         'session' => $sessionResponse->getData(),
                     ];
@@ -94,14 +94,12 @@ public function logout(Request $request)
 {
     try {
         $user = $request->user();  // Get the authenticated user
-
+       // return $user;
         if ($user) {
-            Log::info('User logging out:', ['name' => $user->email]);
-
             // Find the latest session for this user with a null logout_date
             $session = Session::where('user_id', $user->id)
-                              ->whereNull('logout_date') // Find session where logout hasn't been set
-                              ->latest()  // Get the latest session
+                              ->whereNull('logout_date') 
+                              ->latest()  
                               ->first();
 
             if ($session) {
@@ -150,7 +148,7 @@ public function logout(Request $request)
                 'logout_date' => null 
             ]);
 
-            return response()->json([ 'message' => 'Session successfully created.', 'session_code' => $sessionCode], 201);
+            return response()->json([  'session_code' => $sessionCode], 201);
 
         } catch (Throwable $e) {
             return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.', 'error' => $e->getMessage()], 500);
@@ -158,11 +156,6 @@ public function logout(Request $request)
     }
 
     
-  
-
-
-   
-
     
 
 //////password reset////////

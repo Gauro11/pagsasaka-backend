@@ -56,14 +56,14 @@ Route::controller(AccountController::class)->group(function () {
     Route::get('getAccounts', 'getAccounts');
     Route::post('searchAccount', 'searchAccount');
     Route::post('createAccoount', 'createAccount');
-    Route::post('editAccount','editAccount');
+   // Route::post('editAccount','editAccount');
     Route::post('/updateAccoount/{id}', 'updateAccount');
-    Route::post('deleteAccount','deleteAccount');
+    Route::post('deleteAccount/{id}','deleteAccount');
     
 });
 
+Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
-Route::middleware('auth:sanctum')->post('/logout/{id}', [AuthController::class, 'logout']);
 
 
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
