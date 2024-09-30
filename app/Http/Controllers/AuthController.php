@@ -59,7 +59,7 @@ class AuthController extends Controller
     
                    
                     $response = [
-                        'isScucces' => true,
+                        'isSuccess' => true,
                         'message' => ucfirst($user->role) . ' logged in successfully',
                         'token' => $token,
                         'user' => $user->only(['org_log_id', 'email']),
@@ -102,7 +102,7 @@ public function logout(Request $request)
                               ->latest()  
                               ->first();
 
-            if ($session) {
+           if ($session) {
                 // Update the session with the current logout date
                 $session->update([
                     'logout_date' => Carbon::now()->toDateTimeString(), // Set logout date to current time
