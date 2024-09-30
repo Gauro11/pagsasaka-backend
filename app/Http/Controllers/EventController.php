@@ -294,7 +294,7 @@ class EventController extends Controller
 
     public function viewEvent(Request $request) {
         try {
-            // Validate the incoming request
+            
             $validated = $request->validate([
                 'id' => 'required|exists:events,id'  // Ensure the event ID exists in validation
             ]);
@@ -305,14 +305,14 @@ class EventController extends Controller
                 ->first();
     
             if (!$eventData) {
-                // Return response if the event is not found (shouldn't happen due to validation)
+              
                 return response()->json([
                     'isSuccess' => false,
                     'message' => "Event not found."
                 ], 404);
             }
     
-            // Success response with the selected fields
+          
             $response = [
                 'isSuccess' => true,
                 'data' => $eventData  // Return the event data with the specified fields
