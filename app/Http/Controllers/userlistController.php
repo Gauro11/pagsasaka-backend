@@ -7,7 +7,7 @@ use App\Models\listofuser;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
 use App\Models\ApiLog;
-
+/*
 class userlistController extends Controller
 {
     // Log API calls
@@ -28,7 +28,7 @@ class userlistController extends Controller
 
     /**
       create user
-     */
+     
     public function create(Request $request)
     {
         try {
@@ -224,4 +224,4 @@ public function searchuser(Request $request)
         return response()->json($response, 500);
     }
 }
-}
+}*/

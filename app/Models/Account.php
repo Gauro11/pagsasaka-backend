@@ -32,7 +32,7 @@ class Account extends Model
             'email' => ['required', 'email', 'unique:accounts,email'],
             'role' => ['required',  ],
             'password',
-            'org_log_id' => ['required',  ],
+            'org_log_id' => ['required',],
            
         ]);
 
