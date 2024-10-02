@@ -7,9 +7,8 @@ use App\Models\OrganizationalLog;
 use App\Models\ApiLog;
 use App\Models\Program;
 use App\Http\Requests\OrgLogRequest;
-use Throwable;  
-use Exception; 
-
+use Throwable;
+use Illuminate\Validation\ValidationException;
 
 class OrgLogController extends Controller
 {
@@ -20,6 +19,7 @@ class OrgLogController extends Controller
 
             $items = 10;
 
+            // Validation
             $validate = $request->validate([
                 'org_id' => 'required'
             ]);
@@ -29,34 +29,33 @@ class OrgLogController extends Controller
           
             $search = $request->input('search'); 
 
+            // Query building
             $query = OrganizationalLog::where('status', 'A')
                 ->where('org_id', $request->org_id);
 
+            // Search filter
             if (!empty($search)) {
                 $query->where(function($q) use ($search) {
                     $q->where('name', 'LIKE', "%{$search}%")
-                    ->orWhere('acronym', 'LIKE', "%{$search}%");
+                      ->orWhere('acronym', 'LIKE', "%{$search}%");
                 });
             }
 
-
-            if ($request->org_id == "3") {
-
-                $data = $query->with(['programs:program_entity_id,college_entity_id']) 
-                    ->orderBy('created_at', 'desc') 
+            // Custom handling for org_id == 3
+            if ($request->org_id == 3) { // Ensure org_id is integer
+                $data = $query->with(['programs:program_entity_id,college_entity_id'])
+                    ->orderBy('created_at', 'desc')
                     ->paginate($perPage);
-                
-                     // manipulate the respose to get the name of college.
 
+                // Manipulate the response to get the name of the college.
                 $data->getCollection()->transform(function ($item) {
                     foreach ($item->programs as $program) {
                         $college = OrganizationalLog::find($program->college_entity_id);
-                        $program->college_name = $college ? $college->name : null; 
+                        $program->college_name = $college ? $college->name : null;
                     }
                     return $item;
                 });
             } else {
-
                 $data = $query->orderBy('created_at', 'desc')->paginate($perPage);
             }
 
@@ -73,13 +72,11 @@ class OrgLogController extends Controller
                 'isSuccess' => false,
                 'message' => "Please contact support.",
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
+            ];
 
             $this->logAPICalls('getOrgLog', "", $request->all(), [$response]);
             return response()->json($response, 500);
-
         }
-    
     }
 
     public function storeOrgLog(OrgLogRequest $request){
@@ -120,15 +117,14 @@ class OrgLogController extends Controller
                                              ->where('acronym',$validate['acronym'])->exists();
            }
 
-            if ($exists) {
+        if ($exists) {
 
                 $response = [
-                    'isSuccess'=> false,
-                    'message'=> 'The organization you are trying to register already exists. Please verify your input and try again.'
+                    'isSuccess' => false,
+                    'message' => 'The organization you are trying to register already exists. Please verify your input and try again.'
                 ];
 
                 $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
-
                 return response()->json($response, 422);
 
             }else{
@@ -156,7 +152,7 @@ class OrgLogController extends Controller
                 $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
                 return response()->json($response);
             }
-
+        }
              
          }catch (Throwable $e) {
  
@@ -170,6 +166,7 @@ class OrgLogController extends Controller
              return response()->json($response, 500);
  
          }
+        
 
     }
 
@@ -315,25 +312,23 @@ class OrgLogController extends Controller
           
             $response = [
                 'isSuccess' => true,
-                'message' => "Successfully deleted."
+                'message' => "Successfully created."
             ];
 
-            $this->logAPICalls('deleteOrgLog', "", $request->all(), [$response]);
+            $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
             return response()->json($response);
 
         }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
-                'message' => "Unsuccessfully deleted. Please try again.",
+                'message' => "Unsuccessfully created. Please check your inputs.",
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
+            ];
 
-            $this->logAPICalls('deleteOrgLog', "", $request->all(), [$response]);
+            $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
             return response()->json($response, 500);
-
         }
-        
     }
 
     public function isExist($validate){
@@ -356,6 +351,10 @@ class OrgLogController extends Controller
                          return true;}
           }     
 
+        Program::create([
+            'program_entity_id' => $program->id,
+            'college_entity_id' => $college_id
+        ]);
     }
     
     
@@ -376,20 +375,17 @@ class OrgLogController extends Controller
 
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp)
     {
-        try
-        {
+        try {
             ApiLog::create([
                 'method_name' => $methodName,
                 'user_id' => $userId,
-                'api_request' =>  json_encode($param),
-                'api_response' =>  json_encode($resp)
+                'api_request' => json_encode($param),
+                'api_response' => json_encode($resp)
             ]);
-        }
-        catch(Throwable $ex){
+        } 
+        catch (Throwable $ex) {
             return false;
         }
         return true;
     }
-
-
-}
+    }

@@ -10,8 +10,9 @@ use App\Models\Program;
 use App\Models\ApiLog;
 use App\Models\AcademicYear;
 use App\Models\OrganizationalLog;
-
+use Throwable;
 use App\Http\Requests\EventRequest;
+use Exception;
 
 class EventController extends Controller
 {
@@ -84,7 +85,7 @@ class EventController extends Controller
             $this->logAPICalls('getEvent', "", $request->all(), [$response]);
             return response()->json($data);
             
-        }catch(Throwable $ex){
+        }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
@@ -304,31 +305,46 @@ class EventController extends Controller
             $validated = $validate = $request->validate([
                 'id' => 'required|exists:events,id'
             ]);
-
+    
+            // Find the event by ID
             $event = Event::find($request->id);
-            $event->update(['status' => "I"]);
-
+    
+            // Check if the event exists (although validation should handle this)
+            if (!$event) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => "Event not found."
+                ], 404);
+            }
+    
+            // Hard delete the event from the database
+            $event->delete();
+    
+            // Return success response
             $response = [
                 'isSuccess' => true,
-                'message' => "Successfully deleted."
+                'message' => "Event successfully deleted."
             ];
-
+    
+            // Log API call
             $this->logAPICalls('deleteEvent', "", $request->all(), [$response]);
+    
             return response()->json($response);
-
-        }catch(Exception $e){
-
+    
+        } catch (Exception $e) {
+            // Handle exceptions
             $response = [
                 'isSuccess' => false,
                 'message' => "Unsuccessfully deleted. Please try again.",
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
+            ];
+    
             $this->logAPICalls('deleteEvent', "", $request->all(), [$response]);
+    
             return response()->json($response, 500);
         }
-
     }
+    
 
     // DONE //
     public function getAcademicYear(){
@@ -339,22 +355,23 @@ class EventController extends Controller
                 'data' => $data
             ];
     
-            $this->logAPICalls('getAcademicYear', "", [], [$response]);
+            $this->logAPICalls('getAcademicYear', "", [], [$response]);  // No $request data needed here
             return response()->json($response, 200);
-
-        }catch(Throwable $ex){
-
+    
+        } catch (Exception $e) {  // Use Exception instead of Throwable for consistency
+    
             $response = [
                 'isSuccess' => false,
                 'message' => "Please contact support.",
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
-            $this->logAPICalls('getAcademicYear', "", $request->all(), [$response]);
+            ];
+    
+            // Removed the undefined $request variable
+            $this->logAPICalls('getAcademicYear', "", [], [$response]);
             return response()->json($response, 500);
-
         }
     }
+    
 
     // DONE //
     public function viewEvent(Request $request){
@@ -394,19 +411,18 @@ class EventController extends Controller
 
             $this->logAPICalls('viewEvent', "", $request->all(), [$response]);
             return response()->json($response);
-       
-
-        }catch(Exception $e){
-            
+    
+        } catch (Exception $e) {
+            // Handle the exception and return an error response
             $response = [
                 'isSuccess' => false,
-                'message' => "Please contact support.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
-
+                'message' => "An unexpected error occurred. Please contact support.",
+                'error' => $e->getMessage()  // Return the actual error message
+            ];
+    
+            // Log the API call with the error response
             $this->logAPICalls('viewEvent', "", $request->all(), [$response]);
             return response()->json($response, 500);
-
         }
     }
     
@@ -446,10 +462,12 @@ class EventController extends Controller
                 'api_response' =>  json_encode($resp)
             ]);
         }
-        catch(Throwable $ex){
+        catch(Throwable $e){
             return false;
         }
         return true;
     }
 
 }
+
+

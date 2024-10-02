@@ -50,8 +50,8 @@ class AuthController extends Controller
                             break;
                         default:
                             $response = ['message' => 'Unauthorized'];
-                            $this->logAPICalls('login', $request->email, $request->all(), $response); 
-                            return response()->json($response, 403);
+                            $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
+                            return response()->json($response, 500);
                     }
     
                 
@@ -59,25 +59,26 @@ class AuthController extends Controller
     
                    
                     $response = [
+                        'isSuccess' => true,
                         'message' => ucfirst($user->role) . ' logged in successfully',
                         'token' => $token,
-                        'user' => $user->only(['id', 'email']),
+                        'user' => $user->only(['org_log_id', 'email']),
                         'role' => $user->role,
                         'session' => $sessionResponse->getData(),
                     ];
-                    $this->logAPICalls('login', $user->id, $request->all(), $response); 
+                    $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                     return response()->json($response, 200);
     
                 } else {
                     
                     $response = ['message' => 'Invalid credentials'];
-                    $this->logAPICalls('login', $request->email, $request->all(), $response); 
-                    return response()->json($response, 401); 
+                    $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
+                    return response()->json($response, 500); 
                 }
             } else {
                 $response = ['message' => 'Invalid credentials'];
-                $this->logAPICalls('login', $request->email, $request->all(), $response);
-                return response()->json($response, 401); 
+                $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
+                return response()->json($response, 500); 
             }
         } catch (Throwable $e) {
             $response = [
@@ -93,17 +94,15 @@ public function logout(Request $request)
 {
     try {
         $user = $request->user();  // Get the authenticated user
-
+       // return $user;
         if ($user) {
-            Log::info('User logging out:', ['name' => $user->email]);
-
             // Find the latest session for this user with a null logout_date
             $session = Session::where('user_id', $user->id)
-                              ->whereNull('logout_date') // Find session where logout hasn't been set
-                              ->latest()  // Get the latest session
+                              ->whereNull('logout_date') 
+                              ->latest()  
                               ->first();
 
-            if ($session) {
+           if ($session) {
                 // Update the session with the current logout date
                 $session->update([
                     'logout_date' => Carbon::now()->toDateTimeString(), // Set logout date to current time
@@ -118,7 +117,7 @@ public function logout(Request $request)
             return response()->json($response, 200);
         }
 
-        return response()->json(['message' => 'Unauthenticated'], 401);
+        return response()->json(['message' => 'Unauthenticated'], 500);
     } catch (Throwable $e) {
         return response()->json([
             'message' => 'Failed to log out',
@@ -126,9 +125,6 @@ public function logout(Request $request)
         ], 500);
     }
 }
-
-
-    
 
     // Method to insert session
     public function insertSession(Request $request)
@@ -149,30 +145,23 @@ public function logout(Request $request)
                 'logout_date' => null 
             ]);
 
-            return response()->json(['isSuccess' => true, 'message' => 'Session successfully created.', 'session_code' => $sessionCode], 201);
+            return response()->json([  'session_code' => $sessionCode], 200);
 
         } catch (Throwable $e) {
             return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.', 'error' => $e->getMessage()], 500);
         }
     }
 
-    
-  
 
+//////password change////////
 
-   
-
-    
-
-//////password reset////////
-
-    public function resetPassword(Request $request)
+public function changePassword(Request $request)
 {
     try {
         // Validate the request
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'new_password' => 'required|min:8',
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed', // 'new_password_confirmation' should match 'new_password'
         ]);
 
         if ($validator->fails()) {
@@ -181,32 +170,35 @@ public function logout(Request $request)
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
             ];
-            $this->logAPICalls('resetPassword', null, $request->all(), $response);
-            return response()->json($response, 422);
+            $this->logAPICalls('changePassword', null, $request->all(), $response);
+            return response()->json($response, 500);
         }
 
-        // Find the user by email
-        $user = Account::where('email', $request->email)->first();
+        // Find the user by email and get only specific fields
+        $user = Account::select('name', 'email', 'org_log_id')->where('email', $request->email)->first();
 
         if (!$user) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'User not found.',
             ];
-            $this->logAPICalls('resetPassword', null, $request->all(), $response);
-            return response()->json($response, 404);
+            $this->logAPICalls('changePassword', null, $request->all(), $response);
+            return response()->json($response, 500);
         }
 
-        // Update the password
-        $user->password = Hash::make($request->new_password);
-        $user->save();
+       
+        // You can either retrieve the full user again or use the email to update the password
+        $fullUser = Account::where('email', $request->email)->first();
+        $fullUser->password = Hash::make($request->new_password);
+        $fullUser->save();
 
-        // Successful response
+        // Return the selected fields in the response
         $response = [
             'isSuccess' => true,
             'message' => 'Password reset successfully.',
+            'user' => $user 
         ];
-        $this->logAPICalls('resetPassword', $user->id, $request->all(), $response);
+        $this->logAPICalls('resetPassword', $fullUser->id, $request->all(), $response);
         return response()->json($response, 200);
 
     } catch (Throwable $e) {
@@ -220,6 +212,9 @@ public function logout(Request $request)
         return response()->json($response, 500);
     }
 }
+
+  
+   
 
     // Method to log API calls
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)

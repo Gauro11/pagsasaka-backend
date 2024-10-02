@@ -18,7 +18,7 @@ class Account extends Model
             'email',
             'role',
             'password',
-            'organization_id'
+            'org_log_id'
             
         ];
         public static function validateAccount($data)
@@ -32,7 +32,7 @@ class Account extends Model
             'email' => ['required', 'email', 'unique:accounts,email'],
             'role' => ['required',  ],
             'password',
-            'org_log_id' => ['required',  ],
+            'org_log_id' => ['required',],
            
         ]);
 

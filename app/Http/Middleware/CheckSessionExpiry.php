@@ -54,7 +54,7 @@ class CheckSessionExpiry
     }
 
     // Proceed with the request if the session is valid
-    return $next($request);
-}
+    return $next($request); 
+} 
     }
 
