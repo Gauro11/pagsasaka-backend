@@ -110,14 +110,12 @@ class OrgLogController extends Controller
                     $exists =false;
                 }
 
-              
-        
            }else{
                 $exists =  OrganizationalLog::where('name',$validate['name'])
                                              ->where('acronym',$validate['acronym'])->exists();
            }
 
-        if ($exists) {
+            if ($exists) {
 
                 $response = [
                     'isSuccess' => false,
@@ -152,11 +150,11 @@ class OrgLogController extends Controller
                 $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
                 return response()->json($response);
             }
-        }
              
          }catch (Throwable $e) {
  
              $response = [
+
                  'isSuccess' => false,
                  'message' => "Unsucessfully created. Please check your inputs.",
                  'error' => 'An unexpected error occurred: ' . $e->getMessage()
@@ -180,10 +178,9 @@ class OrgLogController extends Controller
                 'acronym' => 'required',
                 'college_entity_id' => 'nullable'
             ]);
-            
-
+        
             if ($this->isExist($validate)) {
-    
+            
                 $response = [
                     'isSuccess'=> false,
                     'message'=> 'The organization you are trying to update already exists. Please verify your input and try again.'
@@ -194,19 +191,21 @@ class OrgLogController extends Controller
                 return response()->json($response, 422);
     
             }else{
-    
+                
                 $organization = OrganizationalLog::find($request->id);
 
                 if($organization->org_id == "3"){
 
-             
+                   
                     $program = Program::where('program_entity_id',$organization->id)->first();
 
                      $organization->update([
                         'name' => $validate['name'],
                         'acronym' => $validate['acronym']
                      ]);
-                     $program->update([
+
+
+                    $program->update([
                         'college_entity_id' => $validate['college_entity_id']
                      ]);
 
@@ -332,7 +331,7 @@ class OrgLogController extends Controller
     }
 
     public function isExist($validate){
-         
+        
         $data = OrganizationalLog::where('id',$validate['id'])->get();
 
           
@@ -343,18 +342,18 @@ class OrgLogController extends Controller
                 ->exists();
 
           }else{
+           
             if (OrganizationalLog::where('name', $validate['name'])
             ->where('acronym', $validate['acronym'])
             ->exists() && Program::where('program_entity_id',$validate['id'])
                      ->where('college_entity_id',$validate['college_entity_id'])
                      ->exists() ){
-                         return true;}
+                         return true;
+                        
+                        
+                        }
+         
           }     
-
-        Program::create([
-            'program_entity_id' => $program->id,
-            'college_entity_id' => $college_id
-        ]);
     }
     
     
