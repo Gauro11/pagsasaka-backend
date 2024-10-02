@@ -18,6 +18,7 @@ class CreateOrganizationalLogsTable extends Migration
             $table->string('name');
             $table->string('acronym');
             $table->string('org_id');
+            $table->string('percentage')->nullable();
             $table->string('status')->default('A');
             $table->timestamps();
         });

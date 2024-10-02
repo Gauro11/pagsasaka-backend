@@ -6,10 +6,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Requirement;
 use App\Models\ApiLog;
+use App\Models\OrganizationalLog;
 
 class RequirementController extends Controller
 {
 
+    // DONE //
     public function getRequirement(Request $request){
 
        try{
@@ -20,17 +22,31 @@ class RequirementController extends Controller
             ]);
         
             $query = Requirement::where('event_id', $validated['event_id'])
-                            ->where('status', 'A');
+                            ->where('status', 'A')
+                            ->orderBy('created_at', 'desc');
+
         
             if (!empty($validated['search'])) {
                 $query->where('name', 'like', '%' . $validated['search'] . '%'); 
             }
         
             $data = $query->get();
-            
+            $orglog = OrganizationalLog::where('id',$data->first()->org_log_id)->get();
+
+
             $response = [
                 'isSuccess' => true,
-                'data' => $data
+                'getRequirement' => [
+                    "id" => $data->first()->id,
+                    "event_id" => $data->first()->event_id,
+                    "name" => $data->first()->name,
+                    "org_log_id" => $data->first()->org_log_id,
+                    "org_log_acronym" => $orglog->first()->acronym,
+                    "upload_status" => $data->first()->upload_status,
+                    "status" => $data->first()->status,
+                    "created_at" =>$data->first()->created_at,
+                    "updated_at" => $data->first()->updated_at
+                ]
             ];
         
             $this->logAPICalls('getRequirement', "", $request->all(), [$response]);
@@ -52,6 +68,7 @@ class RequirementController extends Controller
         }
     }
 
+    // DONE //
     public function deleteRequirement(Request $request){
         
         try{
