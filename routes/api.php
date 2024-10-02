@@ -36,36 +36,32 @@ use App\Http\Controllers\ProgramController;
 Route::controller(AuthController::class)->group(function () {
     Route::post('login',  'login');
     Route::post('session',  'insertSession');
-    Route::post('reset-password',  'resetPassword');
-
+    Route::post('change-password',  'changePassword');
     });
+
+    Route::post('/reset-password-to-default', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
+
+
     Route::middleware(['auth:sanctum', 'UserTypeAuth'])->group(function () {
         Route::get('/admin/dashboard', [AuthController::class, 'admin']);
         Route::get('/head/dashboard', [AuthController::class, 'head']);
         Route::get('/programchair/dashboard', [AuthController::class, 'programchair']);
         Route::get('/staff/dashboard', [AuthController::class, 'staff']);
         Route::get('/dean/dashboard', [AuthController::class, 'dean']);
-       
-    
-        // Add more protected routes here
     });
 
     //create acc///
 Route::controller(AccountController::class)->group(function () {
-   
     Route::get('getAccounts', 'getAccounts');
-    Route::post('searchAccount', 'searchAccount');
-    Route::post('createAccoount', 'createAccount');
+   // Route::post('searchAccount', 'searchAccount');
+    Route::post('Add', 'createAccount');
    // Route::post('editAccount','editAccount');
-    Route::post('/updateAccoount/{id}', 'updateAccount');
-    Route::post('deleteAccount/{id}','deleteAccount');
+    Route::post('/updateAccoount', 'updateAccount');
+    Route::post('deleteAccount','deleteAccount');
     
 });
 
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-
-
-
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
 
