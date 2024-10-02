@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Throwable;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\ValidationException;
 
 class AccountController extends Controller
 {
@@ -134,69 +135,49 @@ class AccountController extends Controller
     /**
      * Update an existing user account.
      */ 
-    public function updateAccount(Request $request)
+    public function updateAccount(Request $request, $id)
     {
         try {
-            // Find the account by name instead of ID
-            $account = Account::where('id', $request->id)->first();
+            $Account = Account::findOrFail($id);
     
-            // Check if account exists
-            if (!$account) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Account not found.',
-                ];
-                $this->logAPICalls('updateAccount', null, $request->all(), $response);
-                return response()->json($response, 500);
-            }
+            // Validation will throw a ValidationException automatically if it fails
+            $request->validate([
+                'name' => ['sometimes','required', 'string'],
+                'email' => ['sometimes','required', 'string'],
+                'role' => ['sometimes','required', 'string'],
+                'org_log_id'=> ['sometimes', 'required', 'numeric'],
+                
+            ]);
     
-            // Define validation rules
-            $rules = [
-                'name' => 'required|string|max:255',
-                'email' => 'nullable|email|max:255', 
-                'role' => 'required|string',
-                'org_log_id' => 'required|integer',
-            ];
-    
-            $validator = Validator::make($request->all(), $rules);
-    
-            if ($validator->fails()) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors()
-                ];
-                $this->logAPICalls('updateAccount', $account->id, $request->all(), $response);
-                return response()->json($response, 500);
-            }
-    
-            // Update account details, only update fields that are present in the request
-            $account->update(array_filter([
+            $Account->update([
                 'name' => $request->name,
                 'email' => $request->email,
-                'role' => $request->role,
+                'role' => $request->email,
                 'org_log_id' => $request->org_log_id,
-                'password' => $request->password ? Hash::make($request->password) : null,
-            ]));
+            ]);
+               
+            
     
             $response = [
                 'isSuccess' => true,
-                'message' => 'Account successfully updated.',
-                'account' => $account
+                'message' => "Account successfully updated.",
+                'account' => $Account
             ];
-            $this->logAPICalls('updateAccount', $account->id, $request->all(), $response);
+            $this->logAPICalls('updatemanpower', $id, $request->all(), [$response]);
             return response()->json($response, 200);
     
         } catch (Throwable $e) {
+            // Handle non-validation errors
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to update the Account.',
+                'message' => "Failed to update the Manpower.",
                 'error' => $e->getMessage()
             ];
-            $this->logAPICalls('updateAccount', null, $request->all(), $response);
+            $this->logAPICalls('updatemanpower', "", $request->all(), [$response]);
             return response()->json($response, 500);
         }
     }
+    
     
 
     /**

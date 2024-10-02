@@ -59,7 +59,7 @@ Route::controller(AccountController::class)->group(function () {
    // Route::post('searchAccount', 'searchAccount');
     Route::post('Add', 'createAccount');
    // Route::post('editAccount','editAccount');
-    Route::post('/updateAccoount', 'updateAccount');
+    Route::post('updateAccoounts/{id}', 'updateAccount');
     Route::post('deleteAccount','deleteAccount');
     
 });
