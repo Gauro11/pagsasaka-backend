@@ -21,12 +21,13 @@ class requestUser extends FormRequest
      *
      * @return array
      */
+    
     public function rules()
     {
         return [
-            'account_id' => ['required'],
+            'account_id' => ['required','exists:accounts,id'],
             'purpose' => ['required'],
-            'files' => ['required','array']
+            'files' => ['required']
         ];
     }
 }

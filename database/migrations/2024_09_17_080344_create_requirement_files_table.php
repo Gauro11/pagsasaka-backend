@@ -21,7 +21,8 @@ class CreateRequirementFilesTable extends Migration
             $table->string('size')->nullable();
             $table->string('folder_id')->nullable();
             $table->string('org_log_id');
-            $table->string('role');
+            $table->string('college_entity_id')->nullable();
+          //  $table->string('account_id');
             $table->string('status')->default('A');
             $table->timestamps();
         });

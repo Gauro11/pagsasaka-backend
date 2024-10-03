@@ -17,6 +17,7 @@ class CreateEventsTable extends Migration
             $table->id();
             $table->string('name');
             $table->string('org_log_id');
+            $table->string('college_entity_id')->nullable();
             $table->string('description');
             $table->string('academic_year');
             $table->string('submission_date');
