@@ -17,9 +17,12 @@ class CreateUserRequestsTable extends Migration
             $table->id();
             $table->string('request_no');
             $table->string('account_id');
+            $table->string('org_log_id');
+            $table->string('college_entity_id')->nullable();
             $table->string('role');
             $table->string('purpose');
             $table->string('requested_date');
+            $table->string('files');
             $table->string('status')->default('A');
             $table->timestamps();
         });

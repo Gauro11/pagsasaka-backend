@@ -15,6 +15,8 @@ use App\Http\Controllers\FileRequirementController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\emailcontroller;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ReportController;
 
 Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
 
@@ -35,6 +37,7 @@ Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
 
 
 ///////////////////////////////////LOGIN//////////////////////////////////////////
+
 Route::controller(AuthController::class)->group(function () {
     Route::post('login',  'login');
     Route::post('session',  'insertSession');
@@ -96,6 +99,7 @@ Route::controller(ProgramController::class)->group(function () {
 
 Route::controller(EventController::class)->group(function () {
 
+    Route::get('getActiveEvent','getActiveEvent'); // ADMIN AND STAFF ONLY
     Route::post('getEvent','getEvent');
     Route::get('getAcademicYear','getAcademicYear');
     Route::post('viewEvent','viewEvent');
@@ -108,16 +112,18 @@ Route::controller(EventController::class)->group(function () {
 });
 
 Route::controller(RequirementController::class)->group(function () {
-
     Route::post('getRequirement','getRequirement');
     Route::post('deleteRequirement','deleteRequirement');
 });
 
 Route::controller(FileRequirementController::class)->group(function () {
-
+    
+    Route::get('getAllfile','getAllfile');
     Route::post('getFileRequirement','getFileRequirement');
     Route::post('storeFileRequirement','storeFileRequirement');
     Route::post('storeFolderRequirement','storeFolderRequirement');
+    Route::post('storeDMO_files','storeDMO_files');
+    Route::post('createDMO_folder','createDMO_folder');
     Route::post('downloadFileRequirement','downloadFileRequirement');    
   
 });
@@ -127,7 +133,30 @@ Route::controller(ConversationController::class)->group(function () {
     Route::post('getConvesation','getConvesation');
 });
 
+Route::controller(RequestController::class)->group(function () {
+    Route::post('storeRequest', 'storeRequest');
+    Route::post('getRequest', 'getRequest');
+    Route::post('getReqInfo', 'getReqInfo');
+    Route::post('getAcceptRequest', 'getAcceptRequest');
+});
 
+Route::controller(DashboardController::class)->group(function () {
+    Route::get('getAdminDashboard','getAdminDashboard');
+    Route::post('getDeanDashboard','getDeanDashboard');
+    Route::post('getProgramDashboard','getProgramDashboard');
+    Route::post('getHeadDashboard','getHeadDashboard');
+    
+    Route::post('getDocumentRequest','getDocumentRequest');
+    Route::post('getCompliance','getCompliance');
+    Route::post('getRecentUpload','getRecentUpload');
+});
+
+Route::controller(ReportController::class)->group(function () {  
+
+    Route::post('getReportRequest','getReportRequest');
+    Route::post('getComplianceReport','getComplianceReport');
+  
+});
 
 
 
