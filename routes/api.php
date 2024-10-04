@@ -18,7 +18,7 @@ use App\Http\Controllers\emailcontroller;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
 
-Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
+//Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
 
 
 
@@ -29,13 +29,6 @@ Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
         return response()->json(['status' => 'OK'], 200);
     })->where('any', '.*');
  
-
-   /* Route::post('create', [userlistController::class, 'create']); // Create a new user
-    Route::post('/users/{id}', [userlistController::class, 'edit']);
-    Route::post('/delete/{id}', [userlistController::class, 'destroy']);
-    Route::post('searchuser', [userlistController::class, 'searchuser']); */
-
-
 ///////////////////////////////////LOGIN//////////////////////////////////////////
 
 Route::controller(AuthController::class)->group(function () {

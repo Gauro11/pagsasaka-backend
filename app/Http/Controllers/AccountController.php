@@ -85,6 +85,7 @@ class AccountController extends Controller
                 $response = [
                     'isSuccess' => false,
                     'message' => 'No accounts found matching the criteria.',
+                   
                 ];
                 $this->logAPICalls('getAccounts', "", $request->all(), $response);
                 return response()->json($response, 500);
@@ -158,24 +159,22 @@ class AccountController extends Controller
                 'org_log_id' => $request->org_log_id,
             ]);
                
-            
-    
             $response = [
                 'isSuccess' => true,
                 'message' => "Account successfully updated.",
                 'account' => $Account
             ];
-            $this->logAPICalls('updatemanpower', $id, $request->all(), [$response]);
+            $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
             return response()->json($response, 200);
     
         } catch (Throwable $e) {
             // Handle non-validation errors
             $response = [
                 'isSuccess' => false,
-                'message' => "Failed to update the Manpower.",
+                'message' => "Failed to update account.",
                 'error' => $e->getMessage()
             ];
-            $this->logAPICalls('updatemanpower', "", $request->all(), [$response]);
+            $this->logAPICalls('updateaccount', "", $request->all(), [$response]);
             return response()->json($response, 500);
         }
     }

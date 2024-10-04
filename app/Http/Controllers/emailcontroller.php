@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Notifications\PHPMailerService;
 use Illuminate\Http\Request;
 
-class emailcontroller extends Controller
+/*class emailcontroller extends Controller
 {
     protected $mailService;
 
