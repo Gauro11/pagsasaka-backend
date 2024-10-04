@@ -14,7 +14,9 @@ use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\FileRequirementController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\emailcontroller;
 
+Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
 
 
 
@@ -55,9 +57,9 @@ Route::controller(AccountController::class)->group(function () {
     Route::get('getAccounts', 'getAccounts');
    // Route::post('searchAccount', 'searchAccount');
     Route::post('Add', 'createAccount');
-   // Route::post('editAccount','editAccount');
+   /// Route::post('editAccount','editAccount');
     Route::post('updateAccoounts/{id}', 'updateAccount');
-    Route::post('deleteAccount','deleteAccount');
+    Route::post('deleteAccount/{id}','deleteAccount');
     
 });
 

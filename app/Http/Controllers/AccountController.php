@@ -12,6 +12,8 @@ use Throwable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\ValidationException;
 
+use App\Notifications\email;
+
 class AccountController extends Controller
 {
     /**
@@ -140,17 +142,17 @@ class AccountController extends Controller
     
             // Validation will throw a ValidationException automatically if it fails
             $request->validate([
-                'name' => ['sometimes','required', 'string'],
-                'email' => ['sometimes','required', 'string'],
-                'role' => ['sometimes','required', 'string'],
-                'org_log_id'=> ['sometimes', 'required', 'numeric'],
+                'name' => ['sometimes', 'string'],
+                'email' => ['sometimes', 'string'],
+                'role' => ['sometimes', 'string'],
+                'org_log_id'=> ['sometimes', 'numeric'],
                 
             ]);
     
             $Account->update([
                 'name' => $request->name,
                 'email' => $request->email,
-                'role' => $request->email,
+                'role' => $request->role,
                 'org_log_id' => $request->org_log_id,
             ]);
                
@@ -181,58 +183,42 @@ class AccountController extends Controller
     /**
      * Delete a user account.
      */
-    public function deleteAccount(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'name' => 'required|string',
-            ]);
-    
-            if ($validator->fails()) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors(),
-                ];
-                $this->logAPICalls('deleteAccount', null, $request->all(), $response);
-                return response()->json($response, 500);
-            }
-    
-            // Find the user account by name
-            $userAccount = Account::where('name', $request->name)->first();
-    
-            // Check if the account exists
-            if (!$userAccount) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Account not found.',
-                ];
-                $this->logAPICalls('deleteAccount', null, $request->all(), $response);
-                return response()->json($response, 500);
-            }
-    
-            // Delete the user account
-            $userAccount->delete();
-    
-            $response = [
-                'isSuccess' => true,
-                'message' => 'Account successfully deleted.'
-            ];
-    
-            $this->logAPICalls('deleteUserAccount', $userAccount->id, [], $response);
-    
-            return response()->json($response, 200);
-        } catch (Throwable $e) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Failed to delete the Account.',
-                'error' => $e->getMessage()
-            ];
-    
-            $this->logAPICalls('deleteAccount', null, $request->all(), $response);
-            return response()->json($response, 500);
-        }
+    public function deleteAccount(Request $request, $id)
+{
+    try {
+        
+        $Account = Account::findOrFail($id);
+
+       
+        $Account->delete();
+
+        // Prepare a successful response
+        $response = [
+            'isSuccess' => true,
+            'message' => "Account successfully deleted.",
+            'account' => $Account
+        ];
+
+        // Log the API call
+        $this->logAPICalls('deleteAccount', $id, $request->all(), [$response]);
+
+        // Return success response
+        return response()->json($response, 200);
+
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => "Failed to delete the Account.",
+            'error' => $e->getMessage(),
+        ];
+
+        $this->logAPICalls('deleteAccount', $id, $request->all(), [$response]);
+
+        
+        return response()->json($response, 500);
     }
+}
+
     
     
     public function resetPasswordToDefault(Request $request)
@@ -287,6 +273,8 @@ class AccountController extends Controller
             return response()->json($response, 500);
         }
     }
+
+  
     
 
     /**
