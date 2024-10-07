@@ -14,9 +14,11 @@ use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\FileRequirementController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\emailcontroller;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
 
+//Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
 
 
 
@@ -27,13 +29,6 @@ use App\Http\Controllers\ReportController;
         return response()->json(['status' => 'OK'], 200);
     })->where('any', '.*');
  
-
-   /* Route::post('create', [userlistController::class, 'create']); // Create a new user
-    Route::post('/users/{id}', [userlistController::class, 'edit']);
-    Route::post('/delete/{id}', [userlistController::class, 'destroy']);
-    Route::post('searchuser', [userlistController::class, 'searchuser']); */
-
-
 ///////////////////////////////////LOGIN//////////////////////////////////////////
 
 Route::controller(AuthController::class)->group(function () {
@@ -58,9 +53,9 @@ Route::controller(AccountController::class)->group(function () {
     Route::get('getAccounts', 'getAccounts');
    // Route::post('searchAccount', 'searchAccount');
     Route::post('Add', 'createAccount');
-   // Route::post('editAccount','editAccount');
+   /// Route::post('editAccount','editAccount');
     Route::post('updateAccoounts/{id}', 'updateAccount');
-    Route::post('deleteAccount','deleteAccount');
+    Route::post('deleteAccount/{id}','deleteAccount');
     
 });
 
