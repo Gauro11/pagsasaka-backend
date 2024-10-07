@@ -80,7 +80,9 @@ Route::post('/sample',function(Request $request){
 
 Route::controller(OrgLogController::class)->group(function () {
 
+    Route::get('getConcernedOffice','getConcernedOffice');
     Route::post('getOrgLog','getOrgLog');
+    Route::post('getDropdownOrg','getDropdownOrg');
     Route::post('storeOrgLog','storeOrgLog');
     Route::post('editOrgLog','editOrgLog');
     Route::post('updateOrgLog','updateOrgLog');
@@ -117,6 +119,9 @@ Route::controller(RequirementController::class)->group(function () {
 Route::controller(FileRequirementController::class)->group(function () {
     
     Route::get('getAllfile','getAllfile');
+    Route::post('getFolder','getFolder');
+    Route::post('getEditFile','getEditFile');
+    Route::post('updateFile','updateFile');
     Route::post('getFileRequirement','getFileRequirement');
     Route::post('storeFileRequirement','storeFileRequirement');
     Route::post('storeFolderRequirement','storeFolderRequirement');
@@ -132,6 +137,7 @@ Route::controller(ConversationController::class)->group(function () {
 });
 
 Route::controller(RequestController::class)->group(function () {
+    Route::post('rejectRequest', 'rejectRequest');
     Route::post('storeRequest', 'storeRequest');
     Route::post('getRequest', 'getRequest');
     Route::post('getReqInfo', 'getReqInfo');
@@ -139,7 +145,7 @@ Route::controller(RequestController::class)->group(function () {
 });
 
 Route::controller(DashboardController::class)->group(function () {
-    Route::get('getAdminDashboard','getAdminDashboard');
+    Route::post('getAdminDashboard','getAdminDashboard');
     Route::post('getDeanDashboard','getDeanDashboard');
     Route::post('getProgramDashboard','getProgramDashboard');
     Route::post('getHeadDashboard','getHeadDashboard');

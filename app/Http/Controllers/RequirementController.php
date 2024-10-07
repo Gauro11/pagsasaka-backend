@@ -7,15 +7,15 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Requirement;
 use App\Models\ApiLog;
 use App\Models\OrganizationalLog;
+use Throwable;
 
 class RequirementController extends Controller
 {
 
-    // DONE //
     public function getRequirement(Request $request){
 
        try{
-
+            $requirement = [];
             $validated = $request->validate([
                 'event_id' => 'required|exists:events,id',
                 'search' => 'nullable' 
@@ -30,30 +30,37 @@ class RequirementController extends Controller
                 $query->where('name', 'like', '%' . $validated['search'] . '%'); 
             }
         
-            $data = $query->get();
-            $orglog = OrganizationalLog::where('id',$data->first()->org_log_id)->get();
+            $datas= $query->get();
+
+            foreach($datas as $data){
+
+                $orglog = OrganizationalLog::where('id',$data->org_log_id)->first();
+                
+                $requirement[] = [
+                    "id" => $data->id,
+                    "event_id" => $data->event_id,
+                    "name" => $data->name,
+                    "org_log_id" => $data->org_log_id,
+                    "org_log_acronym" => $orglog ?  $orglog->acronym : null,
+                    "upload_status" => $data->upload_status,
+                    "status" => $data->status,
+                    "created_at" =>$data->created_at,
+                    "updated_at" => $data->updated_at
+                ];
+            }
+            
 
 
             $response = [
                 'isSuccess' => true,
-                'getRequirement' => [
-                    "id" => $data->first()->id,
-                    "event_id" => $data->first()->event_id,
-                    "name" => $data->first()->name,
-                    "org_log_id" => $data->first()->org_log_id,
-                    "org_log_acronym" => $orglog->first()->acronym,
-                    "upload_status" => $data->first()->upload_status,
-                    "status" => $data->first()->status,
-                    "created_at" =>$data->first()->created_at,
-                    "updated_at" => $data->first()->updated_at
-                ]
+                'getRequirement' => $requirement
             ];
         
             $this->logAPICalls('getRequirement', "", $request->all(), [$response]);
             return response()->json($response, 200);
         
 
-       }catch(Exception $e){
+       }catch(Throwable $e){
             
         $response = [
 
@@ -68,7 +75,7 @@ class RequirementController extends Controller
         }
     }
 
-    // DONE //
+
     public function deleteRequirement(Request $request){
         
         try{
@@ -88,7 +95,7 @@ class RequirementController extends Controller
             $this->logAPICalls('deleteRequirement', "", $request->all(), [$response]);
             return response()->json($response);
 
-        }catch(Exception $e){
+        }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,

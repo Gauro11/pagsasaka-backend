@@ -9,9 +9,46 @@ use App\Models\Account;
 use App\Models\Program;
 
 use Carbon\Carbon;
+use Throwable;
 
 class RequestController extends Controller
 {
+    
+    public function rejectRequest(Request $request){
+
+        try{
+
+        
+            $validated = $request->validate([
+                'request_id' => ['required']
+            ]);
+
+        $data = UserRequest::where('id',$validated['request_id'])->first();
+        $data->update([
+            'approval_status' => 'rejected'
+        ]);
+
+        $response = [
+            'isSuccess' => true,
+            'rejected_request' => $data
+        ];
+
+        $this->logAPICalls('rejectRequest', "", $request->all(), $response);
+        return response($response ,200);
+
+        }catch(Throwable $e){
+
+             $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => $e->getMessage()
+            ];
+            $this->logAPICalls('rejectRequest', "", $request->all(), $response);
+            return response()->json($response, 500);
+
+        }
+        
+    }
 
     public function updateReqStatus(Request $request){
 
@@ -71,34 +108,61 @@ class RequestController extends Controller
             $validate = $request->validate([
                 'account_id' => 'required'
             ]);
-    
+            $perPage = 10;
+            $page = $request->input('page', 1);
+            $search = $request->input('search', ''); 
             $role = $this->getRole($validate['account_id']);
     
-            if(empty($request->search)){
-    
-                $data = UserRequest::where('role', $role)->get();
+            if(empty($search)){
+                
+                if ($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2") {
+
+                    $data = UserRequest::orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
+
+                } else {
+                    $data = UserRequest::where('role', $role)
+                                        ->orderBy('created_at', 'desc')
+                                        ->get();
+                }
+
+                $response = [
+                    'isSuccess' => true,
+                    'data' => $data
+                ];
+                
     
             }else{
-    
-                $results = UserRequest::where('role', $role)
+
+                if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
+
+                    $results = UserRequest::orderBy('created_at', 'desc')
+                                ->where(function($q) use ($search) {
+                                    $q->where('request_no', 'LIKE', "%{$search}%");
+                                })
+                                ->paginate($perPage, ['*'], 'page', $page);;
+                    
+                }else{
+                    $results = UserRequest::where('role', $role)
                     ->when($query, function ($q) use ($query) {
                         return $q->where(function ($queryBuilder) use ($query) {
                             $queryBuilder->where('request_no', 'LIKE', "%{$request->search}%");
                         });
                     })->get();
+                }
+
+                $response = [
+                    'isSuccess' => true,
+                    'data' => $results
+                ];
+               
             }
     
-    
-            $response = [
-                'isSuccess' => true,
-                'data' => $data
-            ];
-            
+
             $this->logAPICalls('getRequest', "", $request->all(), $response);
             return response()->json($response,200);
 
 
-        }catch(Exception $e){
+        }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
@@ -222,6 +286,7 @@ class RequestController extends Controller
         }
     }
 
+    // DONE //
     public function getAcceptRequest(Request $request){
         $invalidId = []; 
         $validated = $request->validate([
