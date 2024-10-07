@@ -7,6 +7,7 @@ use App\Models\Requirement;
 use App\Models\RequirementConversation;
 use App\Http\Requests\ConversationRequest;
 use Carbon\Carbon;
+use Throwable;
 
 class ConversationController extends Controller
 {
@@ -43,7 +44,8 @@ class ConversationController extends Controller
             
             $this->logAPICalls('storeConverstation', "", $request->all(), [$response]);
             return response()->json($response);
-          }catch (Exception $e) {
+
+          }catch(Throwable $e) {
   
              $response = [
                 'isSuccess' => false,
