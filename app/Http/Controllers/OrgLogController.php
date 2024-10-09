@@ -13,6 +13,79 @@ use Illuminate\Validation\ValidationException;
 class OrgLogController extends Controller
 {
     
+    public function getConcernedOffice(){
+
+        try{
+
+            $data =  OrganizationalLog::where('org_id','!=',1)
+                                        ->where('status','A')
+                                        ->orderBy('created_at','desc')->get();
+
+            $response = [
+                'isSuccess' => true,
+                'concerned_office' => $data
+            ];
+            
+            $this->logAPICalls('getConcernedOffice', "", [], [$response]);
+            return response($response,200);
+
+        }catch(Throwable $e){
+            
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+            ];
+
+            $this->logAPICalls('getConcernedOffice', "", [] [$response]);
+            return response($response, 500);
+        }
+        
+                       
+    }
+
+
+    public function getDropdownOrg(Request $request){
+
+        try{
+            $orgLog=[];
+            $validated = $request->validate([
+                'org_id' => 'required'
+            ]);
+
+            $datas = OrganizationalLog::where('org_id',$validated['org_id'])->get();
+
+            foreach($datas as $data){
+                
+                $orgLog[] = [
+
+                    'id' => $data->id,
+                    'name' => $data->name
+                ];
+            }
+
+            $response = [
+                'isSuccess' => true,
+                'OrgLog' =>  $orgLog
+            ];
+            
+            $this->logAPICalls('getDropdownOrg', "", $request->all(), [$response]);
+            return response($response,200);
+
+        }catch(Throwable $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+            ];
+
+            $this->logAPICalls('getDropdownOrg', "", $request->all(), [$response]);
+            return response($response, 500);
+        }
+        
+    }
+
     public function getOrgLog(Request $request){
 
         try{
@@ -30,8 +103,7 @@ class OrgLogController extends Controller
             $search = $request->input('search'); 
 
             // Query building
-            $query = OrganizationalLog::where('status', 'A')
-                ->where('org_id', $request->org_id);
+            $query = OrganizationalLog::where('org_id', $request->org_id);
 
             // Search filter
             if (!empty($search)) {

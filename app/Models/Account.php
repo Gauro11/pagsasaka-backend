@@ -30,9 +30,9 @@ class Account extends Model
 
         $validator = Validator::make($data, [
             
-            'name' => ['required', 'string'],
+            'name' => ['required', 'string','min:3','max:225'],
             'email' => ['required', 'email', 'unique:accounts,email'],
-            'role' => ['required',  ],
+            'role' => ['required'  ],
             'password',
             'org_log_id' => ['required',],
            

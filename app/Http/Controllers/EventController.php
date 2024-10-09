@@ -16,39 +16,57 @@ use Exception;
 
 class EventController extends Controller
 {
-    // DONE //
+
+
+    // VALIDATED //
     public function getActiveEvent(){
-        $event =[];
-        $datas = Event::where('status','A')
-                        ->orderBy('created_at','desc')->get();
-
-        foreach($datas as $data){
-
-            $org_log_data = OrganizationalLog::where('id', $data->org_log_id)->first();
-
-            $event[] =[
-
-                'id' => $data->id,
-                'name'=> $data->name,
-                'description' => $data->description,
-                'org_log_id' => $data->org_log_id,
-                'org_log_name' => $org_log_data->name,
-                'submission_date' => $data->submission_date
-
-            ];
-        }
         
-       $response = [
-         'isSuccess' =>true,
-          'activeEvent' =>$event
-       ];
+       try{
 
-       $this->logAPICalls('getEvent', "",[], [$response]);
-       return response()->json($response);
+            $event =[];
+
+            $datas = Event::where('status','A')
+                                ->orderBy('created_at','desc')->get();
+
+                foreach($datas as $data){
+
+                    $org_log_data = OrganizationalLog::where('id', $data->org_log_id)->first();
+
+                    $event[] =[
+
+                        'id' => $data->id,
+                        'name'=> $data->name,
+                        'description' => $data->description,
+                        'org_log_id' => $data->org_log_id,
+                        'org_log_name' =>$org_log_data ? $org_log_data->name :null,
+                        'submission_date' => $data->submission_date
+
+                    ];
+                }
+                
+            $response = [
+                'isSuccess' =>true,
+                'activeEvent' =>$event
+            ];
+
+            $this->logAPICalls('getActiveEvent', "",[], [$response]);
+            return response()->json($response);
+
+       }catch(Throwable $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+            ];
+
+            $this->logAPICalls('getActiveEvent', "",[], [$response]);
+            return response()->json($response, 500);
+
+       }
        
     }
 
-    // DONE //
     public function getEvent(Request $request){
 
         try{
@@ -100,7 +118,7 @@ class EventController extends Controller
 
     }
 
-    // DONE //
+ 
     public function storeEvent(EventRequest $request){
 
         try{
@@ -197,7 +215,7 @@ class EventController extends Controller
              }
  
               
-          }catch (Exception $e) {
+          }catch (Throwable $e) {
   
               $response = [
                   'isSuccess' => false,
@@ -212,7 +230,7 @@ class EventController extends Controller
  
     }
 
-    // DONE //
+
     public function editEvent(Request $request){
 
         try{
@@ -232,7 +250,7 @@ class EventController extends Controller
            $this->logAPICalls('editEvent', "", $request->all(), [$response]);
            return response()->json($response);
    
-        }catch(Exception $e){
+        }catch(Throwable $e){
    
             $response = [
                    'isSuccess' => false,
@@ -246,7 +264,7 @@ class EventController extends Controller
           
     }
 
-    // DONE //
+  
     public function updateEvent(Request $request){
 
         try{
@@ -284,7 +302,7 @@ class EventController extends Controller
                 return response()->json($response);
             }
 
-        }catch(Exception $e){
+        }catch(Throwable $e){
             $response = [
                 'isSuccess' => false,
                 'message' => "Unsucessfully updated. Please check your inputs.",
@@ -292,12 +310,12 @@ class EventController extends Controller
            ];
 
             $this->logAPICalls('updateEvent', "", $request->all(), [$response]);
-            return response()->json($response, 500);
+            return response($response, 500);
         }
         
     }
 
-    // DONE //
+   
     public function deleteEvent(Request $request){
 
         try{
@@ -318,7 +336,11 @@ class EventController extends Controller
             }
     
             // Hard delete the event from the database
-            $event->delete();
+            $event->update(
+                [
+                    'status' => 'I'
+                ]
+            );
     
             // Return success response
             $response = [
@@ -331,7 +353,7 @@ class EventController extends Controller
     
             return response()->json($response);
     
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             // Handle exceptions
             $response = [
                 'isSuccess' => false,
@@ -346,7 +368,6 @@ class EventController extends Controller
     }
     
 
-    // DONE //
     public function getAcademicYear(){
         try{
             $data = AcademicYear::all();
@@ -425,8 +446,7 @@ class EventController extends Controller
             return response()->json($response, 500);
         }
     }
-    
-    // DONE //
+
     public function getEventID($name,$descrip,$acadyear,$submdate){
         $event= Event::where('name',$name)
                       ->where('description',$descrip)
@@ -437,7 +457,6 @@ class EventController extends Controller
         return $event->first()->id;
     }
 
-    // DONE //
     public function isExist($validate){
 
         return Event::where('org_log_id', $validate['org_log_id'])
@@ -448,10 +467,7 @@ class EventController extends Controller
         ->exists();
 
     }
-
-
-
-    
+  
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp){
         try
         {

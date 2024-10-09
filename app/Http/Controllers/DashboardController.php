@@ -14,21 +14,25 @@ use App\Models\Event;
 class DashboardController extends Controller
 {
 
-    private function percentOffice(){
+    private function percentOffice($currentPage){
+
+        $perPage = 10; // Set items per page
 
         $ReqOffice = [];
-        $datas = OrganizationalLog::where('org_id', '2')->get();
-
+        
+        // Paginate the results
+        $datas = OrganizationalLog::where('org_id', '2')->paginate($perPage, ['*'], 'page', $currentPage);
+        
+        // Process each item
         foreach ($datas as $data) {
-            // Get counts directly
             $totalReq = Requirement::where('org_log_id', $data->id)->count();
             $totalUpload = Requirement::where('org_log_id', $data->id)
-                                    ->where('upload_status', 'completed')
-                                    ->count();
-
+                                        ->where('upload_status', 'completed')
+                                        ->count();
+        
             // Avoid division by zero
             $percentage = $totalReq > 0 ? ($totalUpload / $totalReq) * 100 : 0;
-
+        
             $ReqOffice[] = [ 
                 'id' => $data->id,
                 'name' => $data->name,
@@ -37,13 +41,28 @@ class DashboardController extends Controller
                 'totalUpload' => $totalUpload,
                 'percentage' => $percentage
             ];
-
+        
             $data->update([
-                'percentage' =>  $percentage
+                'percentage' => $percentage
             ]);
         }
+        
+        // Prepare pagination details
 
-        return $ReqOffice;
+        $lastPage = $datas->lastPage();
+        $currentPage = $datas->currentPage();
+        $total = $datas->total();
+
+        $response = [
+            'data' => $ReqOffice,
+            'current_page' => $currentPage,
+            'last_page' => $lastPage,
+            'total' => $total
+        ];
+
+
+
+        return $response;
     }
 
     private function percentPrograms(){
@@ -83,11 +102,14 @@ class DashboardController extends Controller
 
     }
 
-    private function percentColleges(){
+    private function percentColleges($currentPage){
+
+        $perPage = 10; // Set items per page
 
         $this-> percentPrograms();
         $ReqCollege= [];
-        $datas = OrganizationalLog::where('org_id', '1')->get();
+        
+        $datas = OrganizationalLog::where('org_id', '1')->paginate($perPage, ['*'], 'page', $currentPage);
       
         foreach ($datas as $data) {
 
@@ -125,20 +147,34 @@ class DashboardController extends Controller
 
         }
 
-        return $ReqCollege;
+        $lastPage = $datas->lastPage();
+        $currentPage = $datas->currentPage();
+        $total = $datas->total();
+
+        $response = [
+            'data' => $ReqCollege,
+            'current_page' => $currentPage,
+            'last_page' => $lastPage,
+            'total' => $total
+        ];
+
+        return $response;
 
     }
-
+    
+    // DONE //
     public function getAdminDashboard(Request $request){
+ 
+        $currentPage_college = $request->input('page_college', 1);
+        $currentPage_office = $request->input('page_office', 1);
 
         $response = [
             'isSuccess' => true,
-            'colleges' => $this->percentColleges(),
-            'offices' => $this->percentOffice()
+            'colleges' => $this->percentColleges($currentPage_college),
+            'offices' => $this->percentOffice($currentPage_office)
         ];
 
         return response()->json($response);
-
     }
 
     public function getDeanDashboard(Request $request){
@@ -200,85 +236,99 @@ class DashboardController extends Controller
 
     }
 
-
-     // DONE //
+    // VALIDATED //
     public function getDocumentRequest(Request $request){
 
-        $validated = $request->validate([
-            'account_id' => ['required','exists:accounts,id']
-        ]);
+        try{
 
-        $account = Account::where('id',$validated['account_id'])->get();
-         $role = $account->first()->role;
+            $validated = $request->validate([
+                'account_id' => ['required','exists:accounts,id']
+            ]);
 
-        if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
-            $requirement= [];
+            $account = Account::where('id',$validated['account_id'])->get();
+            $role = $account->first()->role;
 
-           $datas = UserRequest::where('status', 'A')
-                    ->orderBy('created_at', 'desc')
-                    ->get();
+            if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
+                $requirement= [];
+
+            $datas = UserRequest::where('status', 'A')
+                        ->orderBy('created_at', 'desc')
+                        ->get();
 
 
-                    foreach ($datas as $data) {
-                        $org_log_data = OrganizationalLog::where('id', $data->org_log_id)->first();
-                    
-                        $requirement[] = [
-                            'id' => $data->id,
-                            'request_no' => $data->request_no,
-                            'org_log_id' => $data->org_log_id,
-                            'org_log_name' => $org_log_data ? $org_log_data->name : null, // Check if org_log_data exists
-                            'requested_date' => $data->requested_date
-                        ];
-                    }
-            
-
-        }elseif($role == "Dean" || $role == "3"){
-
-            $data = UserRequest::where('college_entity_id',$account->first()->org_log_id)
-                                        ->orderBy('created_at', 'desc')
-                                        ->get();
+                        foreach ($datas as $data) {
+                            $org_log_data = OrganizationalLog::where('id', $data->org_log_id)->first();
+                        
+                            $requirement[] = [
+                                'id' => $data->id,
+                                'request_no' => $data->request_no,
+                                'org_log_id' => $data->org_log_id,
+                                'org_log_name' => $org_log_data ? $org_log_data->name : null, // Check if org_log_data exists
+                                'requested_date' => $data->requested_date
+                            ];
+                        }
                 
-                    $org_log_data = OrganizationalLog::where('id',$data->first()->org_log_id)->first();
 
-                    $requirement  = [
+            }elseif($role == "Dean" || $role == "3"){
 
-                        'id' => $data->first()->id,
-                        'request_no' => $data->first()->request_no,
-                        'org_log_id' => $data->first()->org_log_id,
-                        'org_log_name' => $org_log_data->name,
-                        'requested_date' =>  $data->first()->requested_date
-                        
-                    ];
+                $data = UserRequest::where('college_entity_id',$account->first()->org_log_id)
+                                            ->orderBy('created_at', 'desc')
+                                            ->get();
+                    
+                        $org_log_data = OrganizationalLog::where('id',$data->first()->org_log_id)->first();
+
+                        $requirement  = [
+
+                            'id' => $data->first()->id,
+                            'request_no' => $data->first()->request_no,
+                            'org_log_id' => $data->first()->org_log_id,
+                            'org_log_name' => $org_log_data->name,
+                            'requested_date' =>  $data->first()->requested_date
+                            
+                        ];
 
 
-        }else{
+            }else{
 
-            $data = UserRequest::where('org_log_id',$account->first()->org_log_id)
-                                        ->where('status','A')
-                                        ->orderBy('created_at', 'desc')
-                                        ->get();
+                $data = UserRequest::where('org_log_id',$account->first()->org_log_id)
+                                            ->where('status','A')
+                                            ->orderBy('created_at', 'desc')
+                                            ->get();
 
-            
-            $requirement  = [
+                
+                $requirement  = [
 
-                        'id' => $data->first()->id,
-                        'request_no' => $data->first()->request_no,
-                        'purpose' => $data->first()->purpose,
-                        'requested_date' =>  $data->first()->requested_date
-                        
-                    ];
+                            'id' => $data->first()->id,
+                            'request_no' => $data->first()->request_no,
+                            'purpose' => $data->first()->purpose,
+                            'requested_date' =>  $data->first()->requested_date
+                            
+                        ];
+            }
+
+            $response = [
+                'isSuccess' => true,
+                'document_request' => $requirement
+            ];  
+
+            $this->logAPICalls('getDocumentRequest', "", $request->all(), $response);
+            return response()->json($response);
+        
+        }catch(Exception $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => $e->getMessage()
+            ];
+            $this->logAPICalls('getDocumentRequest', "", $request->all(), $response);
+            return response()->json($response, 500);
+
         }
-
-        $response = [
-            'isSuccess' => true,
-            'document_request' => $requirement
-        ];
-
-        return response()->json($response);
 
     }
 
-    // DONE //
+    // VALIDATED //
     public function getRecentUpload(Request $request){
 
         $validated = $request->validate([
@@ -291,6 +341,7 @@ class DashboardController extends Controller
         if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
 
             $requirement = RequirementFile::orderBy('created_at', 'desc')
+                                            ->where('path','!=',null)
                                             ->where('status',"A")->get();
 
         }elseif($role == "Dean" || $role == "3"){

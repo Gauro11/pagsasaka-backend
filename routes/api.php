@@ -113,6 +113,7 @@ Route::controller(ConversationController::class)->group(function () {
 });
 
 Route::controller(RequestController::class)->group(function () {
+    Route::post('rejectRequest', 'rejectRequest');
     Route::post('storeRequest', 'storeRequest');
     Route::post('getRequest', 'getRequest');
     Route::post('getReqInfo', 'getReqInfo');
