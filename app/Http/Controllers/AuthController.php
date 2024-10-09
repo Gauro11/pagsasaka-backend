@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -18,19 +19,25 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         try {
-           
+
             $request->validate([
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
-    
-           
+
+
             $user = Account::where('email', $request->email)->first();
-    
+
             if ($user) {
-                
+                  // Check if the account's status is 'I' (Inactive)
+            if ($user->status === 'I') {
+                $response = ['message' => 'Account is inactive.'];
+                $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
+                return response()->json($response, 500); // 500 Forbidden
+            }
+
                 if (Hash::check($request->password, $user->password)) {
-                   
+
                     $token = null;
                     switch ($user->role) {
                         case 'Admin':
@@ -53,11 +60,11 @@ class AuthController extends Controller
                             $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                             return response()->json($response, 500);
                     }
-    
-                
+
+
                     $sessionResponse = $this->insertSession($request->merge(['id' => $user->id]));
-    
-                   
+
+
                     $response = [
                         'isSuccess' => true,
                         'message' => ucfirst($user->role) . ' logged in successfully',
@@ -68,153 +75,159 @@ class AuthController extends Controller
                     ];
                     $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                     return response()->json($response, 200);
-    
                 } else {
-                    
+
                     $response = ['message' => 'Invalid credentials'];
                     $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
-                    return response()->json($response, 500); 
+                    return response()->json($response, 500);
                 }
             } else {
                 $response = ['message' => 'Invalid credentials'];
                 $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
-                return response()->json($response, 500); 
+                return response()->json($response, 500);
             }
         } catch (Throwable $e) {
             $response = [
                 'message' => 'An error occurred',
-                'error' => $e->getMessage() // Return the specific error message
+                'error' => $e->getMessage()
             ];
-            $this->logAPICalls('login', $request->email, $request->all(), $response); 
+            $this->logAPICalls('login', $request->email, $request->all(), $response);
             return response()->json($response, 500);
         }
     }
-/////logout//////
-public function logout(Request $request)
-{
-    try {
-        $user = $request->user();  // Get the authenticated user
-       // return $user;
-        if ($user) {
-            // Find the latest session for this user with a null logout_date
-            $session = Session::where('user_id', $user->id)
-                              ->whereNull('logout_date') 
-                              ->latest()  
-                              ->first();
+    /////logout//////
+    public function logout(Request $request, $id)
+    {
+        try {
+            // Find the user by their ID
+            $user = Account::find($id);
 
-           if ($session) {
-                // Update the session with the current logout date
-                $session->update([
-                    'logout_date' => Carbon::now()->toDateTimeString(), // Set logout date to current time
-                ]);
+            if ($user) {
+                $session = Session::where('user_id', $user->id)
+                    ->whereNull('logout_date')
+                    ->latest()
+                    ->first();
+
+                if ($session) {
+                    $session->update([
+                        'logout_date' => Carbon::now()->toDateTimeString(),
+                    ]);
+                }
+
+
+                $user->tokens()->delete();
+                $response = ['message' => 'User logged out successfully'];
+
+                $this->logAPICalls('logoutById', $user->id, [], $response);
+                return response()->json($response, 200);
             }
 
-            // Revoke the user's current access token
-            $user->currentAccessToken()->delete();
-
-            $response = ['message' => 'User logged out successfully'];
-            $this->logAPICalls('logout', $user->id, [], $response);
-            return response()->json($response, 200);
+            return response()->json(['message' => 'User not found'], 500);
+        } catch (Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to log out user',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        return response()->json(['message' => 'Unauthenticated'], 500);
-    } catch (Throwable $e) {
-        return response()->json([
-            'message' => 'Failed to log out',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
+
 
     // Method to insert session
     public function insertSession(Request $request)
     {
         try {
             $request->validate([
-                'user_id' => 'get|string|exists:user_accounts,id' 
+                'user_id' => 'get|string|exists:user_accounts,id'
             ]);
 
-            $sessionCode = Str::uuid();  
+            $sessionCode = Str::uuid();
             $dateTime = Carbon::now()->toDateTimeString();
-           
+
 
             Session::create([
                 'session_code' => $sessionCode,
                 'user_id' => $request->id,
                 'login_date' => $dateTime,
-                'logout_date' => null 
+                'logout_date' => null
             ]);
 
-            return response()->json([  'session_code' => $sessionCode], 200);
-
+            return response()->json(['session_code' => $sessionCode], 200);
         } catch (Throwable $e) {
             return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.', 'error' => $e->getMessage()], 500);
         }
     }
 
 
-//////password change////////
+    //////password change////////
+    public function changePassword(Request $request)
+    {
+        try {
+            // Validate the request
+            $validator = Validator::make($request->all(), [
+                'current_password' => ['required','string',
+                    function ($attribute, $value, $fail) use ($request) {
+                        // Find the user by email
+                        $user = Account::where('email', $request->email)->first();
 
-public function changePassword(Request $request)
-{
-    try {
-        // Validate the request
-        $validator = Validator::make($request->all(), [
-            'current_password' => 'required|string',
-            'new_password' => 'required|string|min:8|confirmed', // 'new_password_confirmation' should match 'new_password'
-        ]);
+                        // If user exists, check the current password
+                        if (!$user || !Hash::check($value, $user->password)) {
+                            return $fail('The current password is incorrect.');
+                        }
+                    },
+                ],
+                'new_password' => 'required|string|min:8|confirmed', 
+            ]);
 
-        if ($validator->fails()) {
+            if ($validator->fails()) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ];
+                $this->logAPICalls('changePassword', null, $request->all(), $response);
+                return response()->json($response, 500);
+            }
+
+            // Find the user by email and get only specific fields
+            $user = Account::select('name', 'email',)->where('email', $request->email)->first();
+
+            if (!$user) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'User not found.',
+                ];
+                $this->logAPICalls('changePassword', null, $request->all(), $response);
+                return response()->json($response, 500);
+            }
+
+
+            // You can either retrieve the full user again or use the email to update the password
+            $fullUser = Account::where('email', $request->email)->first();
+            $fullUser->password = Hash::make($request->new_password);
+            $fullUser->save();
+
+            // Return the selected fields in the response
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Password reset successfully.',
+                'user' => $user
+            ];
+            $this->logAPICalls('resetPassword', $fullUser->id, $request->except('org_log_id'), $response);
+            return response()->json($response, 200);
+        } catch (Throwable $e) {
+            // Error handling
             $response = [
                 'isSuccess' => false,
-                'message' => 'Validation failed.',
-                'errors' => $validator->errors(),
+                'message' => 'Failed to reset password.',
+                'error' => $e->getMessage(),
             ];
-            $this->logAPICalls('changePassword', null, $request->all(), $response);
+            $this->logAPICalls('resetPassword', null, $request->all(), $response);
             return response()->json($response, 500);
         }
-
-        // Find the user by email and get only specific fields
-        $user = Account::select('name', 'email', 'org_log_id')->where('email', $request->email)->first();
-
-        if (!$user) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'User not found.',
-            ];
-            $this->logAPICalls('changePassword', null, $request->all(), $response);
-            return response()->json($response, 500);
-        }
-
-       
-        // You can either retrieve the full user again or use the email to update the password
-        $fullUser = Account::where('email', $request->email)->first();
-        $fullUser->password = Hash::make($request->new_password);
-        $fullUser->save();
-
-        // Return the selected fields in the response
-        $response = [
-            'isSuccess' => true,
-            'message' => 'Password reset successfully.',
-            'user' => $user 
-        ];
-        $this->logAPICalls('resetPassword', $fullUser->id, $request->all(), $response);
-        return response()->json($response, 200);
-
-    } catch (Throwable $e) {
-        // Error handling
-        $response = [
-            'isSuccess' => false,
-            'message' => 'Failed to reset password.',
-            'error' => $e->getMessage(),
-        ];
-        $this->logAPICalls('resetPassword', null, $request->all(), $response);
-        return response()->json($response, 500);
     }
-}
 
-  
-   
+
+
 
     // Method to log API calls
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)
@@ -232,5 +245,3 @@ public function changePassword(Request $request)
         return true;
     }
 }
-
-

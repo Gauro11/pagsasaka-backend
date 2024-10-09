@@ -14,116 +14,102 @@ use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\FileRequirementController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\ProgramController;
-use App\Http\Controllers\emailcontroller;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
 
 //Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
 
+//connection//
+Route::options('/{any}', function (Request $request) {
+    return response()->json(['status' => 'OK'], 200);
+})->where('any', '.*');
 
 
-
-
-     //connection//
-     Route::options('/{any}', function (Request $request) {
-        return response()->json(['status' => 'OK'], 200);
-    })->where('any', '.*');
- 
 ///////////////////////////////////LOGIN//////////////////////////////////////////
-
 Route::controller(AuthController::class)->group(function () {
     Route::post('login',  'login');
     Route::post('session',  'insertSession');
     Route::post('change-password',  'changePassword');
-    });
+});
 
-    Route::post('/reset-password-to-default', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
+Route::middleware('auth:sanctum')->post('/logout/{id}', [AuthController::class, 'logout']);
+
+Route::post('/reset-password-to-default', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
 
 
-    Route::middleware(['auth:sanctum', 'UserTypeAuth'])->group(function () {
-        Route::get('/admin/dashboard', [AuthController::class, 'admin']);
-        Route::get('/head/dashboard', [AuthController::class, 'head']);
-        Route::get('/programchair/dashboard', [AuthController::class, 'programchair']);
-        Route::get('/staff/dashboard', [AuthController::class, 'staff']);
-        Route::get('/dean/dashboard', [AuthController::class, 'dean']);
-    });
+Route::middleware(['auth:sanctum', 'UserTypeAuth'])->group(function () {
+    Route::get('/admin/dashboard', [AuthController::class, 'admin']);
+    Route::get('/head/dashboard', [AuthController::class, 'head']);
+    Route::get('/programchair/dashboard', [AuthController::class, 'programchair']);
+    Route::get('/staff/dashboard', [AuthController::class, 'staff']);
+    Route::get('/dean/dashboard', [AuthController::class, 'dean']);
+});
 
-    //create acc///
+//create acc///
 Route::controller(AccountController::class)->group(function () {
     Route::get('getAccounts', 'getAccounts');
-   // Route::post('searchAccount', 'searchAccount');
     Route::post('Add', 'createAccount');
-   /// Route::post('editAccount','editAccount');
-    Route::post('updateAccoounts/{id}', 'updateAccount');
-    Route::post('deleteAccount/{id}','deleteAccount');
-    
+    Route::post('updateAccounts/{id}', 'updateAccount');
+    Route::post('/softdelete/{id}', 'changeStatusToInactive');
+    //Route::post('deleteAccount/{id}','deleteAccount');
 });
 
-Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+/*Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
+});*/
 
-});
-
-   
-
-Route::post('/sample',function(Request $request){
+Route::post('/sample', function (Request $request) {
     return $request->requirements;
 });
 
-
-
 Route::controller(OrgLogController::class)->group(function () {
 
-    Route::post('getOrgLog','getOrgLog');
-    Route::post('storeOrgLog','storeOrgLog');
-    Route::post('editOrgLog','editOrgLog');
-    Route::post('updateOrgLog','updateOrgLog');
-    Route::post('deleteOrgLog','deleteOrgLog');
-    Route::post('searchOrgLog','searchOrgLog');
-  
+    Route::post('getOrgLog', 'getOrgLog');
+    Route::post('storeOrgLog', 'storeOrgLog');
+    Route::post('editOrgLog', 'editOrgLog');
+    Route::post('updateOrgLog', 'updateOrgLog');
+    Route::post('deleteOrgLog', 'deleteOrgLog');
+    Route::post('searchOrgLog', 'searchOrgLog');
 });
 
 Route::controller(ProgramController::class)->group(function () {
 
-    Route::post('getProgram','getProgram');
-
+    Route::post('getProgram', 'getProgram');
 });
 
 Route::controller(EventController::class)->group(function () {
 
-    Route::get('getActiveEvent','getActiveEvent'); // ADMIN AND STAFF ONLY
-    Route::post('getEvent','getEvent');
-    Route::get('getAcademicYear','getAcademicYear');
-    Route::post('viewEvent','viewEvent');
-    Route::post('storeEvent','storeEvent');
-    Route::post('editEvent','editEvent');
-    Route::post('updateEvent','updateEvent');
-    Route::post('deleteEvent','deleteEvent');
-    Route::post('searchEvent','searchEvent');
-  
+    Route::get('getActiveEvent', 'getActiveEvent'); // ADMIN AND STAFF ONLY
+    Route::post('getEvent', 'getEvent');
+    Route::get('getAcademicYear', 'getAcademicYear');
+    Route::post('viewEvent', 'viewEvent');
+    Route::post('storeEvent', 'storeEvent');
+    Route::post('editEvent', 'editEvent');
+    Route::post('updateEvent', 'updateEvent');
+    Route::post('deleteEvent', 'deleteEvent');
+    Route::post('searchEvent', 'searchEvent');
 });
 
 Route::controller(RequirementController::class)->group(function () {
-    Route::post('getRequirement','getRequirement');
-    Route::post('deleteRequirement','deleteRequirement');
+    Route::post('getRequirement', 'getRequirement');
+    Route::post('deleteRequirement', 'deleteRequirement');
 });
 
 Route::controller(FileRequirementController::class)->group(function () {
-    
-    Route::get('getAllfile','getAllfile');
-    Route::post('getFileRequirement','getFileRequirement');
-    Route::post('storeFileRequirement','storeFileRequirement');
-    Route::post('storeFolderRequirement','storeFolderRequirement');
-    Route::post('storeDMO_files','storeDMO_files');
-    Route::post('createDMO_folder','createDMO_folder');
-    Route::post('downloadFileRequirement','downloadFileRequirement');    
-  
+
+    Route::get('getAllfile', 'getAllfile');
+    Route::post('getFileRequirement', 'getFileRequirement');
+    Route::post('storeFileRequirement', 'storeFileRequirement');
+    Route::post('storeFolderRequirement', 'storeFolderRequirement');
+    Route::post('storeDMO_files', 'storeDMO_files');
+    Route::post('createDMO_folder', 'createDMO_folder');
+    Route::post('downloadFileRequirement', 'downloadFileRequirement');
 });
 
 Route::controller(ConversationController::class)->group(function () {
-    Route::post('storeConverstation','storeConverstation');
-    Route::post('getConvesation','getConvesation');
+    Route::post('storeConverstation', 'storeConverstation');
+    Route::post('getConvesation', 'getConvesation');
 });
 
 Route::controller(RequestController::class)->group(function () {
@@ -134,25 +120,18 @@ Route::controller(RequestController::class)->group(function () {
 });
 
 Route::controller(DashboardController::class)->group(function () {
-    Route::get('getAdminDashboard','getAdminDashboard');
-    Route::post('getDeanDashboard','getDeanDashboard');
-    Route::post('getProgramDashboard','getProgramDashboard');
-    Route::post('getHeadDashboard','getHeadDashboard');
-    
-    Route::post('getDocumentRequest','getDocumentRequest');
-    Route::post('getCompliance','getCompliance');
-    Route::post('getRecentUpload','getRecentUpload');
+    Route::get('getAdminDashboard', 'getAdminDashboard');
+    Route::post('getDeanDashboard', 'getDeanDashboard');
+    Route::post('getProgramDashboard', 'getProgramDashboard');
+    Route::post('getHeadDashboard', 'getHeadDashboard');
+
+    Route::post('getDocumentRequest', 'getDocumentRequest');
+    Route::post('getCompliance', 'getCompliance');
+    Route::post('getRecentUpload', 'getRecentUpload');
 });
 
-Route::controller(ReportController::class)->group(function () {  
+Route::controller(ReportController::class)->group(function () {
 
-    Route::post('getReportRequest','getReportRequest');
-    Route::post('getComplianceReport','getComplianceReport');
-  
+    Route::post('getReportRequest', 'getReportRequest');
+    Route::post('getComplianceReport', 'getComplianceReport');
 });
-
-
-
-
-
-

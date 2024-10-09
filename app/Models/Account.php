@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Validator;
+use App\Models\OrganizationalLog;
 
 class Account extends Model
 
@@ -18,6 +19,7 @@ class Account extends Model
             'email',
             'role',
             'password',
+            'status',
             'org_log_id'
             
         ];
@@ -38,6 +40,11 @@ class Account extends Model
 
         return $validator;
     }
+
+   
+
+
+
 }
 
     

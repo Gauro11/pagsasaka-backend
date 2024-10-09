@@ -17,5 +17,9 @@ class OrganizationalLog extends Model
      {
         return $this->hasMany(Program::class, 'program_entity_id', 'id');
      }
+
+     
  
+
+     
 }

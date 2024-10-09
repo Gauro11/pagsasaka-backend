@@ -10,7 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Throwable;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\ValidationException;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 use App\Notifications\email;
 
@@ -35,12 +36,12 @@ class AccountController extends Controller
             }
 
             $Account = Account::create([
-                
+
                 'name' => $request->name,
                 'email' => $request->email,
                 'role' => $request->role,
                 'org_log_id' => $request->org_log_id,
-              'password' => Hash::make($request->password ?? '123456789'),
+                'password' => Hash::make($request->password ?? '123456789'),
             ]);
 
             $response = [
@@ -51,9 +52,7 @@ class AccountController extends Controller
 
             $this->logAPICalls('createAccount', "", $request->all(), [$response]);
             return response()->json($response, 201);
-            
-        }
-        catch (Throwable $e) {
+        } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Failed to create the Account.',
@@ -64,37 +63,36 @@ class AccountController extends Controller
         }
     }
 
-     /*
+    /*
      * Read: Get all user accounts.
      */
     public function getAccounts(Request $request)
     {
         try {
-            // Get the per_page value from the request, defaulting to 10 if not provided
             $perPage = $request->input('per_page', 10);
-    
-            // Fetch accounts with optional search parameter for name
+
             $datas = Account::select('id', 'name', 'email', 'role', 'status', 'org_log_id')
-                ->when($request->search, function ($query, $name) {
-                    return $query->where('name', 'like', '%' . $name . '%')
-                   ->orWhere('email', 'like', '%' . $name . '%');
+                ->where('status', 'A')
+                ->when($request->search, function ($query, $searchTerm) {
+                    return $query->where(function ($activeQuery) use ($searchTerm) {
+                        $activeQuery->where('name', 'like', '%' . $searchTerm . '%')
+                            ->orWhere('email', 'like', '%' . $searchTerm . '%');
+                    });
                 })
                 ->paginate($perPage);
-    
+
             if ($datas->isEmpty()) {
                 $response = [
                     'isSuccess' => false,
-                    'message' => 'No accounts found matching the criteria.',
-                   
+                    'message' => 'No active accounts found matching the criteria.',
                 ];
                 $this->logAPICalls('getAccounts', "", $request->all(), $response);
                 return response()->json($response, 500);
             }
-    
+
             $accounts = $datas->map(function ($data) {
-                // Find the organizational log by ID
                 $org_log = OrganizationalLog::where('id', $data->org_log_id)->first();
-    
+
                 return [
                     'id' => $data->id,
                     'name' => $data->name,
@@ -102,14 +100,14 @@ class AccountController extends Controller
                     'role' => $data->role,
                     'status' => $data->status,
                     'org_log_id' => $data->org_log_id,
-                    'org_log_name' => optional($org_log)->name,  // Use optional() to avoid errors if org_log is null
+                    'org_log_name' => optional($org_log)->name,
                 ];
             });
-    
-            // Prepare the response including the pagination metadata
+
+            // Prepare the response with pagination metadata
             $response = [
                 'isSuccess' => true,
-                'message' => 'User accounts retrieved successfully.',
+                'message' => 'Active user accounts retrieved successfully.',
                 'Accounts' => $accounts,
                 'pagination' => [
                     'current_page' => $datas->currentPage(),
@@ -118,73 +116,108 @@ class AccountController extends Controller
                     'last_page' => $datas->lastPage(),
                 ],
             ];
-    
+
             $this->logAPICalls('getAccounts', "", $request->all(), $response);
             return response()->json($response, 200);
-    
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Failed to retrieve accounts.',
                 'error' => $e->getMessage(),
             ];
-    
+
             $this->logAPICalls('getAccounts', "", $request->all(), $response);
             return response()->json($response, 500);
         }
     }
-    
-   
+
     /**
      * Update an existing user account.
-     */ 
+     */
     public function updateAccount(Request $request, $id)
     {
         try {
-            $Account = Account::findOrFail($id);
-    
-            // Validation will throw a ValidationException automatically if it fails
+            $account = Account::findOrFail($id);
+            // Validation with custom error messages
             $request->validate([
                 'name' => ['sometimes', 'string'],
-                'email' => ['sometimes', 'string'],
+                'email' => ['sometimes', 'string', 'email', Rule::unique('accounts')->ignore($account->id)],
                 'role' => ['sometimes', 'string'],
-                'org_log_id'=> ['sometimes', 'numeric'],
-                
+                'org_log_id' => ['sometimes', 'numeric'],
+            ], [
+                'email.unique' => 'The email is already taken.',
             ]);
-    
-            $Account->update([
+
+            $account->update([
                 'name' => $request->name,
                 'email' => $request->email,
                 'role' => $request->role,
                 'org_log_id' => $request->org_log_id,
             ]);
-               
+
             $response = [
                 'isSuccess' => true,
                 'message' => "Account successfully updated.",
-                'account' => $Account
+                'account' => $account
             ];
             $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
             return response()->json($response, 200);
-    
-        } catch (Throwable $e) {
-            // Handle non-validation errors
+        } catch (ValidationException $e) {
             $response = [
                 'isSuccess' => false,
                 'message' => "Failed to update account.",
-                'error' => $e->getMessage()
+                'errors' => $e->errors()
             ];
             $this->logAPICalls('updateaccount', "", $request->all(), [$response]);
             return response()->json($response, 500);
         }
     }
-    
-    
+
+    public function changeStatusToInactive($id)
+    {
+        try {
+            $account = Account::findOrFail($id);
+
+            // Ensure status is "A" before updating
+            if ($account->status === 'A') {
+                $account->update(['status' => 'I']);
+
+                $response = [
+                    'isSuccess' => true,
+                    'message' => 'Account status is Inactive.',
+                    'account' => $account
+                ];
+
+                $this->logAPICalls('changeStatusToInactive', $account->id, [], $response);
+
+                return response()->json($response, 200);
+            }
+
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Account is already inactive or not found.'
+            ];
+
+            $this->logAPICalls('changeStatusToInactive', $id, [], $response);
+
+            return response()->json($response, 400);
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Failed to update account status.',
+                'error' => $e->getMessage()
+            ];
+
+            $this->logAPICalls('changeStatusToInactive', $id, [], $response);
+
+            return response()->json($response, 500);
+        }
+    }
 
     /**
      * Delete a user account.
      */
-    public function deleteAccount(Request $request, $id)
+    /*  public function deleteAccount(Request $request, $id)
 {
     try {
         
@@ -219,16 +252,14 @@ class AccountController extends Controller
         return response()->json($response, 500);
     }
 }
-
-    
-    
+*/
     public function resetPasswordToDefault(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
                 'email' => 'required|string|email',
             ]);
-    
+
             if ($validator->fails()) {
                 $response = [
                     'isSuccess' => false,
@@ -238,11 +269,11 @@ class AccountController extends Controller
                 $this->logAPICalls('resetPasswordToDefault', null, $request->all(), $response);
                 return response()->json($response, 500);
             }
-    
+
             // Find the user by email
-            $user = Account::where('email', $request->email)->first();
-    
-            if (!$user) {
+            $account = Account::where('email', $request->email)->first();
+
+            if (!$account) {
                 $response = [
                     'isSuccess' => false,
                     'message' => 'User not found.',
@@ -250,19 +281,19 @@ class AccountController extends Controller
                 $this->logAPICalls('resetPasswordToDefault', null, $request->all(), $response);
                 return response()->json($response, 500);
             }
-    
+
             // Reset the password to the default value
             $defaultPassword = '123456789';
-            $user->password = Hash::make($defaultPassword);
-            $user->save();
-    
+            $account->password = Hash::make($defaultPassword);
+            $account->save();
+
             $response = [
                 'isSuccess' => true,
                 'message' => 'Password reset to default successfully.',
+                'account' => $account
             ];
-            $this->logAPICalls('resetPasswordToDefault', $user->id, $request->all(), $response);
+            $this->logAPICalls('resetPasswordToDefault', $account->id, $request->all(), $response);
             return response()->json($response, 200);
-    
         } catch (Throwable $e) {
             // Error handling
             $response = [
@@ -275,35 +306,32 @@ class AccountController extends Controller
         }
     }
 
-  
-    
-
     /**
      * Log all API calls.
-     */public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
-{
-    
-    try {
-        // If userId is null, use a default value for logging
-        $userId = $userId ?? 'N/A'; // Or any default placeholder you'd prefer
+     */ public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
+    {
 
-        \App\Models\ApiLog::create([
-            'method_name' => $methodName,
-            'user_id' => $userId,
-            'api_request' => json_encode($param),
-            'api_response' => json_encode($resp),
-        ]);
-    } catch (Throwable $e) {
-       
-     
-        return false; // Indicate failure
+        try {
+            // If userId is null, use a default value for logging
+            $userId = $userId ?? 'N/A'; // Or any default placeholder you'd prefer
+
+            \App\Models\ApiLog::create([
+                'method_name' => $methodName,
+                'user_id' => $userId,
+                'api_request' => json_encode($param),
+                'api_response' => json_encode($resp),
+            ]);
+        } catch (Throwable $e) {
+
+
+            return false; // Indicate failure
+        }
+        return true; // Indicate success
     }
-    return true; // Indicate success
-}
 
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   /* public function __construct(Request $request)
+    /* public function __construct(Request $request)
     {
         // Retrieve the authenticated user
         $user = $request->user();
