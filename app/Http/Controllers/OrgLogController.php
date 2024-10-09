@@ -103,7 +103,8 @@ class OrgLogController extends Controller
             $search = $request->input('search'); 
 
             // Query building
-            $query = OrganizationalLog::where('org_id', $request->org_id);
+            $query = OrganizationalLog::where('org_id', $request->org_id)
+                                        ->where('status','!=','D');
 
             // Search filter
             if (!empty($search)) {
@@ -367,23 +368,34 @@ class OrgLogController extends Controller
         try{
 
             $request->validate( [
-                'id' => 'required|exists:organizational_logs,id'
+                'id' => 'required|exists:organizational_logs,id',
+                'status' => 'required'
             ] );
 
+            $status = strtoupper($request->status);
+
             $organization = OrganizationalLog::find($request->id);
-            $organization->update(['status' =>"I"]);
+            $organization->update(['status' =>  $status ]);
             
             $program = Program::where('program_entity_id',$request->id)->first();
 
             if($program){
                 $program->update([
-                    'status' => "I"
+                    'status' =>  $status 
                 ]);
             }
-          
+            
+           if($status == 'A'){
+                $message = "Activated successfully.";
+           }elseif($status == 'I'){
+                $message = "Inactivated successfully.";
+           }else{
+             $message = "Successfully deleted.";
+           }
+
             $response = [
                 'isSuccess' => true,
-                'message' => "Successfully created."
+                'message' => $message
             ];
 
             $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
