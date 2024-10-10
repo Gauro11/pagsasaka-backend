@@ -455,6 +455,34 @@ class OrgLogController extends Controller
 
     }
 
+    public function filterCollege(Request $request){
+        
+        $validated = $request->validate([
+            'college_id' => 'required|exists:organizational_logs,id'
+        ]);
+        $programs =[];
+        $datas = Program::where('college_entity_id',$validated['college_id'])
+                        ->where('status','A')->get();
+
+        foreach($datas as $data){
+            $organization = OrganizationalLog::where('id',$data->program_entity_id)->first();
+            $college = OrganizationalLog::where('id',$validated['college_id'])->first();
+            $programs[] =[
+                'id' => $organization->id,
+                'name' => $organization->name,
+                'acronym' => $organization->acronym,
+                'college_id' => $validated['college_id'],
+                'college_name' =>  $college->name
+            ];
+        }
+
+        $response = [
+            'isSuccess' => true,
+            'programs' => $programs
+        ];
+        return response($response);
+    }
+
 
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp)
     {
