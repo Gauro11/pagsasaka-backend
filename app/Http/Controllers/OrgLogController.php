@@ -455,6 +455,49 @@ class OrgLogController extends Controller
 
     }
 
+    public function filterCollege(Request $request){
+        try{
+
+            $validated = $request->validate([
+                'college_id' => 'required|exists:organizational_logs,id'
+            ]);
+            $programs =[];
+            $datas = Program::where('college_entity_id',$validated['college_id'])
+                            ->where('status','A')->get();
+    
+            foreach($datas as $data){
+                $organization = OrganizationalLog::where('id',$data->program_entity_id)->first();
+                $college = OrganizationalLog::where('id',$validated['college_id'])->first();
+                $programs[] =[
+                    'id' => $organization->id,
+                    'name' => $organization->name,
+                    'acronym' => $organization->acronym,
+                    'college_id' => $validated['college_id'],
+                    'college_name' =>  $college->name
+                ];
+            }
+    
+            $response = [
+                'isSuccess' => true,
+                'programs' => $programs
+            ];
+            
+            return response($response,200);
+
+        }catch(Throwable $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Unsuccessfully created. Please check your inputs.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+            ];
+
+            $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+        }
+   
+    }
+
 
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp)
     {
