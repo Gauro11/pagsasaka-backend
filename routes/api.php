@@ -66,6 +66,7 @@ Route::post('/sample', function (Request $request) {
 Route::controller(OrgLogController::class)->group(function () {
 
     Route::post('getOrgLog', 'getOrgLog');
+    Route::post('getDropdownOrg','getDropdownOrg');
     Route::post('storeOrgLog', 'storeOrgLog');
     Route::post('editOrgLog', 'editOrgLog');
     Route::post('updateOrgLog', 'updateOrgLog');
