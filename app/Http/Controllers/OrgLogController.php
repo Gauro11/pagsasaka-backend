@@ -113,6 +113,7 @@ class OrgLogController extends Controller
                       ->orWhere('acronym', 'LIKE', "%{$search}%");
                 });
             }
+        //    return $query;
 
             // Custom handling for org_id == 3
             if ($request->org_id == 3) { // Ensure org_id is integer
@@ -465,18 +466,26 @@ class OrgLogController extends Controller
             $datas = Program::where('college_entity_id',$validated['college_id'])
                             ->where('status','A')->get();
     
-            foreach($datas as $data){
-                $organization = OrganizationalLog::where('id',$data->program_entity_id)->first();
-                $college = OrganizationalLog::where('id',$validated['college_id'])->first();
-                $programs[] =[
-                    'id' => $organization->id,
-                    'name' => $organization->name,
-                    'acronym' => $organization->acronym,
-                    'college_id' => $validated['college_id'],
-                    'college_name' =>  $college->name
-                ];
+           foreach ($datas as $data) {
+                $organization = OrganizationalLog::where('id', $data->program_entity_id)->first();
+                $college = OrganizationalLog::where('id', $validated['college_id'])->first();
+
+                // Check if organization and college are found
+                if ($organization && $college) {
+                    $programs[] = [
+                        'id' => $organization->id,
+                        'name' => $organization->name,
+                        'acronym' => $organization->acronym,
+                        'status' => $organization->session_status, // Added missing comma
+                        'programs' => [
+                            'program_entity_id' => $college->program_entity_id,
+                            'college_entity_id' => $validated['college_id'],
+                            'college_name' => $college->name,
+                        ],
+                    ];
+                }
             }
-    
+                
             $response = [
                 'isSuccess' => true,
                 'programs' => $programs
