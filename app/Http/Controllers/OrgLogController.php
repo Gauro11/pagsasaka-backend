@@ -103,7 +103,8 @@ class OrgLogController extends Controller
             $search = $request->input('search'); 
 
             // Query building
-            $query = OrganizationalLog::where('org_id', $request->org_id);
+            $query = OrganizationalLog::where('org_id', $request->org_id)
+                                        ->where('status','!=','D');
 
             // Search filter
             if (!empty($search)) {
@@ -112,6 +113,7 @@ class OrgLogController extends Controller
                       ->orWhere('acronym', 'LIKE', "%{$search}%");
                 });
             }
+        //    return $query;
 
             // Custom handling for org_id == 3
             if ($request->org_id == 3) { // Ensure org_id is integer
@@ -367,23 +369,34 @@ class OrgLogController extends Controller
         try{
 
             $request->validate( [
-                'id' => 'required|exists:organizational_logs,id'
+                'id' => 'required|exists:organizational_logs,id',
+                'status' => 'required'
             ] );
 
+            $status = strtoupper($request->status);
+
             $organization = OrganizationalLog::find($request->id);
-            $organization->update(['status' =>"I"]);
+            $organization->update(['status' =>  $status ]);
             
             $program = Program::where('program_entity_id',$request->id)->first();
 
             if($program){
                 $program->update([
-                    'status' => "I"
+                    'status' =>  $status 
                 ]);
             }
-          
+            
+           if($status == 'A'){
+                $message = "Activated successfully.";
+           }elseif($status == 'I'){
+                $message = "Inactivated successfully.";
+           }else{
+             $message = "Successfully deleted.";
+           }
+
             $response = [
                 'isSuccess' => true,
-                'message' => "Successfully created."
+                'message' => $message
             ];
 
             $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
@@ -441,6 +454,59 @@ class OrgLogController extends Controller
                 'college_entity_id' => $college_id
             ]);
 
+    }
+
+    public function filterCollege(Request $request){
+        try{
+
+            $validated = $request->validate([
+                'college_id' => 'required|exists:organizational_logs,id'
+            ]);
+            $programs =[];
+            $datas = Program::where('college_entity_id',$validated['college_id'])
+                            ->where('status','A')->get();
+    
+           foreach ($datas as $data) {
+                $organization = OrganizationalLog::where('id', $data->program_entity_id)->first();
+                $college = OrganizationalLog::where('id', $validated['college_id'])->first();
+
+                // Check if organization and college are found
+                if ($organization && $college) {
+                    $programs[] = [
+                        'id' => $organization->id,
+                        'name' => $organization->name,
+                        'acronym' => $organization->acronym,
+                        'status' => $organization->status, // Added missing comma
+                        'programs' => [
+                            [
+                                'program_entity_id' => $organization->id, // Use the correct ID here
+                                'college_entity_id' => $validated['college_id'],
+                                'college_name' => $college->name,
+                            ],
+                        ]
+                    ];
+                }
+            }
+                
+            $response = [
+                'isSuccess' => true,
+                'programs' => $programs
+            ];
+            
+            return response($response,200);
+
+        }catch(Throwable $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Unsuccessfully created. Please check your inputs.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+            ];
+
+            $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+        }
+   
     }
 
 
