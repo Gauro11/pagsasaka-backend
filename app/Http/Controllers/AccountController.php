@@ -69,7 +69,7 @@ class AccountController extends Controller
     public function getAccounts(Request $request)
     {
         try {
-            $perPage = $request->input('per_page', 10);
+           $perPage = $request->input('per_page', 10);
 
             $datas = Account::select('id', 'name', 'email', 'role', 'status', 'org_log_id')
                 ->where('status', 'A')
@@ -79,7 +79,7 @@ class AccountController extends Controller
                             ->orWhere('email', 'like', '%' . $searchTerm . '%');
                     });
                 })
-                ->paginate($perPage);
+            ->paginate($perPage);
 
             if ($datas->isEmpty()) {
                 $response = [
@@ -104,8 +104,8 @@ class AccountController extends Controller
                 ];
             });
 
-            // Prepare the response with pagination metadata
-            $response = [
+                // Prepare the response with pagination metadata
+                $response = [
                 'isSuccess' => true,
                 'message' => 'Active user accounts retrieved successfully.',
                 'Accounts' => $accounts,
@@ -114,6 +114,7 @@ class AccountController extends Controller
                     'per_page' => $datas->perPage(),
                     'total' => $datas->total(),
                     'last_page' => $datas->lastPage(),
+                    'url' => url('api/accounts?page=' . $datas->currentPage() . '&per_page=' . $datas->perPage()), // URL with per_page
                 ],
             ];
 
@@ -214,45 +215,6 @@ class AccountController extends Controller
         }
     }
 
-    /**
-     * Delete a user account.
-     */
-    /*  public function deleteAccount(Request $request, $id)
-{
-    try {
-        
-        $Account = Account::findOrFail($id);
-
-       
-        $Account->delete();
-
-        // Prepare a successful response
-        $response = [
-            'isSuccess' => true,
-            'message' => "Account successfully deleted.",
-            'account' => $Account
-        ];
-
-        // Log the API call
-        $this->logAPICalls('deleteAccount', $id, $request->all(), [$response]);
-
-        // Return success response
-        return response()->json($response, 200);
-
-    } catch (Throwable $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => "Failed to delete the Account.",
-            'error' => $e->getMessage(),
-        ];
-
-        $this->logAPICalls('deleteAccount', $id, $request->all(), [$response]);
-
-        
-        return response()->json($response, 500);
-    }
-}
-*/
     public function resetPasswordToDefault(Request $request)
     {
         try {
@@ -357,4 +319,6 @@ class AccountController extends Controller
             $this->middleware('UserTypeAuth:Staff')->only(['getReviews']);
         }
     }*/
+
+    
 }

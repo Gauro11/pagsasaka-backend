@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Throwable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use App\Models\OrganizationalLog;
 
 class AuthController extends Controller
 {
@@ -164,20 +165,29 @@ class AuthController extends Controller
         try {
             // Validate the request
             $validator = Validator::make($request->all(), [
-                'current_password' => ['required','string',
+                'name' => 'required|string|max:255',    // Validate name
+                'email' => 'required|email',            // Validate email
+                'office' => 'required|string|max:255',  // Validate org_log_name
+                'current_password' => [
+                    'required', 'string',
                     function ($attribute, $value, $fail) use ($request) {
                         // Find the user by email
                         $user = Account::where('email', $request->email)->first();
-
+    
                         // If user exists, check the current password
                         if (!$user || !Hash::check($value, $user->password)) {
                             return $fail('The current password is incorrect.');
                         }
+    
+                        // Validate org_log_name against the user's associated organizational log
+                        if ($user->organizationalLog && $user->organizationalLog->org_log_name !== $request->org_log_name) {
+                            return $fail('The provided org_log_name does not match your organization.');
+                        }
                     },
                 ],
-                'new_password' => 'required|string|min:8|confirmed', 
+                'new_password' => 'required|string|min:8|confirmed',  // Validate new password
             ]);
-
+    
             if ($validator->fails()) {
                 $response = [
                     'isSuccess' => false,
@@ -187,10 +197,12 @@ class AuthController extends Controller
                 $this->logAPICalls('changePassword', null, $request->all(), $response);
                 return response()->json($response, 500);
             }
-
+    
             // Find the user by email and get only specific fields
-            $user = Account::select('name', 'email',)->where('email', $request->email)->first();
-
+            $user = Account::select('name', 'email', 'org_log_id') // Assuming org_log_id is related
+                ->where('email', $request->email)
+                ->first();
+    
             if (!$user) {
                 $response = [
                     'isSuccess' => false,
@@ -199,13 +211,12 @@ class AuthController extends Controller
                 $this->logAPICalls('changePassword', null, $request->all(), $response);
                 return response()->json($response, 500);
             }
-
-
-            // You can either retrieve the full user again or use the email to update the password
+    
+            // Update the user's password
             $fullUser = Account::where('email', $request->email)->first();
             $fullUser->password = Hash::make($request->new_password);
             $fullUser->save();
-
+    
             // Return the selected fields in the response
             $response = [
                 'isSuccess' => true,
@@ -225,8 +236,7 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
-
-
+    
 
 
     // Method to log API calls

@@ -16,8 +16,9 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\EmailController;
 
-//Route::post('/send-email', [emailcontroller::class, 'sendEmail']);
+Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 //connection//
 Route::options('/{any}', function (Request $request) {
@@ -51,7 +52,7 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('Add', 'createAccount');
     Route::post('updateAccounts/{id}', 'updateAccount');
     Route::post('/softdelete/{id}', 'changeStatusToInactive');
-    //Route::post('deleteAccount/{id}','deleteAccount');
+   
 });
 
 /*Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
