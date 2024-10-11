@@ -476,9 +476,9 @@ class OrgLogController extends Controller
                         'id' => $organization->id,
                         'name' => $organization->name,
                         'acronym' => $organization->acronym,
-                        'status' => $organization->session_status, // Added missing comma
+                        'status' => $organization->status, // Added missing comma
                         'programs' => [
-                            'program_entity_id' => $college->program_entity_id,
+                            'program_entity_id' => $organization->id,
                             'college_entity_id' => $validated['college_id'],
                             'college_name' => $college->name,
                         ],
