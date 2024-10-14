@@ -18,84 +18,97 @@ use App\Models\OrganizationalLog;
 class AuthController extends Controller
 {
     public function login(Request $request)
-    {
-        try {
+{
+    try {
+        // Validate the request
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
 
-            $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
-            ]);
+        // Find the user by email
+        $user = Account::where('email', $request->email)->first();
 
-
-            $user = Account::where('email', $request->email)->first();
-
-            if ($user) {
-                  // Check if the account's status is 'I' (Inactive)
+        if ($user) {
+            // Check if the account's status is 'I' (Inactive)
             if ($user->status === 'I') {
                 $response = ['message' => 'Account is inactive.'];
                 $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                 return response()->json($response, 500); // 500 Forbidden
             }
 
-                if (Hash::check($request->password, $user->password)) {
+            // Verify the password
+            if (Hash::check($request->password, $user->password)) {
 
-                    $token = null;
-                    switch ($user->role) {
-                        case 'Admin':
-                            $token = $user->createToken('admin-token', ['admin'])->plainTextToken;
-                            break;
-                        case 'Head':
-                            $token = $user->createToken('head-token', ['head'])->plainTextToken;
-                            break;
-                        case 'Programchair':
-                            $token = $user->createToken('programchair-token', ['programchair'])->plainTextToken;
-                            break;
-                        case 'Staff':
-                            $token = $user->createToken('staff-token', ['staff'])->plainTextToken;
-                            break;
-                        case 'Dean':
-                            $token = $user->createToken('dean-token', ['dean'])->plainTextToken;
-                            break;
-                        default:
-                            $response = ['message' => 'Unauthorized'];
-                            $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
-                            return response()->json($response, 500);
-                    }
-
-
-                    $sessionResponse = $this->insertSession($request->merge(['id' => $user->id]));
-
-
-                    $response = [
-                        'isSuccess' => true,
-                        'message' => ucfirst($user->role) . ' logged in successfully',
-                        'token' => $token,
-                        'user' => $user->only(['org_log_id', 'email']),
-                        'role' => $user->role,
-                        'session' => $sessionResponse->getData(),
-                    ];
-                    $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
-                    return response()->json($response, 200);
-                } else {
-
-                    $response = ['message' => 'Invalid credentials'];
-                    $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
-                    return response()->json($response, 500);
+                // Assign token based on the user's role
+                $token = null;
+                switch ($user->role) {
+                    case 'Admin':
+                        $token = $user->createToken('admin-token', ['admin'])->plainTextToken;
+                        break;
+                    case 'Head':
+                        $token = $user->createToken('head-token', ['head'])->plainTextToken;
+                        break;
+                    case 'Programchair':
+                        $token = $user->createToken('programchair-token', ['programchair'])->plainTextToken;
+                        break;
+                    case 'Staff':
+                        $token = $user->createToken('staff-token', ['staff'])->plainTextToken;
+                        break;
+                    case 'Dean':
+                        $token = $user->createToken('dean-token', ['dean'])->plainTextToken;
+                        break;
+                    default:
+                        $response = ['message' => 'Unauthorized'];
+                        $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
+                        return response()->json($response, 500);
                 }
+
+                // Fetch the organization log name based on org_log_id
+                $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
+                $org_log_name = $org_log ? $org_log->org_log_name : 'N/A';
+
+              
+                $sessionResponse = $this->insertSession($request->merge(['id' => $user->id]));
+
+                $response = [
+                    'isSuccess' => true,
+                    'message' => ucfirst($user->role) . ' logged in successfully',
+                    'token' => $token,
+                    'user' => [
+                        'id' => $user->id,
+                        'org_log_id' => $user->org_log_id,
+                        'org_log_name' => optional($org_log)->name,
+                        'email' => $user->email,
+                    ],
+                    'role' => $user->role,
+                    'session' => $sessionResponse->getData(),
+                ];
+
+                // Log API call
+                $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
+
+                return response()->json($response, 200);
             } else {
                 $response = ['message' => 'Invalid credentials'];
                 $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
                 return response()->json($response, 500);
             }
-        } catch (Throwable $e) {
-            $response = [
-                'message' => 'An error occurred',
-                'error' => $e->getMessage()
-            ];
-            $this->logAPICalls('login', $request->email, $request->all(), $response);
+        } else {
+            $response = ['message' => 'Invalid credentials'];
+            $this->logAPICalls('login', $request->email, $request->except(['password']), $response);
             return response()->json($response, 500);
         }
+    } catch (Throwable $e) {
+        $response = [
+            'message' => 'An error occurred',
+            'error' => $e->getMessage()
+        ];
+        $this->logAPICalls('login', $request->email, $request->all(), $response);
+        return response()->json($response, 500);
     }
+}
+
     /////logout//////
     public function logout(Request $request, $id)
     {
@@ -165,14 +178,16 @@ class AuthController extends Controller
         try {
             // Validate the request
             $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',    // Validate name
-                'email' => 'required|email',            // Validate email
-                'office' => 'required|string|max:255',  // Validate org_log_name
+                'Firstname' => 'nullable|string|max:255',
+                'Lastname' => 'nullable|string|max:255',
+                'Middlename' => 'nullable|string|max:255',    
+                'email' => 'nullable|email',           
+                
                 'current_password' => [
                     'required', 'string',
                     function ($attribute, $value, $fail) use ($request) {
-                        // Find the user by email
-                        $user = Account::where('email', $request->email)->first();
+                        // Find the user by ID
+                        $user = Account::where('id', $request->id)->first();
     
                         // If user exists, check the current password
                         if (!$user || !Hash::check($value, $user->password)) {
@@ -198,9 +213,9 @@ class AuthController extends Controller
                 return response()->json($response, 500);
             }
     
-            // Find the user by email and get only specific fields
-            $user = Account::select('name', 'email', 'org_log_id') // Assuming org_log_id is related
-                ->where('email', $request->email)
+            // Find the user by ID
+            $user = Account::select('id', 'Firstname', 'Lastname', 'Middlename', 'email', 'org_log_id')
+                ->where('id', $request->id)
                 ->first();
     
             if (!$user) {
@@ -212,18 +227,27 @@ class AuthController extends Controller
                 return response()->json($response, 500);
             }
     
-            // Update the user's password
-            $fullUser = Account::where('email', $request->email)->first();
-            $fullUser->password = Hash::make($request->new_password);
-            $fullUser->save();
+            // Retrieve the organization log based on the user's org_log_id
+            $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
+            $org_log_name = $org_log ? $org_log->org_log_name : 'N/A';
     
-            // Return the selected fields in the response
+            // Update the user's password
+            $user->password = Hash::make($request->new_password);
+            $user->save();
+    
+            // Prepare the response with the org_log_name as office
             $response = [
                 'isSuccess' => true,
                 'message' => 'Password reset successfully.',
-                'user' => $user
+                'user' => [
+                    'Firstname' => $user->Firstname,
+                    'Lastname' => $user->Lastname,
+                    'Middlename' => $user->Middlename,
+                    'email' => $user->email,
+                    'office'  => optional($org_log)->name, // Automatically filled based on org_log_id
+                ]
             ];
-            $this->logAPICalls('resetPassword', $fullUser->id, $request->except('org_log_id'), $response);
+            $this->logAPICalls('resetPassword', $user->id, $request->except('org_log_id'), $response);
             return response()->json($response, 200);
         } catch (Throwable $e) {
             // Error handling
@@ -236,6 +260,9 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
+    
+    
+    
     
 
 
