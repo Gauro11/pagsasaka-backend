@@ -22,7 +22,6 @@ class emailcontroller extends Controller
         $email = $request->input('email');
 
         try {
-            // Dynamically configure mail settings
             Config::set('mail.mailers.smtp.host', 'smtp.gmail.com');
             Config::set('mail.mailers.smtp.port', 587);
             Config::set('mail.mailers.smtp.username', 'milbertgaringa5@gmail.com');
@@ -31,10 +30,9 @@ class emailcontroller extends Controller
             Config::set('mail.from.address', 'milbertgaringa5@gmail.com');
             Config::set('mail.from.name', 'DMO');
 
-            // Send a simple email
             Mail::raw('Good Day! A gentle reminder to comply for the submission of documents tagged to your good office of the Data Bank Management System. Please do submit the needed files', function ($message) use ($email) {
                 $message->to($email)
-                        ->subject('Welcome to Our Application');
+                        ->subject('Notification for Data Bank Management System');
             });
 
             // API response data
@@ -42,15 +40,11 @@ class emailcontroller extends Controller
 
             // Log API call with success status
             $this->logAPICalls('sendEmail', null, $request->all(), $resp);
-
             return response()->json($resp, 200);
         } catch (Throwable $e) {
-            // API error response data
             $resp = ['status' => 'error', 'message' => $e->getMessage()];
 
-            // Log API call with error status
             $this->logAPICalls('sendEmail', null, $request->all(), $resp);
-
             return response()->json($resp, 500);
         }
     }

@@ -71,6 +71,49 @@ class AccountController extends Controller
     public function getAccounts(Request $request)
     {
         try {
+
+            $validated = $request->validate([
+                'paginate' => 'required'
+            ]);
+
+            if($validated['paginate']==0){
+                           $datas = Account::select('id', 'Firstname','Lastname','Middlename', 'email', 'role', 'status', 'org_log_id')
+                         ->where('status', 'A')->get();
+
+                        if ($datas->isEmpty()) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'No active accounts found matching the criteria.',
+                ];
+                $this->logAPICalls('getAccounts', "", $request->all(), $response);
+                return response()->json($response, 500);
+            }
+
+            $accounts = $datas->map(function ($data) {
+                $org_log = OrganizationalLog::where('id', $data->org_log_id)->first();
+
+                return [
+                    'id' => $data->id,
+                    'Firstname' => $data->Firstname,
+                    'Lastname' => $data->Lastname,
+                    'Middlename' => $data->Middlename,
+                    'email' => $data->email,
+                    'role' => $data->role,
+                    'status' => $data->status,
+                    'org_log_id' => $data->org_log_id,
+                    'org_log_name' => optional($org_log)->name,
+                ];
+            });
+
+                $response = [
+                    'isSuccess' => true,
+                    'message' => 'Active user accounts retrieved successfully.',
+                    'Accounts' => $accounts,
+                    
+                  ];
+            }else{
+
+            
            $perPage = $request->input('per_page', 10);
 
             $datas = Account::select('id', 'Firstname','Lastname','Middlename', 'email', 'role', 'status', 'org_log_id')
@@ -121,7 +164,7 @@ class AccountController extends Controller
                     'url' => url('api/accounts?page=' . $datas->currentPage() . '&per_page=' . $datas->perPage()), 
                 ],
             ];
-
+         }
             $this->logAPICalls('getAccounts', "", $request->all(), $response);
             return response()->json($response, 200);
         } catch (Throwable $e) {
