@@ -90,49 +90,74 @@ class OrgLogController extends Controller
 
         try{
 
-            $items = 10;
-
-            // Validation
-            $validate = $request->validate([
+            $validated = $request->validate([
+                'paginate' =>  'required',
                 'org_id' => 'required'
             ]);
 
-            $perPage = $request->query('per_page', $items); 
+            if ($validated['paginate'] == 0) {
+                // Build the query
+                $query = OrganizationalLog::where('org_id', $validated['org_id'])
+                                          ->where('status', '!=', 'D')
+                                          ->orderBy('created_at', 'desc');
+            
+                // Eager load the programs relationship if org_id is 3
+                if ($request->org_id == 3) {
+                    $query->with(['programs:program_entity_id,college_entity_id']);
+                }
+            
+                // Get the results
+                $data = $query->get();
+            
+                // If org_id is 3, transform the data to include college names
+                if ($request->org_id == 3) {
+                    $data->transform(function ($item) {
+                        foreach ($item->programs as $program) {
+                            $college = OrganizationalLog::find($program->college_entity_id);
+                            $program->college_name = $college ? $college->name : null;
+                        }
+                        return $item;
+                    });
+                }
+            
+                // Log the API call
+                $this->logAPICalls('getOrgLog', "", $request->all(), [$data]);
+            
+                // Return the response
+                return response()->json([
+                    'isSuccess' => true,
+                    'get_OrgLog' => $data
+                ]);
 
-          
-            $search = $request->input('search'); 
+            }else{
+            
 
-            // Query building
-            $query = OrganizationalLog::where('org_id', $request->org_id)
-                                        ->where('status','!=','D');
+                // Query building
+                $query = OrganizationalLog::where('org_id', $request->org_id)
+                                            ->where('status','!=','D');
 
-            // Search filter
-            if (!empty($search)) {
-                $query->where(function($q) use ($search) {
-                    $q->where('name', 'LIKE', "%{$search}%")
-                      ->orWhere('acronym', 'LIKE', "%{$search}%");
-                });
+      
+
+                // Custom handling for org_id == 3
+                if ($request->org_id == 3) { // Ensure org_id is integer
+                    $data = $query->with(['programs:program_entity_id,college_entity_id'])
+                        ->orderBy('created_at', 'desc')
+                        ->paginate($perPage);
+
+                    // Manipulate the response to get the name of the college.
+                    $data->getCollection()->transform(function ($item) {
+                        foreach ($item->programs as $program) {
+                            $college = OrganizationalLog::find($program->college_entity_id);
+                            $program->college_name = $college ? $college->name : null;
+                        }
+                        return $item;
+                    });
+                } else {
+                    $data = $query->orderBy('created_at', 'desc')->paginate($perPage);
+                }
+
             }
-        //    return $query;
-
-            // Custom handling for org_id == 3
-            if ($request->org_id == 3) { // Ensure org_id is integer
-                $data = $query->with(['programs:program_entity_id,college_entity_id'])
-                    ->orderBy('created_at', 'desc')
-                    ->paginate($perPage);
-
-                // Manipulate the response to get the name of the college.
-                $data->getCollection()->transform(function ($item) {
-                    foreach ($item->programs as $program) {
-                        $college = OrganizationalLog::find($program->college_entity_id);
-                        $program->college_name = $college ? $college->name : null;
-                    }
-                    return $item;
-                });
-            } else {
-                $data = $query->orderBy('created_at', 'desc')->paginate($perPage);
-            }
-
+            
             $this->logAPICalls('getOrgLog', "", $request->all(), [$data]);
             return response()->json([
                 'isSucccess' => true,
