@@ -48,7 +48,7 @@ Route::middleware(['auth:sanctum', 'UserTypeAuth'])->group(function () {
 
 //create acc///
 Route::controller(AccountController::class)->group(function () {
-    Route::get('getAccounts', 'getAccounts');
+    Route::post('getAccounts', 'getAccounts');
     Route::post('Add', 'createAccount');
     Route::post('updateAccounts/{id}', 'updateAccount');
     Route::post('/softdelete/{id}', 'changeStatusToInactive');
