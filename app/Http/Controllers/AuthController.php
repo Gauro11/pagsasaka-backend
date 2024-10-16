@@ -203,7 +203,7 @@ class AuthController extends Controller
                         }
                     },
                 ],
-                'new_password' => 'required|string|min:8|confirmed',  // Validate new password
+                'new_password' => 'required|string|min:8|confirmed',  
             ]);
     
             if ($validator->fails()) {
@@ -241,8 +241,9 @@ class AuthController extends Controller
             // Prepare the response with the org_log_name as office
             $response = [
                 'isSuccess' => true,
-                'message' => 'Password reset successfully.',
+                'message' => 'Password change successfully.',
                 'user' => [
+                    'id' => $user->id,
                     'Firstname' => $user->Firstname,
                     'Lastname' => $user->Lastname,
                     'Middlename' => $user->Middlename,
