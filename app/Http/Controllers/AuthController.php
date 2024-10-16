@@ -248,7 +248,8 @@ class AuthController extends Controller
                     'Lastname' => $user->Lastname,
                     'Middlename' => $user->Middlename,
                     'email' => $user->email,
-                    'office'  => optional($org_log)->name, // Automatically filled based on org_log_id
+                    'org_log_id' => $user->org_log_id,
+                    'org_log_name'  => optional($org_log)->name, // Automatically filled based on org_log_id
                 ]
             ];
             $this->logAPICalls('resetPassword', $user->id, $request->except('org_log_id'), $response);
