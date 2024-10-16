@@ -181,12 +181,23 @@ class AuthController extends Controller
         try {
             // Validate the request
             $validator = Validator::make($request->all(), [
-                'Firstname' => 'nullable|string|max:255', 
-                'Lastname' => 'nullable|string|max:255',  
-                'Middlename' => 'nullable|string|max:255', 
-                'email' => 'nullable|email',  
-                'current_password' => 'nullable|string',  
-                'new_password' => 'nullable|string|min:8|confirmed', 
+                'Firstname' => 'nullable|string|max:255', // Editable
+                'Lastname' => 'nullable|string|max:255',  // Editable
+                'Middlename' => 'nullable|string|max:255', // Editable
+                'email' => 'nullable|email',  // Optional
+                'current_password' => [
+                    'nullable', 'string',
+                    function ($attribute, $value, $fail) use ($request) {
+                        // Find the user by ID
+                        $user = Account::where('id', $request->id)->first();
+    
+                        // If the password is set and the current password doesn't match
+                        if ($user && $user->password && !Hash::check($value, $user->password)) {
+                            return $fail('The current password is incorrect.');
+                        }
+                    },
+                ],
+                'new_password' => 'nullable|string|min:8|confirmed', // Optional
             ]);
     
             if ($validator->fails()) {
@@ -200,7 +211,7 @@ class AuthController extends Controller
             }
     
             // Find the user by ID
-            $user = Account::select('id', 'Firstname', 'Lastname', 'Middlename', 'email', 'org_log_id')
+            $user = Account::select('id', 'Firstname', 'Lastname', 'Middlename', 'email', 'org_log_id', 'password')
                 ->where('id', $request->id)
                 ->first();
     
@@ -212,27 +223,40 @@ class AuthController extends Controller
                 $this->logAPICalls('changePassword', null, $request->all(), $response);
                 return response()->json($response, 500);
             }
-
+    
+            // Update user's editable fields if provided
             if ($request->has('Firstname')) {
-                $user->Firstname = $request->Firstname;
+                $user->Firstname = $request->Firstname; // Editable
             }
             if ($request->has('Lastname')) {
-                $user->Lastname = $request->Lastname;
+                $user->Lastname = $request->Lastname; // Editable
             }
             if ($request->has('Middlename')) {
-                $user->Middlename = $request->Middlename;
+                $user->Middlename = $request->Middlename; // Editable
             }
             if ($request->has('email')) {
                 $user->email = $request->email;
             }
     
-           
+            // Retrieve the organization log based on the user's org_log_id
             $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
             $org_log_name = $org_log ? $org_log->org_log_name : 'N/A';
     
-           
+            // Handle password update logic
             if ($request->filled('new_password')) {
-                $user->password = Hash::make($request->new_password);
+                // If the password is empty (null), skip current_password check
+                if ($user->password == null || Hash::check($request->current_password, $user->password)) {
+                    // Update password if valid current_password is provided (or if it's blank)
+                    $user->password = Hash::make($request->new_password);
+                } else {
+                    // If current password is incorrect and not empty, return an error
+                    $response = [
+                        'isSuccess' => false,
+                        'message' => 'The current password is incorrect.',
+                    ];
+                    $this->logAPICalls('changePassword', $user->id, $request->all(), $response);
+                    return response()->json($response, 500);
+                }
             }
     
             // Save the updated user data
@@ -241,12 +265,12 @@ class AuthController extends Controller
             // Prepare the response with the org_log_name as office
             $response = [
                 'isSuccess' => true,
-                'message' => 'Password and user details updated successfully.',
+                'message' => 'User details updated successfully.',
                 'user' => [
                     'id' => $user->id,
-                    'Firstname' => $user->Firstname,
-                    'Lastname' => $user->Lastname,
-                    'Middlename' => $user->Middlename,
+                    'Firstname' => $user->Firstname,  // Now editable
+                    'Lastname' => $user->Lastname,   // Now editable
+                    'Middlename' => $user->Middlename, // Now editable
                     'email' => $user->email,
                     'org_log_id' => $user->org_log_id,
                     'org_log_name' => optional($org_log)->name, // Automatically filled based on org_log_id
