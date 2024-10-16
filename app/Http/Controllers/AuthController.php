@@ -77,6 +77,9 @@ class AuthController extends Controller
                     'token' => $token,
                     'user' => [
                         'id' => $user->id,
+                        'Firstname' => $user->Firstname,
+                        'Middlename' => $user->Middlename,
+                        'Lastname' => $user->Lastname,
                         'org_log_id' => $user->org_log_id,
                         'org_log_name' => optional($org_log)->name,
                         'email' => $user->email,
@@ -262,9 +265,6 @@ class AuthController extends Controller
     }
     
     
-    
-    
-
 
     // Method to log API calls
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)
