@@ -74,6 +74,7 @@ Route::controller(OrgLogController::class)->group(function () {
     Route::post('deleteOrgLog', 'deleteOrgLog');
     Route::post('searchOrgLog', 'searchOrgLog');
     Route::post('filterCollege', 'filterCollege');
+    Route::post('getOrgLogInfo', 'getOrgLogInfo');
 });
 
 Route::controller(ProgramController::class)->group(function () {
