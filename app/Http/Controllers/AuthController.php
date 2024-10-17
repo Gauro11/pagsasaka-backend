@@ -77,6 +77,9 @@ class AuthController extends Controller
                     'token' => $token,
                     'user' => [
                         'id' => $user->id,
+                        'Firstname' => $user->Firstname,
+                        'Middlename' => $user->Middlename,
+                        'Lastname' => $user->Lastname,
                         'org_log_id' => $user->org_log_id,
                         'org_log_name' => optional($org_log)->name,
                         'email' => $user->email,
@@ -178,29 +181,23 @@ class AuthController extends Controller
         try {
             // Validate the request
             $validator = Validator::make($request->all(), [
-                'Firstname' => 'nullable|string|max:255',
-                'Lastname' => 'nullable|string|max:255',
-                'Middlename' => 'nullable|string|max:255',    
-                'email' => 'nullable|email',           
-                
+                'Firstname' => 'nullable|string|max:255', // Editable
+                'Lastname' => 'nullable|string|max:255',  // Editable
+                'Middlename' => 'nullable|string|max:255', // Editable
+                'email' => 'nullable|email',  // Optional
                 'current_password' => [
-                    'required', 'string',
+                    'nullable', 'string',
                     function ($attribute, $value, $fail) use ($request) {
                         // Find the user by ID
                         $user = Account::where('id', $request->id)->first();
     
-                        // If user exists, check the current password
-                        if (!$user || !Hash::check($value, $user->password)) {
+                        // If the password is set and the current password doesn't match
+                        if ($user && $user->password && !Hash::check($value, $user->password)) {
                             return $fail('The current password is incorrect.');
-                        }
-    
-                        // Validate org_log_name against the user's associated organizational log
-                        if ($user->organizationalLog && $user->organizationalLog->org_log_name !== $request->org_log_name) {
-                            return $fail('The provided org_log_name does not match your organization.');
                         }
                     },
                 ],
-                'new_password' => 'required|string|min:8|confirmed',  // Validate new password
+                'new_password' => 'nullable|string|min:8|confirmed', // Optional
             ]);
     
             if ($validator->fails()) {
@@ -214,7 +211,7 @@ class AuthController extends Controller
             }
     
             // Find the user by ID
-            $user = Account::select('id', 'Firstname', 'Lastname', 'Middlename', 'email', 'org_log_id')
+            $user = Account::select('id', 'Firstname', 'Lastname', 'Middlename', 'email', 'org_log_id', 'password')
                 ->where('id', $request->id)
                 ->first();
     
@@ -227,44 +224,74 @@ class AuthController extends Controller
                 return response()->json($response, 500);
             }
     
+            // Update user's editable fields if provided
+            if ($request->has('Firstname')) {
+                $user->Firstname = $request->Firstname; // Editable
+            }
+            if ($request->has('Lastname')) {
+                $user->Lastname = $request->Lastname; // Editable
+            }
+            if ($request->has('Middlename')) {
+                $user->Middlename = $request->Middlename; // Editable
+            }
+            if ($request->has('email')) {
+                $user->email = $request->email;
+            }
+    
             // Retrieve the organization log based on the user's org_log_id
             $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
             $org_log_name = $org_log ? $org_log->org_log_name : 'N/A';
     
-            // Update the user's password
-            $user->password = Hash::make($request->new_password);
+            // Handle password update logic
+            if ($request->filled('new_password')) {
+                // If the password is empty (null), skip current_password check
+                if ($user->password == null || Hash::check($request->current_password, $user->password)) {
+                    // Update password if valid current_password is provided (or if it's blank)
+                    $user->password = Hash::make($request->new_password);
+                } else {
+                    // If current password is incorrect and not empty, return an error
+                    $response = [
+                        'isSuccess' => false,
+                        'message' => 'The current password is incorrect.',
+                    ];
+                    $this->logAPICalls('changePassword', $user->id, $request->all(), $response);
+                    return response()->json($response, 500);
+                }
+            }
+    
+            // Save the updated user data
             $user->save();
     
             // Prepare the response with the org_log_name as office
             $response = [
                 'isSuccess' => true,
-                'message' => 'Password reset successfully.',
+                'message' => 'User details updated successfully.',
                 'user' => [
-                    'Firstname' => $user->Firstname,
-                    'Lastname' => $user->Lastname,
-                    'Middlename' => $user->Middlename,
+                    'id' => $user->id,
+                    'Firstname' => $user->Firstname,  // Now editable
+                    'Lastname' => $user->Lastname,   // Now editable
+                    'Middlename' => $user->Middlename, // Now editable
                     'email' => $user->email,
-                    'office'  => optional($org_log)->name, // Automatically filled based on org_log_id
+                    'org_log_id' => $user->org_log_id,
+                    'org_log_name' => optional($org_log)->name, // Automatically filled based on org_log_id
                 ]
             ];
-            $this->logAPICalls('resetPassword', $user->id, $request->except('org_log_id'), $response);
+            $this->logAPICalls('changePassword', $user->id, $request->except('org_log_id'), $response);
             return response()->json($response, 200);
         } catch (Throwable $e) {
             // Error handling
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to reset password.',
+                'message' => 'Failed to update user details.',
                 'error' => $e->getMessage(),
             ];
-            $this->logAPICalls('resetPassword', null, $request->all(), $response);
+            $this->logAPICalls('changePassword', null, $request->all(), $response);
             return response()->json($response, 500);
         }
     }
     
     
     
-    
-
 
     // Method to log API calls
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)

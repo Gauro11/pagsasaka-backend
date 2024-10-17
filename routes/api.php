@@ -52,8 +52,8 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('Add', 'createAccount');
     Route::post('updateAccounts/{id}', 'updateAccount');
     Route::post('/softdelete/{id}', 'changeStatusToInactive');
-   
 });
+Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
 /*Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {

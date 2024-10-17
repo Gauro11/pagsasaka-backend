@@ -65,6 +65,27 @@ class AccountController extends Controller
         }
     }
 
+    public function getOrganizationLogs()
+{
+    try {
+        // Retrieve all the org_log_id and org_log_name
+        $organizationLogs = OrganizationalLog::select('id', 'name')->get();
+
+        $response = [
+            'isSuccess' => true,
+            'data' => $organizationLogs
+        ];
+        return response()->json($response, 200);
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => 'Failed to fetch organization logs.',
+            'error' => $e->getMessage()
+        ];
+        return response()->json($response, 500);
+    }
+}
+
     /*
      * Read: Get all user accounts.
      */
@@ -78,7 +99,10 @@ class AccountController extends Controller
 
             if($validated['paginate']==0){
                            $datas = Account::select('id', 'Firstname','Lastname','Middlename', 'email', 'role', 'status', 'org_log_id')
-                         ->where('status', 'A')->get();
+                         ->where('status', 'A')
+                         ->orderBy('created_at', 'desc') // Ordering by creation date in descending order
+                         ->get();
+                        
 
                         if ($datas->isEmpty()) {
                 $response = [
@@ -122,6 +146,7 @@ class AccountController extends Controller
                     return $query->where(function ($activeQuery) use ($searchTerm) {
                         $activeQuery->where('Firstname', 'like', '%' . $searchTerm . '%')
                             ->orWhere('email', 'like', '%' . $searchTerm . '%');
+                            
                     });
                 })
             ->paginate($perPage);
