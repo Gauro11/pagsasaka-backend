@@ -300,10 +300,11 @@ class RequestController extends Controller
             $data = UserRequest::where('id', $request_id)->first();
 
             if ($data) {
-                $data->update(['aproval_status' => "completed"]);
+                $data->update(['approval_status' => "completed"]);
             } else {
                 $invalidId[] = $request_id;
             }
+
        }
 
        $response = [
@@ -360,6 +361,8 @@ class RequestController extends Controller
         }
         return true;
     }
+
+
 
 }
 
