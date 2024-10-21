@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Requests\requestUser;
 use App\Models\UserRequest;
+use App\Models\OrganizationalLog;
 use App\Models\Account;
 use App\Models\Program;
 
@@ -117,17 +118,44 @@ class RequestController extends Controller
                 
                 if ($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2") {
 
-                    $data = UserRequest::orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
+                 $datas = UserRequest::orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
+                
 
                 } else {
-                    $data = UserRequest::where('role', $role)
+                    $datas = UserRequest::where('role', $role)
                                         ->orderBy('created_at', 'desc')
                                         ->get();
                 }
 
+                $requestData =[];
+
+                foreach($datas as $data){
+                    $org = OrganizationalLog::where('id',$data->org_log_id)->first();
+                    $requestData[] = [
+                        'id' => $data->id,
+                        'request_no' => $data->request_no,
+                        'account_id' => $data->account_id,
+                        'org_log_acronym' =>  $org->acronym ,
+                        'purpose' => $data->purpose,
+                        'requested_date' => $data->requested_date,
+                        'files' =>  $data->files,
+                        'qtyfile' => $data->qtyfile,
+                        'approval_status' => $data->approval_status,
+                        'status' =>  $data->status,
+                    ];
+                }
+
                 $response = [
                     'isSuccess' => true,
-                    'data' => $data
+                    'requestData' => $requestData,
+                    'current_page' => $datas->currentPage(),
+                    'from' => $datas->firstItem(),
+                    'last_page' => $datas->lastPage(),
+                    'next_page_url' => $datas->nextPageUrl(),
+                    'per_page' => $datas->perPage(),
+                    'prev_page_url' => $datas->previousPageUrl(),
+                    'to' => $datas->lastItem(),
+                    'total' => $datas->total()
                 ];
                 
     
@@ -150,13 +178,38 @@ class RequestController extends Controller
                     })->get();
                 }
 
-             
+                $requestData =[];
 
+                foreach($results as $data){
+                    $org = OrganizationalLog::where('id',$data->org_log_id)->first();
+                    
+                    $requestData[] = [
+                        'id' => $data->id,
+                        'request_no' => $data->request_no,
+                        'account_id' => $data->account_id,
+                        'org_log_acronym' =>  $org->acronym ,
+                        'purpose' => $data->purpose,
+                        'requested_date' => $data->requested_date,
+                        'files' =>  $data->files,
+                        'qtyfile' => $data->qtyfile,
+                        'approval_status' => $data->approval_status,
+                        'status' =>  $data->status
+                    ];
+                }
+                
                 $response = [
                     'isSuccess' => true,
-                    'data' => $results
+                    'requestData' => $requestData,
+                    'current_page' => $results->currentPage(),
+                    'from' => $results->firstItem(),
+                    'last_page' => $results->lastPage(),
+                    'next_page_url' => $results->nextPageUrl(),
+                    'per_page' => $results->perPage(),
+                    'prev_page_url' => $results->previousPageUrl(),
+                    'to' => $results->lastItem(),
+                    'total' => $results->total()
                 ];
-               
+                
             }
     
 
