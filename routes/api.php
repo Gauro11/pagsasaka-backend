@@ -102,7 +102,7 @@ Route::controller(RequirementController::class)->group(function () {
 
 Route::controller(FileRequirementController::class)->group(function () {
 
-    Route::get('getAllfile', 'getAllfile');
+    Route::get('getAllfile', 'getAllfile'); // DMO FILES
     Route::post('getFileRequirement', 'getFileRequirement');
     Route::post('storeFileRequirement', 'storeFileRequirement');
     Route::post('storeFolderRequirement', 'storeFolderRequirement');
