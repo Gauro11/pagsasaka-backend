@@ -10,6 +10,7 @@ use App\Models\Program;
 use App\Models\ApiLog;
 use App\Models\AcademicYear;
 use App\Models\OrganizationalLog;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 use App\Http\Requests\EventRequest;
 use Exception;
@@ -94,14 +95,16 @@ class EventController extends Controller
             }
             
             $data = $query->get();
+            $org_name = OrganizationalLog::find($validated['org_log_id']);
 
             $response = [
                 'isSuccess' => true,
-                'data' => $data
+                'data' => $data,
+                'org_name' => $org_name->name
            ];
 
             $this->logAPICalls('getEvent', "", $request->all(), [$response]);
-            return response()->json($data);
+            return response()->json($response);
             
         }catch(Throwable $e){
 
@@ -122,7 +125,7 @@ class EventController extends Controller
     public function storeEvent(EventRequest $request){
 
         try{
-
+            
              if ($this->isExist($request->validated())) {
  
                  $response = [
@@ -132,13 +135,15 @@ class EventController extends Controller
  
                  $this->logAPICalls('storeEvent', "", $request->all(), [$response]);
  
-                 return response()->json($response, 422);
+                 return response()->json($response, 500);
  
              }else{
-             
+               
+                $this->makeFolder($request->org_log_id, $request->name,$request->requirements);
+              
                 $organizationalLog = OrganizationalLog::where('id', $request->validated())->get();
 
-                // Test if the input org_log_id is for College. //
+               // Test if the input org_log_id is for College. //
 
                if($organizationalLog->first()->org_id != "1"){
 
@@ -157,7 +162,7 @@ class EventController extends Controller
                     ]));
 
             
-                    $eventid= $this->getEventID($request->name,$request->description,$request->academic_year,$request->submission_date);
+                    $eventid= $this->getEventID($request->org_log_id,$request->name,$request->description,$request->academic_year,$request->submission_date);
 
                     $invalidRequirements = [];
                     $duplicateRequirements = [];
@@ -447,9 +452,10 @@ class EventController extends Controller
         }
     }
 
-    public function getEventID($name,$descrip,$acadyear,$submdate){
+    public function getEventID($org_log_id,$name,$descrip,$acadyear,$submdate){
         $event= Event::where('name',$name)
                       ->where('description',$descrip)
+                      ->where('org_log_id',$org_log_id)
                       ->where('academic_year',$acadyear)
                       ->where('submission_date',$submdate)
                       ->get();
@@ -484,6 +490,89 @@ class EventController extends Controller
         return true;
     }
 
+    public function makeFolder($org_log_id,$eventName,$requirements){
+
+        $organization = OrganizationalLog::find($org_log_id);
+        $organization_name = $organization->name;
+
+        if($organization->org_id != 3){
+
+            $folderPath = $organization_name;
+            if (!Storage::disk('public')->exists($folderPath)) {
+                Storage::disk('public')->makeDirectory($folderPath);
+                $folderPath = $organization_name.'/'.$eventName;
+                    
+                    if (!Storage::disk('public')->exists($folderPath)) {
+                        Storage::disk('public')->makeDirectory($folderPath);
+                       
+                    }
+                
+                    $this->makeRequirement($requirements, $folderPath);
+
+            }else{
+                $folderPath = $organization_name.'/'.$eventName;
+                    
+                if (!Storage::disk('public')->exists($folderPath)) {
+                    Storage::disk('public')->makeDirectory($folderPath);
+                    
+                }
+
+                $this->makeRequirement($requirements, $folderPath);
+            }
+        }else{
+            $program = Program::where('program_entity_id', $organization->id)->first();
+            $college = OrganizationalLog::find($program->college_entity_id);
+            $college_name = $college->name;
+
+            if (!Storage::disk('public')->exists($college_name)) {
+
+                Storage::disk('public')->makeDirectory($college_name);
+                $folderPath = $college_name.'/'.$organization->name;
+                    
+                if (!Storage::disk('public')->exists($folderPath)) {
+                    Storage::disk('public')->makeDirectory($folderPath);
+                }
+
+                $folderPath = $college_name.'/'.$organization->name.'/'.$eventName;
+                if (!Storage::disk('public')->exists($folderPath)) {
+                    Storage::disk('public')->makeDirectory($folderPath);
+                }
+
+             $this->makeRequirement($requirements, $folderPath);
+            
+               
+            }else{
+
+                $folderPath = $college_name.'/'.$organization->name;
+                    
+                if (!Storage::disk('public')->exists($folderPath)) {
+                    Storage::disk('public')->makeDirectory($folderPath);
+                    $folderPath = $college_name.'/'.$organization->name.'/'.$eventName;
+                    if (!Storage::disk('public')->exists($folderPath)) {
+                        Storage::disk('public')->makeDirectory($folderPath);
+                    }
+                }else{
+                    $folderPath = $college_name.'/'.$organization->name.'/'.$eventName;
+                    if (!Storage::disk('public')->exists($folderPath)) {
+                        Storage::disk('public')->makeDirectory($folderPath);
+                    }
+                }
+
+                $this->makeRequirement($requirements, $folderPath );
+            
+            }
+        }
+    }
+
+    public function makeRequirement($requirements,$path){
+      
+       foreach($requirements as $requirement){
+         $folderPath = $path.'/'.$requirement['name'];
+         if (!Storage::disk('public')->exists($folderPath)) {
+            Storage::disk('public')->makeDirectory($folderPath);
+         }
+       }
+    }
 }
 
 

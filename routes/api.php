@@ -92,7 +92,7 @@ Route::controller(EventController::class)->group(function () {
     Route::post('editEvent', 'editEvent');
     Route::post('updateEvent', 'updateEvent');
     Route::post('deleteEvent', 'deleteEvent');
-    Route::post('searchEvent', 'searchEvent');
+
 });
 
 Route::controller(RequirementController::class)->group(function () {
@@ -109,6 +109,8 @@ Route::controller(FileRequirementController::class)->group(function () {
     Route::post('storeDMO_files', 'storeDMO_files');
     Route::post('createDMO_folder', 'createDMO_folder');
     Route::post('downloadFileRequirement', 'downloadFileRequirement');
+    Route::post('updateFile', 'updateFile');
+    Route::get('makefolder', 'makefolder');
 });
 
 Route::controller(ConversationController::class)->group(function () {

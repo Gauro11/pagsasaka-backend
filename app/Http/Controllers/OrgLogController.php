@@ -163,13 +163,9 @@ class OrgLogController extends Controller
                 ]);
 
             }else{
-            
-
-                // Query building
+                $perPage= 10;
                 $query = OrganizationalLog::where('org_id', $request->org_id)
                                             ->where('status','!=','D');
-
-      
 
                 // Custom handling for org_id == 3
                 if ($request->org_id == 3) { // Ensure org_id is integer
