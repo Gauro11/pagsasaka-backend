@@ -930,13 +930,41 @@ class FileRequirementController extends Controller
     
     }
 
-    public function deleteFile(){
+    public function deleteFile(Request $request){
+        try{
 
-        $validated = $request->validate([
-            'file_id' => 'required|exists:requirement_files,id'
-        ]);
+            $validated = $request->validate([
+                'file_id' => 'required|exists:requirement_files,id'
+            ]);
+    
+            $data = RequirementFile::find($validated['file_id']);
+            $data->update(
+                [
+                    'status' => 'I'
+                ]
+            );
+    
+            $response = [
+                'isSuccess' => true,
+                'message' => "Deleted successfully!",
+                'data' => $data
+            ];
+    
+            $this->logAPICalls('deleteFile', "", $request->all(), [$response]);
+            return response($response,200);
 
-       // $data = RequirementFile::find()
+        }catch(Exception $e){
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+           ];
+
+            $this->logAPICalls('deleteFile', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+        }
+       
+
     }
 
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp)

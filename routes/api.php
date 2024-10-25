@@ -111,6 +111,8 @@ Route::controller(FileRequirementController::class)->group(function () {
     Route::post('downloadFileRequirement', 'downloadFileRequirement');
     Route::post('updateFile', 'updateFile');
     Route::get('makefolder', 'makefolder');
+    Route::post('deleteFile', 'deleteFile');
+    
 });
 
 Route::controller(ConversationController::class)->group(function () {
