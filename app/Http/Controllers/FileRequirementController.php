@@ -22,23 +22,29 @@ class FileRequirementController extends Controller
     public function getAllfile(Request $request){
 
         try{
-            $allfiles = [];
             $validated = $request->validate([
-                'search' => ['nullable'],
-                'page' => ['nullable']
+                'search' => ['nullable', 'string'],
+                'page' => ['nullable', 'integer'],
             ]);
             
-            $query = RequirementFile::where('folder_id',null)->orderBy('created_at', 'desc');
+            $perPage = 10; // Set default items per page
+            
+            $query = RequirementFile::where('folder_id', null)->orderBy('created_at', 'desc');
             
             // Apply search filter if provided
             if ($request->filled('search')) {
-                $query->where('filename', 'LIKE', '%' . $validated['search'] . '%'); 
+                $query->where('filename', 'LIKE', '%' . $validated['search'] . '%');
             }
             
-            $perPage = $validated['page'] ?? 10; 
-            $datas = $query->paginate($perPage);
+            // Check total items before pagination
+            $totalItems = $query->count();
+            // dd($totalItems); // Debug: See how many items are available
+            
+            // Paginate the results
+            $datas = $query->paginate($perPage, ['*'], 'page', $validated['page'] ?? 1);
             
             // Fetch organizational logs and prepare response data
+            $allfiles = [];
             foreach ($datas as $data) {
                 $org_log = OrganizationalLog::find($data->org_log_id);
                 
@@ -55,7 +61,7 @@ class FileRequirementController extends Controller
                     'college_entity_id' => $data->college_entity_id,
                     'status' => $data->status,
                     'created_at' => $data->created_at,
-                    'updated_at' => $data->updated_at
+                    'updated_at' => $data->updated_at,
                 ];
             }
             
@@ -73,15 +79,6 @@ class FileRequirementController extends Controller
             
             $this->logAPICalls('getAllfile', "", $request->all(), [$response]);
             return response()->json($response);
-            
-            // If the code execution reaches here, it indicates a failure condition,
-            // possibly due to authorization, so return a 403 response.
-            $response = [
-                'isSuccess' => false,
-                'message' => "Only admins can access this API."
-            ];
-            
-            return response()->json($response, 403);
             
             
 
