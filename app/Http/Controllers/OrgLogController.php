@@ -12,6 +12,40 @@ use Illuminate\Validation\ValidationException;
 
 class OrgLogController extends Controller
 {
+
+    public function getOrgLogInfo(Request $request){
+
+        try{
+
+            $validated = $request->validate([
+
+                'org_log_id' => 'required|exists:organizational_logs,id'
+
+            ]);
+
+            $data = OrganizationalLog::where('id', $validated['org_log_id'])->first();
+
+            $response = [
+                'isSuccess' => true,
+                'data' => $data
+            ];
+
+            $this->logAPICalls('getOrgLogInfo',"", $request->all(), [$response]);
+            return response($response,200);
+
+        }catch(Throwable $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+            ];
+
+            $this->logAPICalls('getOrgLogInfo',"", $request->all(), [$response]);
+            return response($response, 500);
+
+        }
+    }
     
     public function getConcernedOffice(){
 
@@ -43,7 +77,6 @@ class OrgLogController extends Controller
         
                        
     }
-
 
     public function getDropdownOrg(Request $request){
 
@@ -130,13 +163,9 @@ class OrgLogController extends Controller
                 ]);
 
             }else{
-            
-
-                // Query building
+                $perPage= 10;
                 $query = OrganizationalLog::where('org_id', $request->org_id)
                                             ->where('status','!=','D');
-
-      
 
                 // Custom handling for org_id == 3
                 if ($request->org_id == 3) { // Ensure org_id is integer

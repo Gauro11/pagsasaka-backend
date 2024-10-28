@@ -75,6 +75,7 @@ Route::controller(OrgLogController::class)->group(function () {
     Route::post('deleteOrgLog', 'deleteOrgLog');
     Route::post('searchOrgLog', 'searchOrgLog');
     Route::post('filterCollege', 'filterCollege');
+    Route::post('getOrgLogInfo', 'getOrgLogInfo');
 });
 
 Route::controller(ProgramController::class)->group(function () {
@@ -92,7 +93,7 @@ Route::controller(EventController::class)->group(function () {
     Route::post('editEvent', 'editEvent');
     Route::post('updateEvent', 'updateEvent');
     Route::post('deleteEvent', 'deleteEvent');
-    Route::post('searchEvent', 'searchEvent');
+
 });
 
 Route::controller(RequirementController::class)->group(function () {
@@ -102,13 +103,18 @@ Route::controller(RequirementController::class)->group(function () {
 
 Route::controller(FileRequirementController::class)->group(function () {
 
-    Route::get('getAllfile', 'getAllfile');
+    Route::get('getAllfile', 'getAllfile'); // DMO FILES
     Route::post('getFileRequirement', 'getFileRequirement');
     Route::post('storeFileRequirement', 'storeFileRequirement');
     Route::post('storeFolderRequirement', 'storeFolderRequirement');
     Route::post('storeDMO_files', 'storeDMO_files');
     Route::post('createDMO_folder', 'createDMO_folder');
     Route::post('downloadFileRequirement', 'downloadFileRequirement');
+    Route::post('updateFile', 'updateFile');
+    Route::get('makefolder', 'makefolder');
+    Route::post('deleteFile', 'deleteFile');
+    Route::post('getFolder', 'getFolder');
+    
 });
 
 Route::controller(ConversationController::class)->group(function () {
