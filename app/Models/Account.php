@@ -8,8 +8,10 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Validator;
 use App\Models\OrganizationalLog;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
-class Account extends Model
+
+class Account extends Authenticatable
 
     {
         use HasApiTokens, Notifiable, HasFactory;

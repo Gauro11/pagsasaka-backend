@@ -33,7 +33,8 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('change-password/{id}',  'changePassword');
 });
 
-Route::middleware('auth:sanctum')->post('/logout/{id}', [AuthController::class, 'logout']);
+Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+
 
 Route::post('/reset-password-to-default', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
 
@@ -55,7 +56,7 @@ Route::controller(AccountController::class)->group(function () {
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
-/*Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+/*
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
 });*/
@@ -92,7 +93,7 @@ Route::controller(EventController::class)->group(function () {
     Route::post('editEvent', 'editEvent');
     Route::post('updateEvent', 'updateEvent');
     Route::post('deleteEvent', 'deleteEvent');
-    Route::post('searchEvent', 'searchEvent');
+
 });
 
 Route::controller(RequirementController::class)->group(function () {
@@ -109,6 +110,11 @@ Route::controller(FileRequirementController::class)->group(function () {
     Route::post('storeDMO_files', 'storeDMO_files');
     Route::post('createDMO_folder', 'createDMO_folder');
     Route::post('downloadFileRequirement', 'downloadFileRequirement');
+    Route::post('updateFile', 'updateFile');
+    Route::get('makefolder', 'makefolder');
+    Route::post('deleteFile', 'deleteFile');
+    Route::post('getFolder', 'getFolder');
+    
 });
 
 Route::controller(ConversationController::class)->group(function () {
