@@ -19,7 +19,7 @@ class EventController extends Controller
 {
 
 
-    // VALIDATED //
+  
     public function getActiveEvent(){
         
        try{
@@ -453,6 +453,7 @@ class EventController extends Controller
     }
 
     public function getEventID($org_log_id,$name,$descrip,$acadyear,$submdate){
+
         $event= Event::where('name',$name)
                       ->where('description',$descrip)
                       ->where('org_log_id',$org_log_id)
