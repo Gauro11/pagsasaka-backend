@@ -66,25 +66,24 @@ class AccountController extends Controller
     }
 
     public function getOrganizationLogs()
-{
-    try {
-        // Retrieve all the org_log_id and org_log_name
-        $organizationLogs = OrganizationalLog::select('id', 'name')->get();
+    {
+        try {
+            $organizationLogs = OrganizationalLog::select('id', 'name')->get();
 
-        $response = [
-            'isSuccess' => true,
-            'data' => $organizationLogs
-        ];
-        return response()->json($response, 200);
-    } catch (Throwable $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => 'Failed to fetch organization logs.',
-            'error' => $e->getMessage()
-        ];
-        return response()->json($response, 500);
+            $response = [
+                'isSuccess' => true,
+                'data' => $organizationLogs
+            ];
+            return response()->json($response, 200);
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Failed to fetch organization logs.',
+                'error' => $e->getMessage()
+            ];
+            return response()->json($response, 500);
+        }
     }
-}
 
     /*
      * Read: Get all user accounts.
@@ -232,10 +231,20 @@ class AccountController extends Controller
                 'org_log_id' => $request->org_log_id,
             ]);
 
+            
+
             $response = [
                 'isSuccess' => true,
                 'message' => "Account successfully updated.",
-                'account' => $account
+                'user' => [
+                    'id' => $account->id,
+                    'Firstname' => $account->Firstname,
+                    'Middlename' => $account->Middlename,
+                    'Lastname' => $account->Lastname,
+                    'org_log_id' => $account->org_log_id,
+                    'email' => $account->email,
+                    'role' => $account->role,
+                ],
             ];
             $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
             return response()->json($response, 200);
@@ -367,6 +376,7 @@ class AccountController extends Controller
         return true; // Indicate success
     }
 
+    
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /* public function __construct(Request $request)

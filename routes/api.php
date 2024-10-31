@@ -33,7 +33,8 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('change-password/{id}',  'changePassword');
 });
 
-Route::middleware('auth:sanctum')->post('/logout/{id}', [AuthController::class, 'logout']);
+Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+
 
 Route::post('/reset-password-to-default', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
 
@@ -55,7 +56,7 @@ Route::controller(AccountController::class)->group(function () {
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
-/*Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+/*
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
 });*/
