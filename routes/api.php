@@ -17,8 +17,11 @@ use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\EmailController;
+use App\Http\Controllers\AcademicYearController;
+
 
 Route::post('send-email', [EmailController::class, 'sendEmail']);
+Route::post('/academic-year', [AcademicYearController::class, 'addAcademicYear']);
 
 //connection//
 Route::options('/{any}', function (Request $request) {
@@ -39,13 +42,13 @@ Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logo
 Route::post('/reset-password-to-default', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
 
 
-Route::middleware(['auth:sanctum', 'UserTypeAuth'])->group(function () {
-    Route::get('/admin/dashboard', [AuthController::class, 'admin']);
-    Route::get('/head/dashboard', [AuthController::class, 'head']);
-    Route::get('/programchair/dashboard', [AuthController::class, 'programchair']);
-    Route::get('/staff/dashboard', [AuthController::class, 'staff']);
-    Route::get('/dean/dashboard', [AuthController::class, 'dean']);
-});
+// Route::middleware(['auth:sanctum', 'UserTypeAuth'])->group(function () {
+//     Route::get('/admin/dashboard', [AuthController::class, 'admin']);
+//     Route::get('/head/dashboard', [AuthController::class, 'head']);
+//     Route::get('/programchair/dashboard', [AuthController::class, 'programchair']);
+//     Route::get('/staff/dashboard', [AuthController::class, 'staff']);
+//     Route::get('/dean/dashboard', [AuthController::class, 'dean']);
+// });
 
 //create acc///
 Route::controller(AccountController::class)->group(function () {

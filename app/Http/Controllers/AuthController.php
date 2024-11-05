@@ -20,112 +20,127 @@ use Laravel\Sanctum\PersonalAccessToken;
 class AuthController extends Controller
 {
     public function login(Request $request)
-{
-    try {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
-
-        // Get User-Agent from headers
-        $userAgent = $request->header('User-Agent');
-        Log::info('User-Agent:', ['userAgent' => $userAgent]);
-
-        // Detect platform
-        $platformType = $this->detectPlatform($userAgent);
-        Log::info('Detected Platform:', ['platform' => $platformType]);
-
-        // Get IP address
-        $ipAddress = $request->ip(); // Get the real IP address
-
-        $user = Account::where('email', $request->email)->first();
-
-        // Check if the user exists
-        if ($user) {
-            // Verify the password
-            if (Hash::check($request->password, $user->password)) {
+    {
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
+    
+            // Auto-detect User-Agent
+            $userAgent = $request->header('User-Agent');
+            Log::info('User-Agent:', ['userAgent' => $userAgent]);
+    
+            // Detect platform automatically
+            $platformType = $this->detectPlatform($userAgent); // Pass the User-Agent to detectPlatform
+            Log::info('Detected Platform:', ['platform' => $platformType]);
+    
+            // Get IP address
+            $ipAddress = $request->ip();
+    
+            // Determine file system based on the detected platform
+            $fileSystemType = $this->detectFileSystem($platformType); // Call a separate method for file system detection
+    
+            $user = Account::where('email', $request->email)->first();
+    
+            if ($user && Hash::check($request->password, $user->password)) {    
                 if ($user->status === 'I') {
                     $response = ['message' => 'Account is inactive.'];
                     $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
                     return response()->json($response, 403);
                 }
-
-                // Generate token
+    
                 $token = $user->createToken('auth-token')->plainTextToken;
 
-                // Get organizational log name
-                $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
-                $org_log_name = optional($org_log)->org_log_name;
+                // Generate session code by calling insertSession
+                $sessionCode = $this->insertSession($user->id);
+                if (!$sessionCode) {
+                    return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
+                }
 
-                // Prepare response data
+                $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
+              
+
+            
                 $response = [
+
                     'isSuccess' => true,
                     'message' => 'Logged in successfully',
                     'token' => $token,
+                    'session_code' => $sessionCode,
+
                     'user' => [
                         'id' => $user->id,
                         'Firstname' => $user->Firstname,
                         'Middlename' => $user->Middlename,
                         'Lastname' => $user->Lastname,
                         'org_log_id' => $user->org_log_id,
-                        'org_log_name' => optional($org_log)->name, 
+                        'org_log_name' => optional($org_log)->name,
                         'email' => $user->email,
                     ],
                     'role' => $user->role,
-                    'ipAddress' => $ipAddress, 
-                    'platform' => $platformType, 
+                    'ipAddress' => $ipAddress,
+                    'platform' => $platformType,
+                    'fileSystem' => $fileSystemType, // Automatically set file system
                 ];
-
-                // Log API call
+    
+                // Log successful login attempt
                 $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
-
-                // Return success response
+    
                 return response()->json($response, 200);
             } else {
-                return $this->sendError('Invalid Credentials.');
+                // Log invalid credentials attempt
+                $response = ['message' => 'Invalid Credentials.'];
+                $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
+                return response()->json($response, 401);
             }
-        } else {
-            return $this->sendError('Provided email address does not exist.');
+        } catch (Throwable $e) {
+            // Log error during login attempt
+            $response = [
+                'isSuccess' => false,
+                'message' => 'An error occurred during login.',
+                'error' => $e->getMessage(),
+            ];
+            
+            $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
+            
+            return response()->json($response, 500);
         }
-    } catch (Throwable $e) {
-        // Handle errors during login
-        $response = [
-            'isSuccess' => false,
-            'message' => 'An error occurred during login.',
-            'error' => $e->getMessage(),
-        ];
-
-        // Log error
-        $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-
-        // Return error response
-        return response()->json($response, 500);
     }
-}
+    
+    // Separate function for file system detection
+    private function detectFileSystem($platformType)
+    {
+        switch (strtolower($platformType)) {
+            case 'windows':
+                return 'NTFS';
+            case 'macos':
+                return 'APFS';
+            case 'linux':
+                return 'exFAT'; // Adjust this if you have a different logic for Linux
+            default:
+                return 'Unknown'; // Default for any unrecognized platform
+        }
+    }
+    
+    // Modify the detectPlatform method
     private function detectPlatform($userAgent)
     {
-        Log::info('Evaluating User-Agent:', ['userAgent' => $userAgent]);
-
-        if (stripos($userAgent, 'Windows') !== false) {
+        $userAgent = strtolower($userAgent); // Convert to lowercase for easier matching
+    
+        if (strpos($userAgent, 'windows') !== false) {
             return 'Windows';
-        } elseif (stripos($userAgent, 'Macintosh') !== false) {
+        } elseif (strpos($userAgent, 'macintosh') !== false || strpos($userAgent, 'mac os') !== false) {
             return 'macOS';
-        } elseif (stripos($userAgent, 'Linux') !== false) {
+        } elseif (strpos($userAgent, 'linux') !== false) {
             return 'Linux';
-        } elseif (stripos($userAgent, 'Android') !== false) {
-            return 'Android';
-        } elseif (stripos($userAgent, 'iPhone') !== false || stripos($userAgent, 'iPad') !== false) {
-            return 'iOS';
+        } else {
+            return 'Unknown'; // Return unknown for unrecognized user agents
         }
-
-        return 'Unknown'; // Default case
     }
-
-
-    
-    
     
 
+    
 
     /////logout//////
     public function logout(Request $request)
@@ -137,9 +152,9 @@ class AuthController extends Controller
             if ($user) {
                 // Find the user's active session
                 $session = Session::where('user_id', $user->id)
-                ->whereNull('logout_date')
-                ->latest()
-                ->first();
+                    ->whereNull('logout_date')
+                    ->latest()
+                    ->first();
 
                 // Get the bearer token from the request header
                 $plainTextToken = $request->bearerToken();
@@ -184,29 +199,27 @@ class AuthController extends Controller
 
 
     // Method to insert session
-    public function insertSession(Request $request)
-    {
-        try {
-            $request->validate([
-                'user_id' => 'get|string|exists:user_accounts,id'
-            ]);
+    public function insertSession(int $userId) // Accept an integer instead of Request
+{
+    try {
+        $sessionCode = Str::uuid(); // Generate a unique session code
+        $dateTime = Carbon::now()->toDateTimeString();
 
-            $sessionCode = Str::uuid();
-            $dateTime = Carbon::now()->toDateTimeString();
+        // Insert session record into the database
+        Session::create([
+            'session_code' => $sessionCode,
+            'user_id' => $userId,
+            'login_date' => $dateTime,
+            'logout_date' => null, // Initially set logout_date to null
+        ]);
 
-
-            Session::create([
-                'session_code' => $sessionCode,
-                'user_id' => $request->id,
-                'login_date' => $dateTime,
-                'logout_date' => null
-            ]);
-
-            return response()->json(['session_code' => $sessionCode], 200);
-        } catch (Throwable $e) {
-            return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.', 'error' => $e->getMessage()], 500);
-        }
+        return $sessionCode; // Return the generated session code
+    } catch (Throwable $e) {
+        Log::error('Failed to create session.', ['error' => $e->getMessage()]);
+        return null; // Return null if session creation fails
     }
+}
+
 
 
     //////password change////////
@@ -215,24 +228,26 @@ class AuthController extends Controller
         try {
             // Validate the request
             $validator = Validator::make($request->all(), [
-                'Firstname' => 'nullable|string|max:255', 
-                'Lastname' => 'nullable|string|max:255',  
-                'Middlename' => 'nullable|string|max:255', 
-                'email' => 'nullable|email',  
-                'current_password' => ['nullable', 'string',
+                'first_name' => 'nullable|string|max:255',
+                'last_name' => 'nullable|string|max:255',
+                'middle_name' => 'nullable|string|max:255',
+                'email' => 'nullable|email',
+                'current_password' => [
+                    'nullable',
+                    'string',
                     function ($attribute, $value, $fail) use ($request) {
                         // Find the user by ID
                         $user = Account::where('id', $request->id)->first();
-    
+
                         // If the password is set and the current password doesn't match
                         if ($user && $user->password && !Hash::check($value, $user->password)) {
                             return $fail('The current password is incorrect.');
                         }
                     },
                 ],
-                'new_password' => 'nullable|string|min:8|confirmed', 
+                'new_password' => 'nullable|string|min:8|confirmed',
             ]);
-    
+
             if ($validator->fails()) {
                 $response = [
                     'isSuccess' => false,
@@ -242,12 +257,12 @@ class AuthController extends Controller
                 $this->logAPICalls('changePassword', null, $request->all(), $response);
                 return response()->json($response, 500);
             }
-    
+
             // Find the user by ID
-            $user = Account::select('id', 'Firstname', 'Lastname', 'Middlename', 'email', 'org_log_id', 'password')
+            $user = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'org_log_id', 'password')
                 ->where('id', $request->id)
                 ->first();
-    
+
             if (!$user) {
                 $response = [
                     'isSuccess' => false,
@@ -256,25 +271,25 @@ class AuthController extends Controller
                 $this->logAPICalls('changePassword', null, $request->all(), $response);
                 return response()->json($response, 500);
             }
-    
+
             // Update user's editable fields if provided
-            if ($request->has('Firstname')) {
-                $user->Firstname = $request->Firstname; 
+            if ($request->has('first_name')) {
+                $user->first_name = $request->first_name;
             }
-            if ($request->has('Lastname')) {
-                $user->Lastname = $request->Lastname; 
+            if ($request->has('last_name')) {
+                $user->last_name = $request->last_name;
             }
-            if ($request->has('Middlename')) {
-                $user->Middlename = $request->Middlename; 
+            if ($request->has('middle_name')) {
+                $user->middle_name = $request->middle_name;
             }
             if ($request->has('email')) {
                 $user->email = $request->email;
             }
-    
+
             // Retrieve the organization log based on the user's org_log_id
             $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
             $org_log_name = $org_log ? $org_log->org_log_name : 'N/A';
-    
+
             if ($request->filled('new_password')) {
                 // If the password is empty (null), skip current_password check
                 if ($user->password == null || Hash::check($request->current_password, $user->password)) {
@@ -289,21 +304,21 @@ class AuthController extends Controller
                     return response()->json($response, 500);
                 }
             }
-    
+
             // Save the updated user data
             $user->save();
-    
+
             $response = [
                 'isSuccess' => true,
                 'message' => 'User details updated successfully.',
                 'user' => [
                     'id' => $user->id,
-                    'Firstname' => $user->Firstname,  
-                    'Lastname' => $user->Lastname,  
-                    'Middlename' => $user->Middlename, 
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'middle_name' => $user->middle_name,
                     'email' => $user->email,
                     'org_log_id' => $user->org_log_id,
-                    'org_log_name' => optional($org_log)->name, 
+                    'org_log_name' => optional($org_log)->name,
                 ]
             ];
             $this->logAPICalls('changePassword', $user->id, $request->except('org_log_id'), $response);
@@ -319,9 +334,9 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
-    
-    
-    
+
+
+
 
     // Method to log API calls
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)

@@ -17,9 +17,9 @@ class Account extends Authenticatable
         use HasApiTokens, Notifiable, HasFactory;
     
         protected $fillable = [
-            'Firstname',
-            'Lastname',
-            'Middlename',
+            'first_name',
+            'last_name',
+            'middle_name',
             'email',
             'role',
             'password',
@@ -29,14 +29,14 @@ class Account extends Authenticatable
         ];
         public static function validateAccount($data)
     {
-        $users = Account::pluck('Firstname')->toArray();
+        $users = Account::pluck('first_name')->toArray();
        
 
         $validator = Validator::make($data, [
             
-            'Firstname' => ['required', 'string','min:3','max:225'],
-            'Lastname' => ['required', 'string','min:3','max:225'],
-            'Middlename' => ['required', 'string','min:1','max:225'],
+            'first_name' => ['required', 'string','min:3','max:225'],
+            'last_name' => ['required', 'string','min:3','max:225'],
+            'middle_name' => ['required', 'string','min:1','max:225'],
             'email' => ['required', 'email', 'unique:accounts,email'],
             'role' => ['required'  ],
             'password',
