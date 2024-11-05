@@ -21,7 +21,11 @@ use App\Http\Controllers\AcademicYearController;
 
 
 Route::post('send-email', [EmailController::class, 'sendEmail']);
+
+
 Route::post('/academic-year', [AcademicYearController::class, 'addAcademicYear']);
+Route::post('/delete-year/{id}', [AcademicYearController::class, 'deleteAcademicYear']);
+
 
 //connection//
 Route::options('/{any}', function (Request $request) {

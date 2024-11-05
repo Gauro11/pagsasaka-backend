@@ -82,6 +82,53 @@ class AcademicYearController extends Controller
         }
     }
 
+    public function deleteAcademicYear(Request $request, $id)
+    {
+        try {
+            // Find the academic year by ID
+            $academicYear = AcademicYear::find($id);
+
+            // Check if the academic year exists
+            if (!$academicYear) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Academic Year not found.'
+                ];
+                $this->logAPICalls('deleteAcademicYear', $id, $request->all(), $response);
+                return response()->json($response, 500);
+            }
+
+            // Check if the academic year is active
+            if ($academicYear->status === 'A') {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Cannot delete an active academic year.'
+                ];
+                $this->logAPICalls('deleteAcademicYear', $id, $request->all(), $response);
+                return response()->json($response, 500);
+            }
+
+            // Delete the inactive academic year
+            $academicYear->delete();
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Academic Year successfully deleted.'
+            ];
+            $this->logAPICalls('deleteAcademicYear', $id, $request->all(), $response);
+            return response()->json($response, 200);
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Failed to delete Academic Year.',
+                'error' => $e->getMessage()
+            ];
+            $this->logAPICalls('deleteAcademicYear', $id, $request->all(), $response);
+            return response()->json($response, 500);
+        }
+    }
+
+
 
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)
     {
