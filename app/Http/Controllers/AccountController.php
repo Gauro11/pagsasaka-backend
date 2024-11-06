@@ -37,9 +37,9 @@ class AccountController extends Controller
 
             $Account = Account::create([
 
-                'Firstname' => $request->Firstname,
-                'Lastname' => $request->Lastname,
-                'Middlename' => $request->Middlename,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'middle_name' => $request->middle_name,
                 'email' => $request->email,
                 'role' => $request->role,
                 'org_log_id' => $request->org_log_id,
@@ -96,99 +96,98 @@ class AccountController extends Controller
                 'paginate' => 'required'
             ]);
 
-            if($validated['paginate']==0){
-                           $datas = Account::select('id', 'Firstname','Lastname','Middlename', 'email', 'role', 'status', 'org_log_id')
-                         ->where('status', 'A')
-                         ->orderBy('created_at', 'desc') // Ordering by creation date in descending order
-                         ->get();
-                        
+            if ($validated['paginate'] == 0) {
+                $datas = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'status', 'org_log_id')
+                    ->where('status', 'A')
+                    ->orderBy('created_at', 'desc') // Ordering by creation date in descending order
+                    ->get();
 
-                        if ($datas->isEmpty()) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'No active accounts found matching the criteria.',
-                ];
-                $this->logAPICalls('getAccounts', "", $request->all(), $response);
-                return response()->json($response, 500);
-            }
 
-            $accounts = $datas->map(function ($data) {
-                $org_log = OrganizationalLog::where('id', $data->org_log_id)->first();
+                if ($datas->isEmpty()) {
+                    $response = [
+                        'isSuccess' => false,
+                        'message' => 'No active accounts found matching the criteria.',
+                    ];
+                    $this->logAPICalls('getAccounts', "", $request->all(), $response);
+                    return response()->json($response, 500);
+                }
 
-                return [
-                    'id' => $data->id,
-                    'Firstname' => $data->Firstname,
-                    'Lastname' => $data->Lastname,
-                    'Middlename' => $data->Middlename,
-                    'email' => $data->email,
-                    'role' => $data->role,
-                    'status' => $data->status,
-                    'org_log_id' => $data->org_log_id,
-                    'org_log_name' => optional($org_log)->name,
-                ];
-            });
+                $accounts = $datas->map(function ($data) {
+                    $org_log = OrganizationalLog::where('id', $data->org_log_id)->first();
+
+                    return [
+                        'id' => $data->id,
+                        'first_name' => $data->first_name,
+                        'last_name' => $data->last_name,
+                        'middle_name' => $data->middle_name,
+                        'email' => $data->email,
+                        'role' => $data->role,
+                        'status' => $data->status,
+                        'org_log_id' => $data->org_log_id,
+                        'org_log_name' => optional($org_log)->name,
+                    ];
+                });
 
                 $response = [
                     'isSuccess' => true,
                     'message' => 'Active user accounts retrieved successfully.',
                     'Accounts' => $accounts,
-                    
-                  ];
-            }else{
 
-            
-           $perPage = $request->input('per_page', 10);
-
-            $datas = Account::select('id', 'Firstname','Lastname','Middlename', 'email', 'role', 'status', 'org_log_id')
-                ->where('status', 'A')
-                ->when($request->search, function ($query, $searchTerm) {
-                    return $query->where(function ($activeQuery) use ($searchTerm) {
-                        $activeQuery->where('Firstname', 'like', '%' . $searchTerm . '%')
-                            ->orWhere('email', 'like', '%' . $searchTerm . '%');
-                            
-                    });
-                })
-            ->paginate($perPage);
-
-            if ($datas->isEmpty()) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'No active accounts found matching the criteria.',
                 ];
-                $this->logAPICalls('getAccounts', "", $request->all(), $response);
-                return response()->json($response, 500);
-            }
+            } else {
 
-            $accounts = $datas->map(function ($data) {
-                $org_log = OrganizationalLog::where('id', $data->org_log_id)->first();
 
-                return [
-                    'id' => $data->id,
-                    'Firstname' => $data->Firstname,
-                    'Lastname' => $data->Lastname,
-                    'Middlename' => $data->Middlename,
-                    'email' => $data->email,
-                    'role' => $data->role,
-                    'status' => $data->status,
-                    'org_log_id' => $data->org_log_id,
-                    'org_log_name' => optional($org_log)->name,
-                ];
-            });
+                $perPage = $request->input('per_page', 10);
+
+                $datas = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'status', 'org_log_id')
+                    ->where('status', 'A')
+                    ->when($request->search, function ($query, $searchTerm) {
+                        return $query->where(function ($activeQuery) use ($searchTerm) {
+                            $activeQuery->where('first_name', 'like', '%' . $searchTerm . '%')
+                                ->orWhere('email', 'like', '%' . $searchTerm . '%');
+                        });
+                    })
+                    ->paginate($perPage);
+
+                if ($datas->isEmpty()) {
+                    $response = [
+                        'isSuccess' => false,
+                        'message' => 'No active accounts found matching the criteria.',
+                    ];
+                    $this->logAPICalls('getAccounts', "", $request->all(), $response);
+                    return response()->json($response, 500);
+                }
+
+                $accounts = $datas->map(function ($data) {
+                    $org_log = OrganizationalLog::where('id', $data->org_log_id)->first();
+
+                    return [
+                        'id' => $data->id,
+                        'first_name' => $data->first_name,
+                        'last_name' => $data->last_name,
+                        'middle_name' => $data->middle_name,
+                        'email' => $data->email,
+                        'role' => $data->role,
+                        'status' => $data->status,
+                        'org_log_id' => $data->org_log_id,
+                        'org_log_name' => optional($org_log)->name,
+                    ];
+                });
 
                 // Prepare the response with pagination metadata
                 $response = [
-                'isSuccess' => true,
-                'message' => 'Active user accounts retrieved successfully.',
-                'Accounts' => $accounts,
-                'pagination' => [
-                    'current_page' => $datas->currentPage(),
-                    'per_page' => $datas->perPage(),
-                    'total' => $datas->total(),
-                    'last_page' => $datas->lastPage(),
-                    'url' => url('api/accounts?page=' . $datas->currentPage() . '&per_page=' . $datas->perPage()), 
-                ],
-            ];
-         }
+                    'isSuccess' => true,
+                    'message' => 'Active user accounts retrieved successfully.',
+                    'Accounts' => $accounts,
+                    'pagination' => [
+                        'current_page' => $datas->currentPage(),
+                        'per_page' => $datas->perPage(),
+                        'total' => $datas->total(),
+                        'last_page' => $datas->lastPage(),
+                        'url' => url('api/accounts?page=' . $datas->currentPage() . '&per_page=' . $datas->perPage()),
+                    ],
+                ];
+            }
             $this->logAPICalls('getAccounts', "", $request->all(), $response);
             return response()->json($response, 200);
         } catch (Throwable $e) {
@@ -212,9 +211,9 @@ class AccountController extends Controller
             $account = Account::findOrFail($id);
             // Validation with custom error messages
             $request->validate([
-                'Firstname' => ['sometimes', 'string'],
-                'Lastname' => ['sometimes', 'string'],
-                'Middlename' => ['sometimes', 'string'],
+                'first_name' => ['sometimes', 'string'],
+                'last_name' => ['sometimes', 'string'],
+                'middle_name' => ['sometimes', 'string'],
                 'email' => ['sometimes', 'string', 'email', Rule::unique('accounts')->ignore($account->id)],
                 'role' => ['sometimes', 'string'],
                 'org_log_id' => ['sometimes', 'numeric'],
@@ -223,24 +222,24 @@ class AccountController extends Controller
             ]);
 
             $account->update([
-                'Firstname' => $request->Firstname,
-                'Lastname' => $request->Lastname,
-                'Middlename' => $request->Middlename,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'middle_name' => $request->middle_name,
                 'email' => $request->email,
                 'role' => $request->role,
                 'org_log_id' => $request->org_log_id,
             ]);
 
-            
+
 
             $response = [
                 'isSuccess' => true,
                 'message' => "Account successfully updated.",
                 'user' => [
                     'id' => $account->id,
-                    'Firstname' => $account->Firstname,
-                    'Middlename' => $account->Middlename,
-                    'Lastname' => $account->Lastname,
+                    'first_name' => $account->first_name,
+                    'middle_name' => $account->middle_name,
+                    'last_name' => $account->last_name,
                     'org_log_id' => $account->org_log_id,
                     'email' => $account->email,
                     'role' => $account->role,
@@ -376,7 +375,7 @@ class AccountController extends Controller
         return true; // Indicate success
     }
 
-    
+
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /* public function __construct(Request $request)
@@ -405,6 +404,4 @@ class AccountController extends Controller
             $this->middleware('UserTypeAuth:Staff')->only(['getReviews']);
         }
     }*/
-
-    
 }

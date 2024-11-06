@@ -13,7 +13,8 @@ use App\Models\OrganizationalLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
-use Throwable;  
+use Throwable; 
+use Carbon\Carbon;  
 
 class FileRequirementController extends Controller
 {
@@ -30,38 +31,40 @@ class FileRequirementController extends Controller
             $perPage = 10; // Set default items per page
             
             $query = RequirementFile::where('folder_id', null)->orderBy('created_at', 'desc');
+          
             
-            // Apply search filter if provided
+            // Apply search filter 
             if ($request->filled('search')) {
                 $query->where('filename', 'LIKE', '%' . $validated['search'] . '%');
             }
             
             // Check total items before pagination
             $totalItems = $query->count();
-            // dd($totalItems); // Debug: See how many items are available
             
             // Paginate the results
             $datas = $query->paginate($perPage, ['*'], 'page', $validated['page'] ?? 1);
             
             // Fetch organizational logs and prepare response data
             $allfiles = [];
+
             foreach ($datas as $data) {
                 $org_log = OrganizationalLog::find($data->org_log_id);
+
+                // Format the date and time
+                $dateTime = Carbon::parse($data->updated_at)->setTimezone('Asia/Manila')->format('F j Y g:i A');
+
                 
                 $allfiles[] = [
                     'id' => $data->id,
                     'requirement_id' => $data->requirement_id,
                     'filename' => $data->filename,
                     'path' => $data->path,
-                    'size' => $data->size,
                     'folder_id' => $data->folder_id,
-                    'org_log_id' => $data->org_log_id,
-                    'org_log_name' => $org_log ? $org_log->name : null,
+                    'org_log_id' => $data->org_log_id, // ID of the person who created the folder or file
+                    'org_log_name' => $org_log ? $org_log->name : null, 
                     'org_log_acronym' => $org_log ? $org_log->acronym : null,
-                    'college_entity_id' => $data->college_entity_id,
                     'status' => $data->status,
-                    'created_at' => $data->created_at,
-                    'updated_at' => $data->updated_at,
+                    'updated_at' =>$dateTime
                 ];
             }
             
@@ -77,11 +80,10 @@ class FileRequirementController extends Controller
                 ],
             ];
             
-            $this->logAPICalls('getAllfile', "", $request->all(), [$response]);
+            $this->logAPICalls('getAllfile',$datas, $request->all(), [$response]);
             return response()->json($response);
             
-            
-
+        
         }catch(Throwable $e){
 
             $response = [
@@ -97,7 +99,6 @@ class FileRequirementController extends Controller
 
     public function getFolder(Request $request){
 
-
        try{
 
             $validated = $request->validate([
@@ -105,19 +106,56 @@ class FileRequirementController extends Controller
                 'search' => ['nullable', 'string'], 
             ]);
             
-        
-            $query = RequirementFile::where('folder_id', $validated['folder_id']);
+            // Query the 'requirement_files' table base on their folder.
+            $query = RequirementFile::where('folder_id', $validated['folder_id'])
+                                      ->where('status','A');
             
-            
+            // Search in the filename
             if ($request->filled('search')) {
-                $query->where('filename', 'LIKE', '%' . $validated['search'] . '%'); // Search in the filename
+                $query->where('filename', 'LIKE', '%' . $validated['search'] . '%'); 
             }
             
-            $data = $query->get();
+            $datas = $query->orderBy('created_at', 'desc')->get();
+
+            $allfiles = [];
+
+            foreach ($datas as $data) {
+
+                $org_log = OrganizationalLog::find($data->org_log_id);
+
+                // Format the date and time
+                $dateTime = Carbon::parse($data->updated_at)->setTimezone('Asia/Manila')->format('F j Y g:i A');
+
+                $sizeInBytes = $data->size;
+
+                if($sizeInBytes == 0 || $sizeInBytes == null){
+                    $size = 0;
+                }else if ($sizeInBytes >= 1073741824) { // 1 GB = 1024^3 bytes
+                    $size = number_format($sizeInBytes / 1073741824, 2) . ' GB';
+                } elseif ($sizeInBytes >= 1048576) { // 1 MB = 1024^2 bytes
+                    $size = number_format($sizeInBytes / 1048576, 2) . ' MB';
+                } elseif ($sizeInBytes >= 1024) { // 1 KB = 1024 bytes
+                    $size = number_format($sizeInBytes / 1024, 2) . ' KB';
+                } else {
+                    $size = $sizeInBytes . ' bytes';
+                }
+
+                $allfiles[] = [
+                    'id' => $data->id,
+                    'requirement_id' => $data->requirement_id,
+                    'filename' => $data->filename,
+                    'path' => $data->path,
+                    "size" =>  $size,
+                    'org_log_id' => $data->org_log_id, // ID of the person who created the folder or file
+                    'org_log_name' => $org_log ? $org_log->name : null, 
+                    'org_log_acronym' => $org_log ? $org_log->acronym : null,
+                    'status' => $data->status,
+                ];
+            }
             
             $response = [
                 'isSuccess' => true,
-                'folder' => $data
+                'folder' =>  $allfiles
             ];
             
             $this->logAPICalls('getFolder', "", $request->all(), [$response]);
@@ -331,22 +369,53 @@ class FileRequirementController extends Controller
     public function updateFile(Request $request){
 
         try{
-
+            
             $validated = $request->validate([
                 'file_id' => 'required|exists:requirement_files,id',
-                'name' => 'required|min:3|max:20'
+                'name' => 'required|max:20',
+                'folder' => 'required'
             ]);
+        
+           $data = RequirementFile::where('id',$validated['file_id'])->first();
+           $newFolderName ="";
+           
+          $parts = explode('/', $data->path);
+          $filename = $validated['name'];
 
-            $data = RequirementFile::find( $validated['file_id']);
+                if ($validated['folder'] == 0) {
+                        $file_extension = pathinfo( $parts[count($parts)-1], PATHINFO_EXTENSION);
+                    $filename .= '.' . $file_extension; // Add the extension back
+                }
+                $parts[count($parts)-1]=$filename;
+                $newFolderPath = (count($parts) > 1) ? implode('/', $parts) : $filename;
+     
 
-            if(!RequirementFile::where('path',$data->path)
+            if(!RequirementFile::where('path',$newFolderPath)
                                 ->where('filename',$validated['name'])
                                 ->exists()){
-                    
-                    $data->update([
-                     'filename' => $validated['name']
-                    ]);
+                               
+                                $currentDateTime = Carbon::now();
 
+                                
+                        
+                                if (Storage::disk('public')->exists($data->path)) {
+                                
+                                  Storage::disk("public")->move($data->path,$newFolderPath);
+                                 
+                                }
+
+                                   
+
+                    if($validated['folder'] != 0)  {
+                        $this->updateChildPaths($data->path, $newFolderPath, $validated['file_id']);
+                    }            
+
+                    $data->update([
+                     'filename' => $filename,
+                     'path' => $newFolderPath
+                    ]);
+                   
+                   
                     $response = [
                         'isSuccess' => true,
                         'message' => "Updated successfully!",
@@ -357,6 +426,8 @@ class FileRequirementController extends Controller
                     return response($response,200);
             }
 
+          
+
             $response = [
                 'isSuccess' => false,
                 'message' => "TThe file/folder name already exists. Please check your input!",
@@ -366,10 +437,7 @@ class FileRequirementController extends Controller
             $this->logAPICalls('getEditFile', "", $request->all(), [$response]);
             return response($response,500);
 
-           
-
-           
-
+        
         }catch(Throwable $e){
 
             $response = [
@@ -383,6 +451,25 @@ class FileRequirementController extends Controller
 
         }
     }
+
+    private function updateChildPaths($oldPath, $newPath,$id) {
+
+        $children = RequirementFile::where('path', 'like', $oldPath . '/%')
+                                    ->where('folder_id',$id)->get();
+
+        foreach ($children as $child) {
+           
+            $newChildPath = str_replace($oldPath, $newPath, $child->path);
+            
+            // Update the child's record
+           $requirement = RequirementFile::where('id',$child->id)->first();
+            $requirement->update([
+                'path' => $newChildPath
+            ]);
+        }
+
+    }
+
     // METHOD THAT CAN STORE FILES INSIDE REQUIREMENTS //
     // DONE //
     public function storeFileRequirement(Request $request){
@@ -609,92 +696,102 @@ class FileRequirementController extends Controller
 
         try{
 
+            
             $validated = $request->validate([
                 'requirement_id' => 'required'
             ]);
-    
+
+
+     
             $data = RequirementFile::find($validated['requirement_id']);
+            $filePath = 'public/' . $data->path; // Tiyaking tama ang format ng path
+            
+            if (Storage::exists($filePath)) {
+                return Storage::download($filePath);
+            } else {
+                return response()->json(['message' => 'File not found'], 404);
+            }
     
-            if($data){
+          //  if($data){
     
-                if(!empty($data->folder_id)){
+            ///    if(!empty($data->folder_id)){
     
                      // DOWNLOAD MULTPLE FILES //
     
-                     $folder_id = $data->folder_id;
-                     $folder_name = $data->filename;
-                     $files =[];
+                    //  $folder_id = $data->folder_id;
+                    //  $folder_name = $data->filename;
+                    //  $files =[];
     
-                     $files_folder = RequirementFile::where('folder_id',$folder_id)->get();
+                    //  $files_folder = RequirementFile::where('folder_id',$folder_id)->get();
     
-                     foreach($files_folder as $file){
-                        $files[] = $file->path;
-                     }
+                    //  foreach($files_folder as $file){
+                    //     $files[] = $file->path;
+                    //  }
     
-                    $zip = new ZipArchive();
-                    $zipFileName =  $folder_name .".zip";
-                    $zipFilePath = storage_path("app/{$zipFileName}");
+                    // $zip = new ZipArchive();
+                    // $zipFileName =  $folder_name .".zip";
+                    // $zipFilePath = storage_path("app/{$zipFileName}");
     
-                    if ($zip->open($zipFilePath, ZipArchive::CREATE) !== TRUE) {
-                        return response()->json(['error' => 'Could not create zip file'], 500);
-                    }
+                    // if ($zip->open($zipFilePath, ZipArchive::CREATE) !== TRUE) {
+                    //     return response()->json(['error' => 'Could not create zip file'], 500);
+                    // }
             
-                    foreach ($files as $file) {
-                        $filePath = storage_path("app/public/{$file}");
-                        if (file_exists($filePath)) {
-                            $zip->addFile($filePath, $file);
-                        }
-                    }
+                    // foreach ($files as $file) {
+                    //     $filePath = storage_path("app/public/{$file}");
+                    //     if (file_exists($filePath)) {
+                    //         $zip->addFile($filePath, $file);
+                    //     }
+                    // }
             
-                    $zip->close();
+                    // $zip->close();
                     
-                    $respone = [
-                        'isSuccess' =>true,
-                        'message' => "Download successfully!"
-                    ];
+                    // $respone = [
+                    //     'isSuccess' =>true,
+                    //     'message' => "Download successfully!"
+                    // ];
     
-                    $this->logAPICalls('downloadFileRequirement', "", $files, [$response]);
-                    return response()->download($zipFilePath)->deleteFileAfterSend(true);
+                    // $this->logAPICalls('downloadFileRequirement', "", $files, [$response]);
+                    // return response()->download($zipFilePath)->deleteFileAfterSend(true);
     
                   
     
-                }else{
+            //    }else{
     
                    // DOWNLOAD ONE FILE //
     
-                    $filepath = $data->path;
-                    $path = storage_path("app/public/{$filepath}");
+                //     $filepath = $data->path;
+                //     $path = storage_path("app/public/{$filepath}");
     
-                    if (!file_exists($path)) {
-                        $respone = [
-                            'isSuccess' =>false,
-                            'message' => "File not found"
-                        ];
+                //     if (!file_exists($path)) {
+                //         $respone = [
+                //             'isSuccess' =>false,
+                //             'message' => "File not found"
+                //         ];
         
-                        $this->logAPICalls('downloadFileRequirement', "", $files, [$response]);
-                        return response()->json($respone , 404);
-                    }else{
-                        $respone = [
-                            'isSuccess' =>true,
-                            'message' => "Download successfully!"
-                        ];
+                //         $this->logAPICalls('downloadFileRequirement', "", $files, [$response]);
+                //         return response()->json($respone , 404);
+                //     }else{
+                //         $respone = [
+                //             'isSuccess' =>true,
+                //             'message' => "Download successfully!"
+                //         ];
         
-                        $this->logAPICalls('downloadFileRequirement', "", $files, [$response]);
-                        return response()->download($path);
+                //         $this->logAPICalls('downloadFileRequirement', "", $files, [$response]);
+                //         return response()->download($path);
     
-                    }
-                }
+                //     }
+                // }
                 
-                   $response = [
+                //    $response = [
     
-                        'isSuccess' => false,
-                        'message' => "File ID does not exist."
+                //         'isSuccess' => false,
+                //         'message' => "File ID does not exist."
     
-                    ];
+                //     ];
     
-            }
-            $this->logAPICalls('downloadFileRequirement', "", $request->all(), [$response]);
-            return response()->json( $response, 400);
+       //     }
+            // $this->logAPICalls('downloadFileRequirement', "", $request->all(), [$response]);
+            // return response()->json( $response, 400);
 
         }catch(Exception $e){
 
@@ -718,15 +815,21 @@ class FileRequirementController extends Controller
             if ($request->hasFile('files')) {
 
                 $validated = $request->validate([
-                  'files.*' => 'required|file'
+                  'files.*' => 'required|file',
+                  'account_id' => 'required|exists:accounts,id' 
                 ]);
+            
 
+            $account = Account::find( $validated['account_id']);
+            
+           // Query to get the college ID from a specific program.
+           $organization = Program::where('program_entity_id',$account->org_log_id)->first();
+           $college_id = ($organization) ?  $organization->college_entity_id:"";
+
+            $total_size = 0;
             $uploadedFiles=[];
             $exists_file=[];
 
-            // $data = Requirement::where('id',$validated['req_id'])->get();
-            // $program = Program::where('program_entity_id',$data->first()->org_log_id)->get();
-            // $college_id = !$program->isEmpty() ?   $program->first()->college_entity_id : "";
             
             foreach($request->file('files') as $file){
 
@@ -754,41 +857,71 @@ class FileRequirementController extends Controller
                             'filename' =>  $filename,
                             'path' => $path,
                             'size' => $file->getSize(),
-                            'org_log_id' => "",
-                            'college_entity_id' => ""
+                            'org_log_id' => $account->org_log_id,
+                            'college_entity_id' => $college_id
                         ]);
 
                     }else{
+                        
                         $data = RequirementFile::find($request->folder_id);
+                        $total_size += $file->getSize();
                         $path = $file->storeAs($data->path,$filename,'public');
                         $uploadedFiles[] = RequirementFile::create([
                             'requirement_id' => "",
                             'filename' =>  $filename,
                             'path' => $path,
                             'size' => $file->getSize(),
-                            'org_log_id' => "",
+                            'org_log_id' =>  $account->org_log_id,
                             'folder_id' => $request->folder_id,
-                            'college_entity_id' => ""
+                            'college_entity_id' => $college_id
                         ]);
-     
+                       
                     }
-                    return response()->json([
-                        'message' => 'Uploaded Successfully!',
-                        'upload_files' => $uploadedFiles,
-                        'exists_file' =>$exists_file
-                    ],200);
+                       // UPDATE THE SIZE OF THE FOLDER
+                        if(!empty($request->folder_id)){
+                        
+                            $main_folder = RequirementFile::find($request->folder_id);
+
+                            $main_folder->update([
+                                'size' => $main_folder->size+$total_size
+                            ]);
+                        }
                 }else{
                     $exists_file[] = $filename;
                 }
                
             }
 
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Files already exist. Please check the file you want to upload.',
+            // return response()->json([
+            //     'isSuccess' => true,
+            //     'upload_files' => $uploadedFiles,
+            //     'exists_file' =>$exists_file
+            // ],200);
+            if(!empty($uploadedFiles)){
+                $response = [
+                'isSuccess' => true,
+                'message' => "Uploaded Successfully!",
                 'upload_files' => $uploadedFiles,
                 'exists_file' =>$exists_file
-            ],500);
+                ];
+                $this->logAPICalls('storeDMO_files',"", $request->all(), [$response]);
+                return response($response,200);
+            }else{
+                $response = [
+                    'isSuccess' => false,
+                    'upload_files' => $uploadedFiles,
+                    'exists_file' =>$exists_file
+                    ];
+                    $this->logAPICalls('storeDMO_files', "", $request->all(), [$response]);
+                    return response($response,500);
+            }
+         //  return response(,200)
+            // return response()->json([
+            //     'isSuccess' => false,
+            //     'message' => 'Files already exist. Please check the file you want to upload.',
+            //     'upload_files' => $uploadedFiles,
+            //     'exists_file' =>$exists_file
+            // ],500);
 
         }
         
@@ -808,21 +941,24 @@ class FileRequirementController extends Controller
 
        }
 
-
     }
 
     public function createDMO_folder(Request $request){
 
         try{
 
-            $validate = $request->validate([
+            $validate= $request->validate([
                 'foldername' =>  'required|min:3|max:20',
+                'account_id' => 'required|exists:accounts,id'
             ]);
-    
+            
+            $account = Account::find( $validate['account_id']);
+            $organization = Program::where('program_entity_id',$account->org_log_id)->first();
+            $college_id = ($organization) ?  $organization->college_entity_id:"";
+            
             if(!empty($request->folder_id)){
     
-                // CREATE FOLDER UNDER FOLDER" //
-    
+                // CREATE FOLDER UNDER FOLDER //
                 $data = RequirementFile::where('id',$request->folder_id)->get();
     
                 if($data){
@@ -830,17 +966,17 @@ class FileRequirementController extends Controller
                     if( !RequirementFile::where('filename', $validate['foldername'])
                                 ->where('folder_id',$request->folder_id)
                                 ->exists()){
-                            
+                          
                              if (!Storage::disk('public')->exists($data->first()->filename.'/'.$validate['foldername'])) {
-                              $path =  Storage::disk('public')->makeDirectory($data->first()->filename.'/'.$validate['foldername']);
+                                $path =  Storage::disk('public')->makeDirectory($data->first()->filename.'/'.$validate['foldername']);
                              }
     
                             $data = RequirementFile::create([
     
                             'requirement_id' => "DMO File",
                             'filename' => $validate['foldername'],
-                            'org_log_id' => $data->first()->org_log_id,
-                            'college_entity_id' => "",
+                            'org_log_id' => $account->org_log_id,
+                            'college_entity_id' => $college_id,
                             'path' => $data->first()->filename.'/'.$validate['foldername'],
                             'folder_id' => $request->folder_id
     
@@ -852,7 +988,7 @@ class FileRequirementController extends Controller
                                 'message' => 'Successfully created',
                                 'folder' => $data
                             ];
-                            $this->logAPICalls('storeFolderRequirement', "", $request->all(), [$response]);
+                            $this->logAPICalls('createDMO_folder', $data, $request->all(), [$response]);
                             return response()->json($response);
                     }
     
@@ -861,10 +997,13 @@ class FileRequirementController extends Controller
                         'isSuccess'=> false,
                         'message'=> 'The folder you are trying to register already exists. Please verify your input and try again.'
                     ];
-                    return response()->json($response,500);
+
                     $this->logAPICalls('createDMO_folder', "", $request->all(), [$response]);
+                    return response()->json($response,500);
+                   
     
                 }else{
+
                     $response = [
                         'isSuccess' => false,
                         'message' => 'Successfully created',
@@ -875,27 +1014,25 @@ class FileRequirementController extends Controller
                 }
     
             }else{
-    
+              
                // CREATE FOLDER UNDER REQUIREMENT //
-    
                 if( !RequirementFile::where('filename', $validate['foldername'])->exists()){
                     
                     if (!Storage::disk('public')->exists($validate['foldername'])) {
                         Storage::disk('public')->makeDirectory($validate['foldername']);
                     }
+              
                     $data = RequirementFile::create([
     
                             'requirement_id' => "DMO File",
                             'filename' => $validate['foldername'],
-                            'org_log_id' => "",
+                            'org_log_id' => $account->org_log_id,
                             'path' => $validate['foldername'],
-                            'college_entity_id' => ""
-            
+                            'college_entity_id' =>$college_id
+
                     ]);
                     
                     
-                  
-
                     return response()->json([
                         'message' => 'Successfully created',
                         'data' => $data
@@ -903,6 +1040,7 @@ class FileRequirementController extends Controller
                 }
     
                 // $this->logAPICalls('createDMO_folder', "", $request->all(), [$response]);
+
                 $response = [
                     'isSuccess'=> false,
                     'message'=> 'The folder you are trying to register already exists. Please verify your input and try again.'
@@ -934,12 +1072,12 @@ class FileRequirementController extends Controller
                 'file_id' => 'required|exists:requirement_files,id'
             ]);
     
-            $data = RequirementFile::find($validated['file_id']);
-            $data->update(
-                [
-                    'status' => 'I'
-                ]
-            );
+            // $data = RequirementFile::find($validated['file_id']);
+            // $data->update(
+            //     [
+            //         'status' => 'I'
+            //     ]
+            // );
     
             $response = [
                 'isSuccess' => true,
@@ -961,7 +1099,6 @@ class FileRequirementController extends Controller
             return response()->json($response, 500);
         }
        
-
     }
 
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp)
