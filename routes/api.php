@@ -17,8 +17,16 @@ use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\EmailController;
+use App\Http\Controllers\AcademicYearController;
+
 
 Route::post('send-email', [EmailController::class, 'sendEmail']);
+
+
+Route::post('/academic-year', [AcademicYearController::class, 'addAcademicYear']);
+Route::post('/delete-year/{id}', [AcademicYearController::class, 'deleteAcademicYear']);
+Route::post('/getacademic-year', [AcademicYearController::class, 'getAcademicYear']);
+
 
 //connection//
 Route::options('/{any}', function (Request $request) {
@@ -39,13 +47,13 @@ Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logo
 Route::post('/reset-password-to-default', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
 
 
-Route::middleware(['auth:sanctum', 'UserTypeAuth'])->group(function () {
-    Route::get('/admin/dashboard', [AuthController::class, 'admin']);
-    Route::get('/head/dashboard', [AuthController::class, 'head']);
-    Route::get('/programchair/dashboard', [AuthController::class, 'programchair']);
-    Route::get('/staff/dashboard', [AuthController::class, 'staff']);
-    Route::get('/dean/dashboard', [AuthController::class, 'dean']);
-});
+// Route::middleware(['auth:sanctum', 'UserTypeAuth'])->group(function () {
+//     Route::get('/admin/dashboard', [AuthController::class, 'admin']);
+//     Route::get('/head/dashboard', [AuthController::class, 'head']);
+//     Route::get('/programchair/dashboard', [AuthController::class, 'programchair']);
+//     Route::get('/staff/dashboard', [AuthController::class, 'staff']);
+//     Route::get('/dean/dashboard', [AuthController::class, 'dean']);
+// });
 
 //create acc///
 Route::controller(AccountController::class)->group(function () {
@@ -68,7 +76,7 @@ Route::post('/sample', function (Request $request) {
 Route::controller(OrgLogController::class)->group(function () {
 
     Route::post('getOrgLog', 'getOrgLog');
-    Route::post('getDropdownOrg','getDropdownOrg');
+    Route::post('getDropdownOrg', 'getDropdownOrg');
     Route::post('storeOrgLog', 'storeOrgLog');
     Route::post('editOrgLog', 'editOrgLog');
     Route::post('updateOrgLog', 'updateOrgLog');
@@ -93,7 +101,6 @@ Route::controller(EventController::class)->group(function () {
     Route::post('editEvent', 'editEvent');
     Route::post('updateEvent', 'updateEvent');
     Route::post('deleteEvent', 'deleteEvent');
-
 });
 
 Route::controller(RequirementController::class)->group(function () {
@@ -114,7 +121,6 @@ Route::controller(FileRequirementController::class)->group(function () {
     Route::get('makefolder', 'makefolder');
     Route::post('deleteFile', 'deleteFile');
     Route::post('getFolder', 'getFolder');
-    
 });
 
 Route::controller(ConversationController::class)->group(function () {
