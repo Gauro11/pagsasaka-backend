@@ -25,6 +25,7 @@ Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 Route::post('/academic-year', [AcademicYearController::class, 'addAcademicYear']);
 Route::post('/delete-year/{id}', [AcademicYearController::class, 'deleteAcademicYear']);
+Route::post('/getacademic-year', [AcademicYearController::class, 'getAcademicYear']);
 
 
 //connection//
@@ -75,7 +76,7 @@ Route::post('/sample', function (Request $request) {
 Route::controller(OrgLogController::class)->group(function () {
 
     Route::post('getOrgLog', 'getOrgLog');
-    Route::post('getDropdownOrg','getDropdownOrg');
+    Route::post('getDropdownOrg', 'getDropdownOrg');
     Route::post('storeOrgLog', 'storeOrgLog');
     Route::post('editOrgLog', 'editOrgLog');
     Route::post('updateOrgLog', 'updateOrgLog');
@@ -100,7 +101,6 @@ Route::controller(EventController::class)->group(function () {
     Route::post('editEvent', 'editEvent');
     Route::post('updateEvent', 'updateEvent');
     Route::post('deleteEvent', 'deleteEvent');
-
 });
 
 Route::controller(RequirementController::class)->group(function () {
@@ -121,7 +121,6 @@ Route::controller(FileRequirementController::class)->group(function () {
     Route::get('makefolder', 'makefolder');
     Route::post('deleteFile', 'deleteFile');
     Route::post('getFolder', 'getFolder');
-    
 });
 
 Route::controller(ConversationController::class)->group(function () {

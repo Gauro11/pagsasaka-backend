@@ -128,6 +128,110 @@ class AcademicYearController extends Controller
         }
     }
 
+    public function getAcademicYear(Request $request)
+    {
+        try {
+
+            $validated = $request->validate([
+                'paginate' => 'required'
+            ]);
+
+            if ($validated['paginate'] == 0) {
+                $datas = AcademicYear::select('id', 'Academic_year', 'start_date', 'end_date', 'status')
+                    ->whereIn('status', ['A', 'I'])
+                    ->orderBy('start_date', 'desc') // Ordering by creation date in descending order
+                    ->get();
+
+
+                if ($datas->isEmpty()) {
+                    $response = [
+                        'isSuccess' => false,
+                        'message' => 'No active AcademicYear found matching the criteria.',
+                    ];
+                    $this->logAPICalls('getAcademicYear', "", $request->all(), $response);
+                    return response()->json($response, 500);
+                }
+
+                $AcademicYear = $datas->map(function ($data) {
+
+                    return [
+                        'id' => $data->id,
+                        'Academic_year' => $data->Academic_year,
+                        'start_date' => $data->start_date,
+                        'end_date' => $data->end_date,
+                        'status' => $data->status,
+                    ];
+                });
+
+                $response = [
+                    'isSuccess' => true,
+                    'message' => 'Active user accounts retrieved successfully.',
+                    'AcademicYear' => $AcademicYear,
+
+                ];
+            } else {
+
+
+                $perPage = $request->input('per_page', 10);
+
+                $datas = AcademicYear::select('id', 'Academic_year', 'start_date', 'end_date', 'status')
+                    ->whereIn('status', ['A', 'I'])
+                    ->when($request->search, function ($query, $searchTerm) {
+                        return $query->where(function ($activeQuery) use ($searchTerm) {
+                            $activeQuery->where('Academic_year', 'like', '%' . $searchTerm . '%');
+                        });
+                    })
+                    ->paginate($perPage);
+
+                if ($datas->isEmpty()) {
+                    $response = [
+                        'isSuccess' => false,
+                        'message' => 'No active Academic_year found matching the criteria.',
+                    ];
+                    $this->logAPICalls('getAcademicYear', "", $request->all(), $response);
+                    return response()->json($response, 500);
+                }
+
+                $AcademicYear = $datas->map(function ($data) {
+
+
+                    return [
+                        'id' => $data->id,
+                        'Academic_year' => $data->Academic_year,
+                        'start_date' => $data->start_date,
+                        'end_date' => $data->end_date,
+                        'status' => $data->status,
+                    ];
+                });
+
+                // Prepare the response with pagination metadata
+                $response = [
+                    'isSuccess' => true,
+                    'message' => 'Active Academic year retrieved successfully.',
+                    'AcademicYear' => $AcademicYear,
+                    'pagination' => [
+                        'current_page' => $datas->currentPage(),
+                        'per_page' => $datas->perPage(),
+                        'total' => $datas->total(),
+                        'last_page' => $datas->lastPage(),
+                        'url' => url('api/accounts?page=' . $datas->currentPage() . '&per_page=' . $datas->perPage()),
+                    ],
+                ];
+            }
+            $this->logAPICalls('getAcademicYear', "", $request->all(), $response);
+            return response()->json($response, 200);
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve accounts.',
+                'error' => $e->getMessage(),
+            ];
+
+            $this->logAPICalls('getAcademicYear', "", $request->all(), $response);
+            return response()->json($response, 500);
+        }
+    }
+
 
 
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)
