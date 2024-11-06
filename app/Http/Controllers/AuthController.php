@@ -26,30 +26,30 @@ class AuthController extends Controller
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
-    
+
             // Auto-detect User-Agent
             $userAgent = $request->header('User-Agent');
             Log::info('User-Agent:', ['userAgent' => $userAgent]);
-    
+
             // Detect platform automatically
             $platformType = $this->detectPlatform($userAgent); // Pass the User-Agent to detectPlatform
             Log::info('Detected Platform:', ['platform' => $platformType]);
-    
+
             // Get IP address
             $ipAddress = $request->ip();
-    
+
             // Determine file system based on the detected platform
             $fileSystemType = $this->detectFileSystem($platformType); // Call a separate method for file system detection
-    
+
             $user = Account::where('email', $request->email)->first();
-    
-            if ($user && Hash::check($request->password, $user->password)) {    
+
+            if ($user && Hash::check($request->password, $user->password)) {
                 if ($user->status === 'I') {
                     $response = ['message' => 'Account is inactive.'];
                     $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
                     return response()->json($response, 403);
                 }
-    
+
                 $token = $user->createToken('auth-token')->plainTextToken;
 
                 // Generate session code by calling insertSession
@@ -59,11 +59,8 @@ class AuthController extends Controller
                 }
 
                 $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
-              
 
-            
                 $response = [
-
                     'isSuccess' => true,
                     'message' => 'Logged in successfully',
                     'token' => $token,
@@ -83,10 +80,10 @@ class AuthController extends Controller
                     'platform' => $platformType,
                     'fileSystem' => $fileSystemType, // Automatically set file system
                 ];
-    
+
                 // Log successful login attempt
                 $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
-    
+
                 return response()->json($response, 200);
             } else {
                 // Log invalid credentials attempt
@@ -101,13 +98,13 @@ class AuthController extends Controller
                 'message' => 'An error occurred during login.',
                 'error' => $e->getMessage(),
             ];
-            
+
             $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-            
+
             return response()->json($response, 500);
         }
     }
-    
+
     // Separate function for file system detection
     private function detectFileSystem($platformType)
     {
@@ -122,27 +119,24 @@ class AuthController extends Controller
                 return 'Unknown'; // Default for any unrecognized platform
         }
     }
-    
+
     // Modify the detectPlatform method
     private function detectPlatform($userAgent)
     {
         $userAgent = strtolower($userAgent); // Convert to lowercase for easier matching
-    
-        if (strpos($userAgent, 'windows') !== false) {
+
+        if (strpos($userAgent, 'windows') !== false || strpos($userAgent, 'win64') !== false || strpos($userAgent, 'wow64') !== false || strpos($userAgent, 'x64') !== false) {
             return 'Windows';
         } elseif (strpos($userAgent, 'macintosh') !== false || strpos($userAgent, 'mac os') !== false) {
             return 'macOS';
-        } elseif (strpos($userAgent, 'linux') !== false) {
+        } elseif (strpos($userAgent, 'linux') !== false || strpos($userAgent, 'ubuntu') !== false || strpos($userAgent, 'debian') !== false || strpos($userAgent, 'fedora') !== false || strpos($userAgent, 'android') !== false) {
             return 'Linux';
         } else {
             return 'Unknown'; // Return unknown for unrecognized user agents
         }
     }
-    
 
-    
-
-    /////logout//////
+    // logout
     public function logout(Request $request)
     {
         try {
@@ -199,30 +193,29 @@ class AuthController extends Controller
 
 
     // Method to insert session
-    public function insertSession(int $userId) // Accept an integer instead of Request
-{
-    try {
-        $sessionCode = Str::uuid(); // Generate a unique session code
-        $dateTime = Carbon::now()->toDateTimeString();
+    public function insertSession(int $userId)
+    {
+        try {
+            $sessionCode = Str::uuid(); // Generate a unique session code
+            $dateTime = Carbon::now()->toDateTimeString();
 
-        // Insert session record into the database
-        Session::create([
-            'session_code' => $sessionCode,
-            'user_id' => $userId,
-            'login_date' => $dateTime,
-            'logout_date' => null, // Initially set logout_date to null
-        ]);
+            // Insert session record into the database
+            Session::create([
+                'session_code' => $sessionCode,
+                'user_id' => $userId,
+                'login_date' => $dateTime,
+                'logout_date' => null, // Initially set logout_date to null
+            ]);
 
-        return $sessionCode; // Return the generated session code
-    } catch (Throwable $e) {
-        Log::error('Failed to create session.', ['error' => $e->getMessage()]);
-        return null; // Return null if session creation fails
+            return $sessionCode; // Return the generated session code
+        } catch (Throwable $e) {
+            Log::error('Failed to create session.', ['error' => $e->getMessage()]);
+            return null; // Return null if session creation fails
+        }
     }
-}
 
 
-
-    //////password change////////
+    // password change
     public function changePassword(Request $request)
     {
         try {
@@ -334,8 +327,6 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
-
-
 
 
     // Method to log API calls

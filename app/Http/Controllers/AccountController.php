@@ -17,9 +17,8 @@ use App\Notifications\email;
 
 class AccountController extends Controller
 {
-    /**
-     * Create a new user account.
-     */
+
+    // Create a new user account.
     public function createAccount(Request $request)
     {
         try {
@@ -85,9 +84,8 @@ class AccountController extends Controller
         }
     }
 
-    /*
-     * Read: Get all user accounts.
-     */
+
+    //  Read: Get all user accounts.     
     public function getAccounts(Request $request)
     {
         try {
@@ -202,9 +200,8 @@ class AccountController extends Controller
         }
     }
 
-    /**
-     * Update an existing user account.
-     */
+
+    // Update an existing user account.
     public function updateAccount(Request $request, $id)
     {
         try {
@@ -352,9 +349,9 @@ class AccountController extends Controller
         }
     }
 
-    /**
-     * Log all API calls.
-     */ public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
+
+    // Log all API calls.
+    public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {
 
         try {
