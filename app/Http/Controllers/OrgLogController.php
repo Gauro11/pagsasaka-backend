@@ -163,17 +163,28 @@ class OrgLogController extends Controller
                 ]);
 
             }else{
-                $perPage= 10;
+                $perPage = 10;
                 $query = OrganizationalLog::where('org_id', $request->org_id)
-                                            ->where('status','!=','D');
+                                        ->where('status', '!=', 'D');
+
+                // If there is a search term in the request, filter based on it
+                if ($request->has('search') && $request->search) {
+                    // Assuming the search term can be used to filter by any relevant column (e.g., name or description)
+                    $searchTerm = $request->search;
+                    $query = $query->where(function ($query) use ($searchTerm) {
+                        $query->where('name', 'like', "%$searchTerm%")
+                            ->orWhere('acronym', 'like', "%$searchTerm%");
+                          // Replace column_name_X with actual column names
+                    });
+                }
 
                 // Custom handling for org_id == 3
-                if ($request->org_id == 3) { // Ensure org_id is integer
+                if ($request->org_id == 3) { // Ensure org_id is an integer
                     $data = $query->with(['programs:program_entity_id,college_entity_id'])
-                        ->orderBy('created_at', 'desc')
-                        ->paginate($perPage);
+                                ->orderBy('created_at', 'desc')
+                                ->paginate($perPage);
 
-                    // Manipulate the response to get the name of the college.
+                    // Manipulate the response to get the name of the college
                     $data->getCollection()->transform(function ($item) {
                         foreach ($item->programs as $program) {
                             $college = OrganizationalLog::find($program->college_entity_id);
@@ -185,14 +196,16 @@ class OrgLogController extends Controller
                     $data = $query->orderBy('created_at', 'desc')->paginate($perPage);
                 }
 
-            }
-            
-            $this->logAPICalls('getOrgLog', "", $request->all(), [$data]);
-            return response()->json([
-                'isSucccess' => true,
-                'get_OrgLog' => $data
-            ]);
+                // Log API call
+                $this->logAPICalls('getOrgLog', "", $request->all(), [$data]);
 
+                // Return the response
+                return response()->json([
+                    'isSucccess' => true,
+                    'get_OrgLog' => $data
+                ]);
+
+            }
 
         }catch(Throwable $e){
 
