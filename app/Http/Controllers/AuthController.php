@@ -17,6 +17,7 @@ use App\Models\OrganizationalLog;
 use Laravel\Sanctum\PersonalAccessToken;
 
 
+
 class AuthController extends Controller
 {
     public function login(Request $request)
@@ -105,43 +106,12 @@ class AuthController extends Controller
         }
     }
 
-    // Separate function for file system detection
-    private function detectFileSystem($platformType)
-    {
-        switch (strtolower($platformType)) {
-            case 'windows':
-                return 'NTFS';
-            case 'macos':
-                return 'APFS';
-            case 'linux':
-                return 'exFAT'; // Adjust this if you have a different logic for Linux
-            default:
-                return 'Unknown'; // Default for any unrecognized platform
-        }
-    }
-
-    // Modify the detectPlatform method
-    private function detectPlatform($userAgent)
-    {
-        $userAgent = strtolower($userAgent); // Convert to lowercase for easier matching
-
-        if (strpos($userAgent, 'windows') !== false || strpos($userAgent, 'win64') !== false || strpos($userAgent, 'wow64') !== false || strpos($userAgent, 'x64') !== false) {
-            return 'Windows';
-        } elseif (strpos($userAgent, 'macintosh') !== false || strpos($userAgent, 'mac os') !== false) {
-            return 'macOS';
-        } elseif (strpos($userAgent, 'linux') !== false || strpos($userAgent, 'ubuntu') !== false || strpos($userAgent, 'debian') !== false || strpos($userAgent, 'fedora') !== false || strpos($userAgent, 'android') !== false) {
-            return 'Linux';
-        } else {
-            return 'Unknown'; // Return unknown for unrecognized user agents
-        }
-    }
-
     // logout
     public function logout(Request $request)
     {
         try {
             // Get the authenticated user based on the token
-            $user = auth()->user();
+            $user = $request->user();
 
             if ($user) {
                 // Find the user's active session
@@ -150,12 +120,6 @@ class AuthController extends Controller
                     ->latest()
                     ->first();
 
-                // Get the bearer token from the request header
-                $plainTextToken = $request->bearerToken();
-
-                // Find the token in the database by comparing the hashed value
-                $token = PersonalAccessToken::findToken($plainTextToken);
-
                 if ($session) {
                     // Update the session's logout date
                     $session->update([
@@ -163,23 +127,19 @@ class AuthController extends Controller
                     ]);
                 }
 
-                if ($token) {
-                    // Delete the token from the personal_access_tokens table
-                    $token->delete();
+                // Delete the token from the personal_access_tokens table
+                $user->currentAccessToken()->delete();
 
-                    $response = [
-                        'isSuccess' => true,
-                        'message' => 'User logged out successfully',
-                        'user' => [
-                            'id' => $user->id,
-                            'email' => $user->email,
-                        ],
-                    ];
-                    $this->logAPICalls('logoutByToken', $user->id, [], $response);
-                    return response()->json($response, 200);
-                }
-
-                return response()->json(['message' => 'Token not found'], 404);
+                $response = [
+                    'isSuccess' => true,
+                    'message' => 'User logged out successfully',
+                    'user' => [
+                        'id' => $user->id,
+                        'email' => $user->email,
+                    ],
+                ];
+                $this->logAPICalls('logoutByToken', $user->id, [], $response);
+                return response()->json($response, 200);
             }
 
             return response()->json(['message' => 'User not found'], 404);
@@ -190,30 +150,6 @@ class AuthController extends Controller
             ], 500);
         }
     }
-
-
-    // Method to insert session
-    public function insertSession(int $userId)
-    {
-        try {
-            $sessionCode = Str::uuid(); // Generate a unique session code
-            $dateTime = Carbon::now()->toDateTimeString();
-
-            // Insert session record into the database
-            Session::create([
-                'session_code' => $sessionCode,
-                'user_id' => $userId,
-                'login_date' => $dateTime,
-                'logout_date' => null, // Initially set logout_date to null
-            ]);
-
-            return $sessionCode; // Return the generated session code
-        } catch (Throwable $e) {
-            Log::error('Failed to create session.', ['error' => $e->getMessage()]);
-            return null; // Return null if session creation fails
-        }
-    }
-
 
     // password change
     public function changePassword(Request $request)
@@ -325,6 +261,59 @@ class AuthController extends Controller
             ];
             $this->logAPICalls('changePassword', null, $request->all(), $response);
             return response()->json($response, 500);
+        }
+    }
+
+    // Separate function for file system detection
+    private function detectFileSystem($platformType)
+    {
+        switch (strtolower($platformType)) {
+            case 'windows':
+                return 'NTFS';
+            case 'macos':
+                return 'APFS';
+            case 'linux':
+                return 'exFAT'; // Adjust this if you have a different logic for Linux
+            default:
+                return 'Unknown'; // Default for any unrecognized platform
+        }
+    }
+
+    // Modify the detectPlatform method
+    private function detectPlatform($userAgent)
+    {
+        $userAgent = strtolower($userAgent); // Convert to lowercase for easier matching
+
+        if (strpos($userAgent, 'windows') !== false || strpos($userAgent, 'win64') !== false || strpos($userAgent, 'wow64') !== false || strpos($userAgent, 'x64') !== false) {
+            return 'Windows';
+        } elseif (strpos($userAgent, 'macintosh') !== false || strpos($userAgent, 'mac os') !== false) {
+            return 'macOS';
+        } elseif (strpos($userAgent, 'linux') !== false || strpos($userAgent, 'ubuntu') !== false || strpos($userAgent, 'debian') !== false || strpos($userAgent, 'fedora') !== false || strpos($userAgent, 'android') !== false) {
+            return 'Linux';
+        } else {
+            return 'Unknown'; // Return unknown for unrecognized user agents
+        }
+    }
+
+    // Method to insert session
+    public function insertSession(int $userId)
+    {
+        try {
+            $sessionCode = Str::uuid(); // Generate a unique session code
+            $dateTime = Carbon::now()->toDateTimeString();
+
+            // Insert session record into the database
+            Session::create([
+                'session_code' => $sessionCode,
+                'user_id' => $userId,
+                'login_date' => $dateTime,
+                'logout_date' => null, // Initially set logout_date to null
+            ]);
+
+            return $sessionCode; // Return the generated session code
+        } catch (Throwable $e) {
+            Log::error('Failed to create session.', ['error' => $e->getMessage()]);
+            return null; // Return null if session creation fails
         }
     }
 
