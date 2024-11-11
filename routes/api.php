@@ -18,6 +18,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\AcademicYearController;
+use App\Http\Controllers\HistoryDocumentController;
 
 
 Route::post('send-email', [EmailController::class, 'sendEmail']);
@@ -82,7 +83,7 @@ Route::controller(OrgLogController::class)->group(function () {
     Route::post('updateOrgLog', 'updateOrgLog');
     Route::post('deleteOrgLog', 'deleteOrgLog');
     Route::post('searchOrgLog', 'searchOrgLog');
-    Route::post('filterCollege', 'filterCollege');
+    Route::post('getFilteredPrograms', 'getFilteredPrograms');
     Route::post('getOrgLogInfo', 'getOrgLogInfo');
 });
 
@@ -110,7 +111,7 @@ Route::controller(RequirementController::class)->group(function () {
 
 Route::controller(FileRequirementController::class)->group(function () {
 
-    Route::get('getAllfile', 'getAllfile'); // DMO FILES
+    Route::post('getAllfile', 'getAllfile'); // DMO FILES
     Route::post('getFileRequirement', 'getFileRequirement');
     Route::post('storeFileRequirement', 'storeFileRequirement');
     Route::post('storeFolderRequirement', 'storeFolderRequirement');
@@ -118,6 +119,7 @@ Route::controller(FileRequirementController::class)->group(function () {
     Route::post('createDMO_folder', 'createDMO_folder');
     Route::post('downloadFileRequirement', 'downloadFileRequirement');
     Route::post('updateFile', 'updateFile');
+    Route::post('confirmationPass', 'confirmationPass');
     Route::get('makefolder', 'makefolder');
     Route::post('deleteFile', 'deleteFile');
     Route::post('getFolder', 'getFolder');
@@ -137,7 +139,7 @@ Route::controller(RequestController::class)->group(function () {
 });
 
 Route::controller(DashboardController::class)->group(function () {
-    Route::get('getAdminDashboard', 'getAdminDashboard');
+    Route::post('getAdminDashboard', 'getAdminDashboard');
     Route::post('getDeanDashboard', 'getDeanDashboard');
     Route::post('getProgramDashboard', 'getProgramDashboard');
     Route::post('getHeadDashboard', 'getHeadDashboard');
@@ -151,4 +153,10 @@ Route::controller(ReportController::class)->group(function () {
 
     Route::post('getReportRequest', 'getReportRequest');
     Route::post('getComplianceReport', 'getComplianceReport');
+});
+
+Route::controller(HistoryDocumentController::class)->group(function () {
+
+    Route::post('getHistory', 'getHistory');
+
 });
