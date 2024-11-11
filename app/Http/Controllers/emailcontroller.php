@@ -13,7 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache; // Use cache for simple tracking
 use Illuminate\Support\Facades\Log;
 
-class emailcontroller extends Controller
+class EmailController extends Controller
 {
 
     public function sendEmail(Request $request)
@@ -101,7 +101,7 @@ class emailcontroller extends Controller
                 </body>
                 </html>
             ";
-                $subject = 'Super Final Notification for Data Bank Management Systemssssss';
+                $subject = 'Super Final Notification for Data Bank Management System';
             }
 
             // Send the email with the generated HTML content
@@ -124,11 +124,6 @@ class emailcontroller extends Controller
         }
     }
 
-
-    
-    /**
-     * Log API calls into ApiLog table
-     */
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {
         try {

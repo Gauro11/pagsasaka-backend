@@ -64,143 +64,6 @@ class AccountController extends Controller
         }
     }
 
-    public function getOrganizationLogs()
-    {
-        try {
-            $organizationLogs = OrganizationalLog::select('id', 'name')->get();
-
-            $response = [
-                'isSuccess' => true,
-                'data' => $organizationLogs
-            ];
-            return response()->json($response, 200);
-        } catch (Throwable $e) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Failed to fetch organization logs.',
-                'error' => $e->getMessage()
-            ];
-            return response()->json($response, 500);
-        }
-    }
-
-
-    //  Read: Get all user accounts.     
-    public function getAccounts(Request $request)
-    {
-        try {
-
-            $validated = $request->validate([
-                'paginate' => 'required'
-            ]);
-
-            if ($validated['paginate'] == 0) {
-                $datas = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'status', 'org_log_id')
-                    ->where('status', 'A')
-                    ->orderBy('created_at', 'desc') // Ordering by creation date in descending order
-                    ->get();
-
-
-                if ($datas->isEmpty()) {
-                    $response = [
-                        'isSuccess' => false,
-                        'message' => 'No active accounts found matching the criteria.',
-                    ];
-                    $this->logAPICalls('getAccounts', "", $request->all(), $response);
-                    return response()->json($response, 500);
-                }
-
-                $accounts = $datas->map(function ($data) {
-                    $org_log = OrganizationalLog::where('id', $data->org_log_id)->first();
-
-                    return [
-                        'id' => $data->id,
-                        'first_name' => $data->first_name,
-                        'last_name' => $data->last_name,
-                        'middle_name' => $data->middle_name,
-                        'email' => $data->email,
-                        'role' => $data->role,
-                        'status' => $data->status,
-                        'org_log_id' => $data->org_log_id,
-                        'org_log_name' => optional($org_log)->name,
-                    ];
-                });
-
-                $response = [
-                    'isSuccess' => true,
-                    'message' => 'Active user accounts retrieved successfully.',
-                    'Accounts' => $accounts,
-
-                ];
-            } else {
-
-
-                $perPage = $request->input('per_page', 10);
-
-                $datas = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'status', 'org_log_id')
-                    ->where('status', 'A')
-                    ->when($request->search, function ($query, $searchTerm) {
-                        return $query->where(function ($activeQuery) use ($searchTerm) {
-                            $activeQuery->where('first_name', 'like', '%' . $searchTerm . '%')
-                                ->orWhere('email', 'like', '%' . $searchTerm . '%');
-                        });
-                    })
-                    ->paginate($perPage);
-
-                if ($datas->isEmpty()) {
-                    $response = [
-                        'isSuccess' => false,
-                        'message' => 'No active accounts found matching the criteria.',
-                    ];
-                    $this->logAPICalls('getAccounts', "", $request->all(), $response);
-                    return response()->json($response, 500);
-                }
-
-                $accounts = $datas->map(function ($data) {
-                    $org_log = OrganizationalLog::where('id', $data->org_log_id)->first();
-
-                    return [
-                        'id' => $data->id,
-                        'first_name' => $data->first_name,
-                        'last_name' => $data->last_name,
-                        'middle_name' => $data->middle_name,
-                        'email' => $data->email,
-                        'role' => $data->role,
-                        'status' => $data->status,
-                        'org_log_id' => $data->org_log_id,
-                        'org_log_name' => optional($org_log)->name,
-                    ];
-                });
-
-                // Prepare the response with pagination metadata
-                $response = [
-                    'isSuccess' => true,
-                    'message' => 'Active user accounts retrieved successfully.',
-                    'Accounts' => $accounts,
-                    'pagination' => [
-                        'current_page' => $datas->currentPage(),
-                        'per_page' => $datas->perPage(),
-                        'total' => $datas->total(),
-                        'last_page' => $datas->lastPage(),
-                        'url' => url('api/accounts?page=' . $datas->currentPage() . '&per_page=' . $datas->perPage()),
-                    ],
-                ];
-            }
-            $this->logAPICalls('getAccounts', "", $request->all(), $response);
-            return response()->json($response, 200);
-        } catch (Throwable $e) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Failed to retrieve accounts.',
-                'error' => $e->getMessage(),
-            ];
-
-            $this->logAPICalls('getAccounts', "", $request->all(), $response);
-            return response()->json($response, 500);
-        }
-    }
-
-
     // Update an existing user account.
     public function updateAccount(Request $request, $id)
     {
@@ -349,6 +212,115 @@ class AccountController extends Controller
         }
     }
 
+    //  Read: Get all user accounts.     
+    public function getAccounts(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'paginate' => 'required',
+            ]);
+    
+            // Initialize the base query
+            $query = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'status', 'org_log_id')
+                            ->where('status', 'A')
+                            ->orderBy('created_at', 'desc');
+    
+            // Apply search term if present
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                $query->where(function ($query) use ($searchTerm) {
+                    $query->whereRaw("CONCAT_WS(' ', first_name, middle_name, last_name) LIKE ?", ["%{$searchTerm}%"])
+                          ->orWhere('email', 'like', "%{$searchTerm}%");
+                });
+            }
+    
+            // Non-paginated data retrieval
+            if (!$validated['paginate']) {
+                $data = $query->get();
+    
+                // Add `org_log_name` for each item if org_log_id is present
+                $data->transform(function ($item) {
+                    $org_log = OrganizationalLog::find($item->org_log_id);
+                    $item->org_log_name = optional($org_log)->name;
+                    return $item;
+                });
+    
+                // Log API call and return response
+                $this->logAPICalls('getAccounts', "", $request->all(), $data);
+    
+                return response()->json([
+                    'isSuccess' => true,
+                    'Accounts' => $data,
+                ], 200);
+    
+            } else {
+                // Paginated data retrieval
+                $perPage = $request->input('per_page', 10);
+                $data = $query->paginate($perPage);
+    
+                // Transform to add `org_log_name` based on `org_log_id`
+                $data->getCollection()->transform(function ($item) {
+                    $org_log = OrganizationalLog::find($item->org_log_id);
+                    $item->org_log_name = optional($org_log)->name;
+                    return $item;
+                });
+    
+                // Log API call and return response with pagination data
+                $response = [
+                    'isSuccess' => true,
+                    'Accounts' => $data,
+                    'pagination' => [
+                        'current_page' => $data->currentPage(),
+                        'per_page' => $data->perPage(),
+                        'total' => $data->total(),
+                        'last_page' => $data->lastPage(),
+                    ],
+                ];
+                $this->logAPICalls('getAccounts', "", $request->all(), $response);
+    
+                return response()->json($response, 200);
+            }
+    
+        } catch (ValidationException $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Invalid input. Please ensure all required fields are provided correctly.',
+                'errors' => $e->errors(),
+            ], 422);
+    
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => "Failed to retrieve accounts. Please contact support.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage(),
+            ];
+    
+            $this->logAPICalls('getAccounts', "", $request->all(), $response);
+            return response()->json($response, 500);
+        }
+    }
+    
+
+
+    public function getOrganizationLogs()
+    {
+        try {
+            $organizationLogs = OrganizationalLog::select('id', 'name')->get();
+
+            $response = [
+                'isSuccess' => true,
+                'data' => $organizationLogs
+            ];
+            return response()->json($response, 200);
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Failed to fetch organization logs.',
+                'error' => $e->getMessage()
+            ];
+            return response()->json($response, 500);
+        }
+    }
 
     // Log all API calls.
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
