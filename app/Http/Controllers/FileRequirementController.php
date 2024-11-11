@@ -10,8 +10,10 @@ use App\Models\Account;
 use App\Models\Program;
 use App\Models\Event;
 use App\Models\OrganizationalLog;
+use App\Models\HistoryDocument;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
 use ZipArchive;
 use Throwable; 
 use File;
@@ -384,7 +386,8 @@ public function getAllfile(Request $request)
             $validated = $request->validate([
                 'file_id' => 'required|exists:requirement_files,id',
                 'name' => 'required|max:20',
-                'folder' => 'required'
+                'folder' => 'required',
+                'account_id' => 'required|exists:accounts,id'
             ]);
         
            $data = RequirementFile::where('id',$validated['file_id'])->first();
@@ -416,23 +419,34 @@ public function getAllfile(Request $request)
                                 }
 
                                    
-
+                
                     if($validated['folder'] != 0)  {
                         $this->updateChildPaths($data->path, $newFolderPath, $validated['file_id']);
+                       
                     }            
 
                     $data->update([
                      'filename' => $filename,
                      'path' => $newFolderPath
                     ]);
-                   
-                   
+                    
+                    $user = Account::where('id',$validated['account_id'])->first();
+
+                    // The records of the user who renamed the file will be saved here. //
+                    if($user){
+                        HistoryDocument::create([
+                            'user_id' => $user->id,
+                            'action' => "has renamed the folder/file",
+                            'file_id' => $validated['file_id']
+                        ]);
+                     }
+
                     $response = [
                         'isSuccess' => true,
                         'message' => "Updated successfully!",
                         'File' => $data
                     ];
-        
+                    
                     $this->logAPICalls('getEditFile', "", $request->all(), [$response]);
                     return response($response,200);
             }
@@ -461,6 +475,45 @@ public function getAllfile(Request $request)
             return response()->json($response, 500);
 
         }
+    }
+
+    // API for Changing Confirmation under on UI DMO Files  //
+    public function confirmationPass(Request $request){
+        
+        $validated = $request->validate([
+            'account_id' => 'required|exists:accounts,id',
+            'password' => 'required'
+        ]);
+
+          $user = Account::find($validated['account_id']);
+         
+
+        if (Hash::check($request->password, $user->password)) {
+            $isSuccess =true;
+            $message = "Password authentication successful.";
+            $code = 200;
+            if($user->status == 'I' || $user->status == 'D'){
+                $isSuccess=false;
+                $message = "Account is inactive or Deleted.";
+                $code = 500;
+            }
+
+            $response =[
+                'isSuccess' => $isSuccess,
+                'message' => $message,
+            ];
+
+            return response()->json($response, $code);
+
+        }
+
+        $response = [
+            'isSuccess' => false,
+            'message' => "Invalid password!"
+        ];
+
+        return response()->json($response, 500);
+
     }
 
     private function updateChildPaths($oldPath, $newPath,$id) {
@@ -709,7 +762,8 @@ public function getAllfile(Request $request)
             try {
 
                 $validated  = $request->validate([
-                    'file_id' => 'required'
+                    'file_id' => 'required',
+                    'account_id' => 'required|exists:accounts,id'
                 ]);
 
 
@@ -770,6 +824,25 @@ public function getAllfile(Request $request)
                     // Check if the zip file was created successfully
 
                     if (file_exists($zipFilePath)) {
+
+                        //  //
+                        $user = Account::where('id',$validated['account_id'])->first();
+
+                        if($user){
+                            foreach($validated['file_id'] as $file_id){
+                                $exists = RequirementFile::where('id',$file_id)->exists();
+
+                                if($exists){
+                                    HistoryDocument::create([
+                                        'user_id' => $user->id,
+                                        'action' => "has downloaded the files.",
+                                        'file_id' => $file_id
+                                    ]);
+                                }
+
+                            }
+                            
+                        }
 
                         // Return the ZIP file as a downloadable response
                         return response()->download($zipFilePath)->deleteFileAfterSend(true);
@@ -853,7 +926,7 @@ public function getAllfile(Request $request)
 
                 if(!$exists){
             
-                  
+                    $path=null;
                     if(empty($request->folder_id)){
                        
                         $path = $file->storeAs('uploads',$filename,'public');
@@ -896,17 +969,36 @@ public function getAllfile(Request $request)
                                 'size' => $main_folder->size+$total_size
                             ]);
                         }
+
+                  // The records of the user who renamed the file will be saved here. //
+
+                    $file = RequirementFile::where('path',$path)->first();
+
+                    $user = Account::find($validated['account_id']);
+
+                    if($user){
+
+                        HistoryDocument::create([
+                            'user_id' => $user->id,
+                            'action' => "has created the folder/file",
+                            'file_id' =>  $file->id
+                        ]);
+
+                    }
+
+                     
+
+
+
+
                 }else{
                     $exists_file[] = $filename;
                 }
+
+                
                
             }
 
-            // return response()->json([
-            //     'isSuccess' => true,
-            //     'upload_files' => $uploadedFiles,
-            //     'exists_file' =>$exists_file
-            // ],200);
             if(!empty($uploadedFiles)){
 
                 $response = [
@@ -963,7 +1055,7 @@ public function getAllfile(Request $request)
                 'foldername' =>  'required|min:3',
                 'account_id' => 'required|exists:accounts,id'
             ]);
-            
+
             $account = Account::find( $validate['account_id']);
             $organization = Program::where('program_entity_id',$account->org_log_id)->first();
             $college_id = ($organization) ?  $organization->college_entity_id:"";
@@ -985,20 +1077,36 @@ public function getAllfile(Request $request)
                                  $path = Storage::disk('public')->path($data->first()->filename.'/'.$validate['foldername']);
                                  $stat = stat($path);
                              }
-                           
+                             
+                            $path = $path = $data->first()->filename.'/'.$validate['foldername'];
                             $data = RequirementFile::create([
     
                             'requirement_id' => "DMO File",
                             'filename' => $validate['foldername'],
                             'org_log_id' => $account->org_log_id,
                             'college_entity_id' => $college_id,
-                            'path' => $data->first()->filename.'/'.$validate['foldername'],
+                            'path' => $path,
                             'folder_id' => $request->folder_id,
                             'ino' => $stat['ino']
     
                             ]);
 
-            
+                              // The records of the user who renamed the file will be saved here. //
+                        
+                         $file = RequirementFile::where('path',$path)->first();
+
+                            $user = Account::find($validate['account_id']);
+
+                            if($user){
+
+                                HistoryDocument::create([
+                                    'user_id' => $user->id,
+                                    'action' => "has created the folder/file",
+                                    'file_id' =>  $file->id
+                                ]);
+                        
+                             }
+
                             $response = [
                                 'isSuccess' => true,
                                 'message' => 'Successfully created',
@@ -1025,6 +1133,8 @@ public function getAllfile(Request $request)
                         'message' => 'Successfully created',
                         'data' => $data
                     ];
+
+                    
                     $this->logAPICalls('createDMO_folder', "", $request->all(), [$response]);
                     return response()->json($response,500);
                 }
@@ -1043,7 +1153,7 @@ public function getAllfile(Request $request)
                         $stat = stat($path);
                     
                     }
-              
+                 
                     $data = RequirementFile::create([
     
                             'requirement_id' => "DMO File",
@@ -1055,7 +1165,22 @@ public function getAllfile(Request $request)
 
                     ]);
                     
-                    
+                      // The records of the user who renamed the file will be saved here. //
+                      $path = $validate['foldername'];
+                      $file = RequirementFile::where('path',$path)->first();
+
+                      $user = Account::find($validate['account_id']);
+  
+                      if($user){
+  
+                          HistoryDocument::create([
+                              'user_id' => $user->id,
+                              'action' => "has created the folder/file",
+                              'file_id' =>  $file->id
+                          ]);
+                          
+                      }
+  
                     return response()->json([
                         'message' => 'Successfully created',
                         'data' => $data

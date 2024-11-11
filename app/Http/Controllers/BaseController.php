@@ -161,6 +161,7 @@ class BaseController extends Controller
         }
         return true;
     }
+    
     public function getSetting(string $code)
     {
         try
