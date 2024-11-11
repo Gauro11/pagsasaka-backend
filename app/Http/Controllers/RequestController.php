@@ -93,7 +93,7 @@ class RequestController extends Controller
 
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to create the Account.',
+                'message' => 'Please contact support.',
                 'error' => $e->getMessage()
             ];
             $this->logAPICalls('updateReqStatus', "", $request->all(), $response);
@@ -221,7 +221,7 @@ class RequestController extends Controller
 
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to create the Account.',
+                'message' => 'Please contact support.',
                 'error' => $e->getMessage()
             ];
             $this->logAPICalls('getRequest', "", $request->all(), $response);
