@@ -523,7 +523,7 @@ class OrgLogController extends Controller
 
     }
 
-    public function filterCollege(Request $request){
+    public function getFilteredPrograms(Request $request){
         try{
 
             $validated = $request->validate([
