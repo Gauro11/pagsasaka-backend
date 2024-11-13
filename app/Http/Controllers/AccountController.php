@@ -12,7 +12,6 @@ use Throwable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-
 use App\Notifications\email;
 
 class AccountController extends Controller
@@ -269,15 +268,9 @@ class AccountController extends Controller
                 $response = [
                     'isSuccess' => true,
                     'Accounts' => $data,
-                    'pagination' => [
-                        'current_page' => $data->currentPage(),
-                        'per_page' => $data->perPage(),
-                        'total' => $data->total(),
-                        'last_page' => $data->lastPage(),
-                    ],
+                   
                 ];
                 $this->logAPICalls('getAccounts', "", $request->all(), $response);
-    
                 return response()->json($response, 200);
             }
     
@@ -300,8 +293,6 @@ class AccountController extends Controller
         }
     }
     
-
-
     public function getOrganizationLogs()
     {
         try {
