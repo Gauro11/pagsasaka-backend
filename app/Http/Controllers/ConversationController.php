@@ -12,7 +12,7 @@ use Throwable;
 class ConversationController extends Controller
 {
 
-    public function storeConverstation(ConversationRequest $request){
+    public function createConverstation(ConversationRequest $request){
 
         try{
            
@@ -42,7 +42,7 @@ class ConversationController extends Controller
                     'date' => $data
             ];
             
-            $this->logAPICalls('storeConverstation', "", $request->all(), [$response]);
+            $this->logAPICalls('createConverstation', "", $request->all(), [$response]);
             return response()->json($response);
 
           }catch(Throwable $e) {
@@ -53,7 +53,7 @@ class ConversationController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
            ];
 
-            $this->logAPICalls('storeConverstation', "", $request->all(), [$response]);
+            $this->logAPICalls('createConverstation', "", $request->all(), [$response]);
             return response()->json($response, 500);
 
   

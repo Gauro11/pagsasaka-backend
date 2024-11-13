@@ -14,51 +14,17 @@ use Illuminate\Pagination\LengthAwarePaginator;
 class OrgLogController extends Controller
 {
 
-    public function getOrgLogInfo(Request $request){
-
-        try{
-
-            $validated = $request->validate([
-
-                'org_log_id' => 'required|exists:organizational_logs,id'
-
-            ]);
-
-            $data = OrganizationalLog::where('id', $validated['org_log_id'])->first();
-
-            $response = [
-                'isSuccess' => true,
-                'data' => $data
-            ];
-
-            $this->logAPICalls('getOrgLogInfo',"", $request->all(), [$response]);
-            return response($response,200);
-
-        }catch(Throwable $e){
-
-            $response = [
-                'isSuccess' => false,
-                'message' => "Please contact support.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-            ];
-
-            $this->logAPICalls('getOrgLogInfo',"", $request->all(), [$response]);
-            return response($response, 500);
-
-        }
-    }
-    
     public function getConcernedOffice(){
 
         try{
 
-            $data =  OrganizationalLog::where('org_id','!=',1)
+            $college_program_office =  OrganizationalLog::where('org_id','!=',1)
                                         ->where('status','A')
                                         ->orderBy('created_at','desc')->get();
 
             $response = [
                 'isSuccess' => true,
-                'concerned_office' => $data
+                'concerned_office' => $college_program_office
             ];
             
             $this->logAPICalls('getConcernedOffice', "", [], [$response]);
@@ -75,11 +41,10 @@ class OrgLogController extends Controller
             $this->logAPICalls('getConcernedOffice', "", [] [$response]);
             return response($response, 500);
         }
-        
-                       
+                          
     }
 
-    public function getDropdownOrg(Request $request){
+    public function getDropdownOrganization(Request $request){
 
         try{
             $orgLog=[];
@@ -88,23 +53,45 @@ class OrgLogController extends Controller
             ]);
 
             $datas = OrganizationalLog::where('org_id',$validated['org_id'])->get();
+            if($datas){
 
-            foreach($datas as $data){
+                $response = [];
+
+                foreach($datas as $data){
                 
-                $orgLog[] = [
+                    $orgLog[] = [
+    
+                        'id' => $data->id,
+                        'name' => $data->name
+                    ];
+                }
+    
+                if($validated['org_id'] == 1){
+    
+                    $response = [
+                        'isSuccess' => true,
+                        'colleges' =>  $orgLog
+                    ];
+    
+                }elseif($validated['org_id'] == 2){
+    
+                    $response = [
+                        'isSuccess' => true,
+                        'offices' =>  $orgLog
+                    ];
+    
+                }else{
+                    $response = [
+                        'isSuccess' => true,
+                        'programs' =>  $orgLog
+                    ];
+                }
+                
+                
+                $this->logAPICalls('getDropdownOrganization', "", $request->all(), [$response]);
+                return response($response,200);
 
-                    'id' => $data->id,
-                    'name' => $data->name
-                ];
             }
-
-            $response = [
-                'isSuccess' => true,
-                'OrgLog' =>  $orgLog
-            ];
-            
-            $this->logAPICalls('getDropdownOrg', "", $request->all(), [$response]);
-            return response($response,200);
 
         }catch(Throwable $e){
 
@@ -114,13 +101,13 @@ class OrgLogController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
 
-            $this->logAPICalls('getDropdownOrg', "", $request->all(), [$response]);
+            $this->logAPICalls('getDropdownOrganization', "", $request->all(), [$response]);
             return response($response, 500);
         }
         
     }
 
-    public function getOrgLog(Request $request){
+    public function getOrganization(Request $request){
 
         try{
 
@@ -129,10 +116,11 @@ class OrgLogController extends Controller
                 'org_id' => 'required'
             ]);
 
+
             if ($validated['paginate'] == 0) {
                 // Build the query
                 $query = OrganizationalLog::where('org_id', $validated['org_id'])
-                                          ->where('status', '!=', 'D')
+                                          ->where('is_archived',0)
                                           ->orderBy('created_at', 'desc');
             
                 // Eager load the programs relationship if org_id is 3
@@ -155,18 +143,37 @@ class OrgLogController extends Controller
                 }
             
                 // Log the API call
-                $this->logAPICalls('getOrgLog', "", $request->all(), [$data]);
+                $this->logAPICalls('getOrgnization', "", $request->all(), [$data]);
             
-                // Return the response
-                return response()->json([
-                    'isSuccess' => true,
-                    'get_OrgLog' => $data
-                ]);
+                 // Return the response
+                 $org_id = $validated['org_id'];
+
+                 if($org_id==1){
+                     $response = [
+                         'isSuccess' => true,
+                         'colleges' => $data
+                     ];
+                 }elseif($org_id==2){
+                     $response = [
+                         'isSuccess' => true,
+                         'offices' => $data
+                     ];
+                 }else{
+                     $response = [
+                         'isSuccess' => true,
+                         'programs' => $data
+                     ];
+                 }
+         
+                 return response()->json($response);
 
             }else{
-                $perPage = 10;
-                $query = OrganizationalLog::where('org_id', $request->org_id)
-                                        ->where('status', '!=', 'D');
+           
+               $perPage = 10;
+       
+              $query = OrganizationalLog::where('org_id', $request->org_id)
+                                                 ->where('is_archived', 0);
+                                       
 
                 // If there is a search term in the request, filter based on it
                 if ($request->has('search') && $request->search) {
@@ -198,15 +205,31 @@ class OrgLogController extends Controller
                 }
 
                 // Log API call
-                $this->logAPICalls('getOrgLog', "", $request->all(), [$data]);
+               $this->logAPICalls('getOrgnization', "", $request->all(), [$data]);
 
                 // Return the response
-                return response()->json([
-                    'isSucccess' => true,
-                    'get_OrgLog' => $data
-                ]);
+                $org_id = $validated['org_id'];
 
-            }
+                if($org_id==1){
+                    $response = [
+                        'isSuccess' => true,
+                        'colleges' => $data
+                    ];
+                }elseif($org_id==2){
+                    $response = [
+                        'isSuccess' => true,
+                        'offices' => $data
+                    ];
+                }else{
+                    $response = [
+                        'isSuccess' => true,
+                        'programs' => $data
+                    ];
+                }
+        
+                return response()->json($response);
+
+        }
 
         }catch(Throwable $e){
 
@@ -221,9 +244,11 @@ class OrgLogController extends Controller
         }
     }
 
-    public function storeOrgLog(OrgLogRequest $request){
+
+    public function createOrganization(OrgLogRequest $request){
 
        try{
+        
           $exists = false;
 
            $validate = $request->validate([
@@ -264,7 +289,7 @@ class OrgLogController extends Controller
                     'message' => 'The organization you are trying to register already exists. Please verify your input and try again.'
                 ];
 
-                $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
+                $this->logAPICalls('createOrganization', "", $request->all(), [$response]);
                 return response()->json($response, 422);
 
             }else{
@@ -284,12 +309,10 @@ class OrgLogController extends Controller
                
                 $response = [
                           'isSuccess' => true,
-                           'message' => "Successfully created!",
-                           'store_OrgLog' => $data 
-
+                           'message' => "Successfully created!"
                     ];
 
-                $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
+                $this->logAPICalls('createOrganization', "", $request->all(), [$response]);
                 return response()->json($response);
             }
              
@@ -310,7 +333,7 @@ class OrgLogController extends Controller
 
     }
 
-    public function updateOrgLog(Request $request){
+    public function updateOrganization(Request $request){
 
         try{
 
@@ -328,7 +351,7 @@ class OrgLogController extends Controller
                     'message'=> 'The organization you are trying to update already exists. Please verify your input and try again.'
                 ];
     
-                $this->logAPICalls('updateOrgLog', "", $request->all(), [$response]);
+                $this->logAPICalls('updateOrganization', "", $request->all(), [$response]);
     
                 return response()->json($response, 422);
     
@@ -364,7 +387,7 @@ class OrgLogController extends Controller
                            'message' => "Successfully updated."
                     ];
     
-                $this->logAPICalls('updateOrgLog', "", $request->all(), [$response]);
+                $this->logAPICalls('updateOrganization', "", $request->all(), [$response]);
                 return response()->json($response);
             }
 
@@ -375,64 +398,64 @@ class OrgLogController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
            ];
 
-            $this->logAPICalls('updateOrgLog', "", $request->all(), [$response]);
+            $this->logAPICalls('updateOrganization', "", $request->all(), [$response]);
             return response()->json($response, 500);
         }
         
     }
 
-    public function editOrgLog(Request $request){
+    // public function editOrgLog(Request $request){
 
-     try{
+    //  try{
 
-        $college  = "";
-        $request->validate( [
-                'id' => 'required|exists:organizational_logs,id'
-            ] );
+    //     $college  = "";
+    //     $request->validate( [
+    //             'id' => 'required|exists:organizational_logs,id'
+    //         ] );
 
-        $data = OrganizationalLog::find($request->id);
+    //     $data = OrganizationalLog::find($request->id);
 
-        if($data->org_id == '3'){
-            $program  = Program::where('program_entity_id',$request->id)->get();
-            if ($program->isNotEmpty()){
-                $college = OrganizationalLog::where('id',$program->first()->college_entity_id)->get();
-                $data = [
-                    'id' => $data->id,
-                    'name' => $data->name,
-                    'acronym' =>  $data->acronym,
-                    'college_id' => $program->first()->college_entity_id,
-                    'college_name' => $college->first()->name,
-                    'org_id' => $data->org_id,
-                    'created_at' =>  $data->created_at,
-                    'updated_at' =>  $data->updated_at
+    //     if($data->org_id == '3'){
+    //         $program  = Program::where('program_entity_id',$request->id)->get();
+    //         if ($program->isNotEmpty()){
+    //             $college = OrganizationalLog::where('id',$program->first()->college_entity_id)->get();
+    //             $data = [
+    //                 'id' => $data->id,
+    //                 'name' => $data->name,
+    //                 'acronym' =>  $data->acronym,
+    //                 'college_id' => $program->first()->college_entity_id,
+    //                 'college_name' => $college->first()->name,
+    //                 'org_id' => $data->org_id,
+    //                 'created_at' =>  $data->created_at,
+    //                 'updated_at' =>  $data->updated_at
 
-                ];
-            }        
-       }
+    //             ];
+    //         }        
+    //    }
 
-        $response = [
-            'isSuccess' => true,
-             'edit_OrgLog' => $data
-        ];
+    //     $response = [
+    //         'isSuccess' => true,
+    //          'edit_OrgLog' => $data
+    //     ];
 
-        $this->logAPICalls('editOrgLog', "", $request->all(), [$response]);
-        return response()->json($response);
+    //     $this->logAPICalls('editOrgLog', "", $request->all(), [$response]);
+    //     return response()->json($response);
 
-     }catch(Throwable $e){
+    //  }catch(Throwable $e){
 
-         $response = [
-                'isSuccess' => false,
-                'message' => "Unsuccessfully edited. Please check your inputs.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-           ];
+    //      $response = [
+    //             'isSuccess' => false,
+    //             'message' => "Unsuccessfully edited. Please check your inputs.",
+    //             'error' => 'An unexpected error occurred: ' . $e->getMessage()
+    //        ];
 
-            $this->logAPICalls('editOrgLog', "", $request->all(), [$response]);
-            return response()->json($response, 500);
-     }
+    //         $this->logAPICalls('editOrgLog', "", $request->all(), [$response]);
+    //         return response()->json($response, 500);
+    //  }
        
-    }
+    // }
 
-    public function deleteOrgLog(Request $request){
+    public function updateOrganizationStatus(Request $request){
         
         try{
 
@@ -458,8 +481,6 @@ class OrgLogController extends Controller
                 $message = "Activated successfully.";
            }elseif($status == 'I'){
                 $message = "Inactivated successfully.";
-           }else{
-             $message = "Successfully deleted.";
            }
 
             $response = [
@@ -467,7 +488,7 @@ class OrgLogController extends Controller
                 'message' => $message
             ];
 
-            $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
+            $this->logAPICalls('updateOrganizationStatus', "", $request->all(), [$response]);
             return response()->json($response);
 
         }catch(Throwable $e){
@@ -482,6 +503,54 @@ class OrgLogController extends Controller
             return response()->json($response, 500);
         }
     }
+
+
+    public function deleteOrganization(Request $request){
+
+        try{
+
+            $validated = $request->validate( [
+                'id' => 'required|exists:organizational_logs,id'
+            ] );
+
+            $organization = OrganizationalLog::find($validated['id']);
+            $organization->update([
+                'is_archived' => 1 ,
+                'status' => 'I'
+            ]);
+
+            $program = Program::where('program_entity_id',$request->id)->first();
+
+            if($program){
+                $program->update([
+                    'is_archived' => 1,
+                    'status' => 'I'
+                ]);
+            }
+
+            $response = [
+                'isSuccess' => true,
+                'message' => "Deleted Successfully!"
+            ];
+
+            $this->logAPICalls('deleteOrganization', "", $request->all(), [$response]);
+            return response()->json($response);
+
+        }catch(Throwable $e){
+
+            $response = [
+                'isSuccess' => false,
+                'message' => "Unsuccessfully created. Please check your inputs.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+            ];
+
+            $this->logAPICalls('deleteOrganization', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+
+        }
+        
+    }
+
 
     public function isExist($validate){
         
@@ -526,8 +595,6 @@ class OrgLogController extends Controller
 
     public function getFilteredPrograms(Request $request){
         try{
-
-           
 
             $validated = $request->validate([
                 'college_id' => 'required|exists:organizational_logs,id'
@@ -655,10 +722,10 @@ class OrgLogController extends Controller
             
         }
         
-        return response([
-            'isSucess' => true,
-            'get_OrgLog' => $response
-        ],200);
+            return response([
+                'isSucess' => true,
+                'programs' => $response
+            ],200);
 
 
         }catch(Throwable $e){
@@ -669,12 +736,34 @@ class OrgLogController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
 
-            $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
+            $this->logAPICalls('getFilteredPrograms', "", $request->all(), [$response]);
             return response()->json($response, 500);
         }
    
     }
 
+    public function getResponse($org_id,$data){
+
+        // Return the response
+        if($org_id==1){
+           $response = [
+               'isSuccess' => true,
+               'colleges' => $data
+           ];
+       }elseif($org_id==2){
+           $response = [
+               'isSuccess' => true,
+               'offices' => $data
+           ];
+       }else{
+           $response = [
+               'isSuccess' => true,
+               'programs' => $data
+           ];
+       }
+       return "h";
+      // return response()->json($response);
+    }
 
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp)
     {
@@ -691,4 +780,4 @@ class OrgLogController extends Controller
         }
         return true;
     }
-    }
+}

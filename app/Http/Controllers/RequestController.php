@@ -308,7 +308,7 @@ class RequestController extends Controller
         }
     }
 
-    public function getReqInfo(Request $request){
+    public function getRequestInformation(Request $request){
 
         try{
 
@@ -327,7 +327,7 @@ class RequestController extends Controller
                 'data' => $data
             ];
 
-            $this->logAPICalls('getReqInfo', "", $request->all(), $response);
+            $this->logAPICalls('getRequestInformation', "", $request->all(), $response);
             return response()->json($response);
 
         }catch(Exception $e){
@@ -336,12 +336,12 @@ class RequestController extends Controller
                 'message' => 'Failed to create the Account.',
                 'error' => $e->getMessage()
             ];
-            $this->logAPICalls('getReqInfo', "", $request->all(), $response);
+            $this->logAPICalls('getRequestInformation', "", $request->all(), $response);
             return response()->json($response, 500);
         }
     }
 
-    // DONE //
+  
     public function getAcceptRequest(Request $request){
         $invalidId = []; 
         $validated = $request->validate([
