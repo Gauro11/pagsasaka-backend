@@ -9,6 +9,7 @@ use App\Models\Program;
 use App\Http\Requests\OrgLogRequest;
 use Throwable;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class OrgLogController extends Controller
 {
@@ -526,27 +527,112 @@ class OrgLogController extends Controller
     public function getFilteredPrograms(Request $request){
         try{
 
+           
+
             $validated = $request->validate([
                 'college_id' => 'required|exists:organizational_logs,id'
             ]);
-            $programs =[];
-            $datas = Program::where('college_entity_id',$validated['college_id'])
-                            ->where('status','A')->get();
-    
-           foreach ($datas as $data) {
-                $organization = OrganizationalLog::where('id', $data->program_entity_id)->first();
-                $college = OrganizationalLog::where('id', $validated['college_id'])->first();
+            
+            $programs = [];
+            $response = [];
+            
+            // Check if a search term is provided
+            if (!empty($request->search)) {
+                // Fetch Organizational Logs with search term (name or acronym)
+                $datas = OrganizationalLog::where('name', 'like', '%' . $request->search . '%')
+                    ->orWhere('acronym', 'like', '%' . $request->search . '%')
+                    ->orderBy('created_at','desc')
+                    ->get();
+            
+                // Loop through the results and filter programs
+                foreach ($datas as $data) {
+                    // Check if a program exists for this organizational log and college ID
+                    $progExists = Program::where('program_entity_id', $data->id)
+                        ->where('college_entity_id', $validated['college_id'])
+                        ->first();
+            
+                    if ($progExists) {
+                        // Fetch the related college for the program
+                        $college = OrganizationalLog::find($progExists->college_entity_id);
+            
+                        // Add the program data to the array
+                        $programs[] = [
+                            'id' => $data->id,
+                            'name' => $data->name,
+                            'acronym' => $data->acronym,
+                            'status' => $data->status,
+                            'programs' => [
+                                [
+                                    'program_entity_id' => $data->id, 
+                                    'college_entity_id' => $validated['college_id'],
+                                    'college_name' => $college->name,
+                                ],
+                            ]
+                        ];
+                    }
+                }
+            
+                // Manually paginate the programs array
+                $currentPage = $request->get('page', 1); // Get current page from the query string (default is page 1)
+                $perPage = 10; // Set the number of items per page
+                $currentPagePrograms = array_slice($programs, ($currentPage - 1) * $perPage, $perPage);
+            
+                // Create the LengthAwarePaginator
+                $paginatedPrograms = new LengthAwarePaginator(
+                    $currentPagePrograms, 
+                    count($programs), 
+                    $perPage, 
+                    $currentPage, 
+                    ['path' => url()->current(), 'query' => request()->query()]
+                );
+            
+                // Return the response with paginated programs and pagination metadata
+                $response = [
+                
+                        'data' => $paginatedPrograms->items(),
+                        'total' => $paginatedPrograms->total(),
+                        'current_page' => $paginatedPrograms->currentPage(),
+                        'last_page' => $paginatedPrograms->lastPage(),
+                        'per_page' => $paginatedPrograms->perPage(),
+                        'next_page_url' => $paginatedPrograms->nextPageUrl(),
+                        'prev_page_url' => $paginatedPrograms->previousPageUrl(),
+                  
+                ];
+            
+        
+            
+        }else{
 
-                // Check if organization and college are found
+
+            $validated = $request->validate([
+                'college_id' => 'required|exists:organizational_logs,id'
+            ]);
+            
+            $programs = [];  // Initialize the array to store the programs
+            
+            // Paginate the Programs based on college_id and status
+            $datas = Program::where('college_entity_id', $validated['college_id'])
+                ->where('status', 'A')
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);  // Paginate to 10 per page
+            
+            // Loop through the paginated results and collect the necessary data
+            foreach ($datas as $data) {
+                // Retrieve the organization details for the program
+                $organization = OrganizationalLog::find($data->program_entity_id);
+                $college = OrganizationalLog::find($validated['college_id']);
+            
+                // Check if both organization and college exist
                 if ($organization && $college) {
+                    // Populate the programs array with necessary data
                     $programs[] = [
                         'id' => $organization->id,
                         'name' => $organization->name,
                         'acronym' => $organization->acronym,
-                        'status' => $organization->status, // Added missing comma
+                        'status' => $organization->status,
                         'programs' => [
                             [
-                                'program_entity_id' => $organization->id, // Use the correct ID here
+                                'program_entity_id' => $organization->id,
                                 'college_entity_id' => $validated['college_id'],
                                 'college_name' => $college->name,
                             ],
@@ -554,13 +640,26 @@ class OrgLogController extends Controller
                     ];
                 }
             }
-                
+            
+            // Prepare the response with pagination metadata
             $response = [
-                'isSuccess' => true,
-                'programs' => $programs
+                    'data' => $programs,  // Programs that match the query and search term
+                    'total' => $datas->total(),
+                    'current_page' => $datas->currentPage(),
+                    'last_page' => $datas->lastPage(),
+                    'per_page' => $datas->perPage(),
+                    'next_page_url' => $datas->nextPageUrl(),
+                    'prev_page_url' => $datas->previousPageUrl(),
+                
             ];
             
-            return response($response,200);
+        }
+        
+        return response([
+            'isSucess' => true,
+            'programs' => $response
+        ],200);
+
 
         }catch(Throwable $e){
 
