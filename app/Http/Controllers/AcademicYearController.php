@@ -123,79 +123,74 @@ class AcademicYearController extends Controller
         }
     }
 
+
     public function getAcademicYear(Request $request)
     {
         try {
             $validated = $request->validate([
-                'paginate' => 'required',
+                'paginate' => 'required|in:1',
             ]);
-    
+
             // Initialize the base query
             $query = AcademicYear::select('id', 'Academic_year', 'start_date', 'end_date', 'status')
-                            ->whereIn('status', ['A', 'I'])
-                            ->orderBy('start_date', 'desc');
-    
+                ->whereIn('status', ['A', 'I'])
+                ->orderBy('start_date', 'desc');
+
             // Apply search term if present
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
-                $query->where(function ($query) use ($searchTerm) {
-                    $query->whereRaw("CONCAT_WS(' ', Academic_year,start_date, end_date) LIKE ?", ["%{$searchTerm}%"])
-                         ;
+                try {
+                    // Parse search term as date if possible
+                    $searchDate = Carbon::parse($searchTerm, null)->format('Y-m-d');
+                } catch (\Exception $e) {
+                    $searchDate = null;
+                }
+
+                $query->where(function ($query) use ($searchTerm, $searchDate) {
+                    $query->where('Academic_year', 'like', "%{$searchTerm}%")
+                        ->orWhereDate('start_date', $searchDate)
+                        ->orWhereDate('end_date', $searchDate);
                 });
             }
-    
-            // Non-paginated data retrieval
-            if (!$validated['paginate']) {
-                $data = $query->get();
-    
-                // Log API call and return response
-                $this->logAPICalls('getAcademicYear', "", $request->all(), $data);
-    
-                return response()->json([
-                    'isSuccess' => true,
-                    'Accounts' => $data,
-                ], 200);
-    
-            } else {
-                // Paginated data retrieval
-                $perPage = $request->input('per_page', 10);
-                $data = $query->paginate($perPage);
-    
-                // Log API call and return response with pagination data
-                $response = [
-                    'isSuccess' => true,
-                    'AcademicYear' => $data,
-                    'pagination' => [
-                        'current_page' => $data->currentPage(),
-                        'per_page' => $data->perPage(),
-                        'total' => $data->total(),
-                        'last_page' => $data->lastPage(),
-                    ],
-                ];
-                $this->logAPICalls('getAccounts', "", $request->all(), $response);
-    
-                return response()->json($response, 200);
-            }
-    
-        } catch (ValidationException $e) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Invalid input. Please ensure all required fields are provided correctly.',
-                'errors' => $e->errors(),
-            ], 422);
-    
-        } catch (Throwable $e) {
+
+            // Paginated data retrieval
+            $perPage = $request->input('per_page', 10);
+            $data = $query->paginate($perPage);
+
+            // Format the dates for the paginated response
+            $data->getCollection()->transform(function ($item) {
+                $item->start_date = Carbon::parse($item->start_date)->format('F j Y');
+                $item->end_date = Carbon::parse($item->end_date)->format('F j Y');
+                return $item;
+            });
+
+            // Prepare the response with only required pagination metadata
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Active Academic year retrieved successfully.',
+                'AcademicYear' => $data->items(),
+                'pagination' => [
+                    'current_page' => $data->currentPage(),
+                    'per_page' => $data->perPage(),
+                    'total' => $data->total(),
+                    'last_page' => $data->lastPage(),
+                    'url' => url('api/AcademicYear?page=' . $data->currentPage() . '&per_page=' . $data->perPage()),
+                ],
+            ];
+
+            $this->logAPICalls('getAcademicYear', "", $request->all(), $response);
+            return response()->json($response, 200);
+        } catch (\Exception $e) {
             $response = [
                 'isSuccess' => false,
-                'message' => "Failed to retrieve AcademicYear. Please contact support.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage(),
+                'message' => 'Failed to retrieve AcademicYear records.',
+                'error' => $e->getMessage(),
             ];
-    
             $this->logAPICalls('getAcademicYear', "", $request->all(), $response);
             return response()->json($response, 500);
         }
     }
-    
+
 
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)
     {
