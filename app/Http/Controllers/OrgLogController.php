@@ -657,7 +657,7 @@ class OrgLogController extends Controller
         
         return response([
             'isSucess' => true,
-            'programs' => $response
+            'get_OrgLog' => $response
         ],200);
 
 
