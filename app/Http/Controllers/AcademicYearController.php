@@ -34,12 +34,12 @@ class AcademicYearController extends Controller
                 return response()->json($response, 422);
             }
     
-            $Date = Carbon::parse($request->start_date)->format('Y-m-d');
-            $Date = Carbon::parse($request->end_date)->format('Y-m-d');
+            $startDate = Carbon::parse($request->start_date)->format('Y-m-d');
+            $endDate = Carbon::parse($request->end_date)->format('Y-m-d');
     
             // Check if an academic year with the same start and end dates already exists
-            $existingAcademicYear = AcademicYear::whereDate('start_date', $Date)
-                ->whereDate('end_date', $Date)
+            $existingAcademicYear = AcademicYear::whereDate('start_date', $startDate)
+                ->whereDate('end_date', $endDate)
                 ->first();
     
             if ($existingAcademicYear) {
@@ -54,8 +54,8 @@ class AcademicYearController extends Controller
             // Set `status` to 'A' and `Isarchive` to 0
             $academicYear = AcademicYear::create([
                 'academic_year' => $request->academic_year,
-                'start_date' => $Date,
-                'end_date' => $Date,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
                 'status' => 'A', // Status set to 'A' (active)
                 'is_archived' => 0, // Isarchive set to 0 (not archived)
             ]);
