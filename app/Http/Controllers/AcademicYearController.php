@@ -23,66 +23,74 @@ class AcademicYearController extends Controller
                 'start_date' => 'required|date',
                 'end_date' => 'required|date|after:start_date',
             ]);
-
+    
             if ($validator->fails()) {
                 $response = [
                     'isSuccess' => false,
                     'message' => 'Validation failed.',
-                    'errors' => $validator->errors()
+                    'errors' => $validator->errors(),
                 ];
                 $this->logAPICalls('addAcademicYear', "", $request->all(), $response);
                 return response()->json($response, 422);
             }
-
-            // Get the current time and date
-            $currentTime = now()->format('H:i:s');
-            $currentDate = Carbon::now();
-
-            // Combine input dates with the current time
-            $startDate = Carbon::parse($request->start_date . ' ' . $currentTime);
-            $endDate = Carbon::parse($request->end_date . ' ' . $currentTime);
-
-            // Determine the status of the new academic year
-            $status = ($startDate->gt($currentDate) || $startDate->eq($currentDate)) ? 'A' : 'I';
-
+    
+            $startDate = Carbon::parse($request->start_date)->format('Y-m-d');
+            $endDate = Carbon::parse($request->end_date)->format('Y-m-d');
+    
+            // Check if an academic year with the same start and end dates already exists
+            $existingAcademicYear = AcademicYear::whereDate('start_date', $startDate)
+                ->whereDate('end_date', $endDate)
+                ->first();
+    
+            if ($existingAcademicYear) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'An academic year with these dates already exists.',
+                ];
+                $this->logAPICalls('addAcademicYear', "", $request->all(), $response);
+                return response()->json($response, 409);
+            }
+    
+            // Set `status` to 'A' and `Isarchive` to 0
             $academicYear = AcademicYear::create([
                 'academic_year' => $request->academic_year,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
-                'status' => $status,
+                'status' => 'A', // Status set to 'A' (active)
+                'is_archived' => 0, // Isarchive set to 0 (not archived)
             ]);
-
-            // Update all past academic years (where end_date is less than the current date) to 'I'
-            AcademicYear::where('end_date', '<', $currentDate)->update(['status' => 'I']);
-
-            // Ensure that only current or future academic years (where start_date >= current date) are 'A'
-            AcademicYear::where('start_date', '>=', $currentDate)->update(['status' => 'A']);
-
+    
+            // Update statuses of past academic years to 'I' (inactive) if needed
+            $currentDate = Carbon::now()->format('Y-m-d');
+            AcademicYear::whereDate('end_date', '<', $currentDate)->update(['status' => 'I']);
+    
             $response = [
                 'isSuccess' => true,
                 'message' => 'Academic Year successfully added.',
-                'academicYear' => $academicYear
+                'academicYear' => $academicYear,
             ];
-
+    
             $this->logAPICalls('addAcademicYear', "", $request->all(), $response);
             return response()->json($response, 201);
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Failed to add Academic Year.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
             $this->logAPICalls('addAcademicYear', "", $request->all(), $response);
             return response()->json($response, 500);
         }
     }
+    
+
 
     public function deleteAcademicYear(Request $request, $id)
     {
         try {
             // Find the academic year by ID
             $academicYear = AcademicYear::find($id);
-
+    
             // Check if the academic year exists
             if (!$academicYear) {
                 $response = [
@@ -90,9 +98,9 @@ class AcademicYearController extends Controller
                     'message' => 'Academic Year not found.'
                 ];
                 $this->logAPICalls('deleteAcademicYear', $id, $request->all(), $response);
-                return response()->json($response, 500);
+                return response()->json($response, 404);
             }
-
+    
             // Check if the academic year is active
             if ($academicYear->status === 'A') {
                 $response = [
@@ -100,40 +108,44 @@ class AcademicYearController extends Controller
                     'message' => 'Cannot delete an active academic year.'
                 ];
                 $this->logAPICalls('deleteAcademicYear', $id, $request->all(), $response);
-                return response()->json($response, 500);
+                return response()->json($response, 400);
             }
-
-            // Delete the inactive academic year
-            $academicYear->delete();
-
+    
+            // Update the academic year to mark as archived and inactive instead of deleting
+            $academicYear->update([
+                'Isarchive' => 1, // Archive the record
+                'status' => 'I'   // Set status to inactive
+            ]);
+    
             $response = [
                 'isSuccess' => true,
-                'message' => 'Academic Year successfully deleted.'
+                'message' => 'Academic Year successfully marked as archived and inactive.'
             ];
             $this->logAPICalls('deleteAcademicYear', $id, $request->all(), $response);
             return response()->json($response, 200);
+    
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to delete Academic Year.',
+                'message' => 'Failed to update Academic Year status.',
                 'error' => $e->getMessage()
             ];
             $this->logAPICalls('deleteAcademicYear', $id, $request->all(), $response);
             return response()->json($response, 500);
         }
     }
-
+    
 
     public function getAcademicYear(Request $request)
     {
         try {
             $validated = $request->validate([
-                'paginate' => 'required|in:1',
+                'paginate' => 'required',
             ]);
 
             // Initialize the base query
             $query = AcademicYear::select('id', 'Academic_year', 'start_date', 'end_date', 'status')
-                ->whereIn('status', ['A', 'I'])
+                ->whereIn('status', ['0', '1'])
                 ->orderBy('start_date', 'desc');
 
             // Apply search term if present
@@ -159,8 +171,8 @@ class AcademicYearController extends Controller
 
             // Format the dates for the paginated response
             $data->getCollection()->transform(function ($item) {
-                $item->start_date = Carbon::parse($item->start_date)->format('F j Y');
-                $item->end_date = Carbon::parse($item->end_date)->format('F j Y');
+                $item->start_date = Carbon::parse($item->start_date)->format('F j, Y');
+                $item->end_date = Carbon::parse($item->end_date)->format('F j, Y');
                 return $item;
             });
 
@@ -168,14 +180,13 @@ class AcademicYearController extends Controller
             $response = [
                 'isSuccess' => true,
                 'message' => 'Active Academic year retrieved successfully.',
-                'AcademicYear' => $data->items(),
-                'pagination' => [
+                'AcademicYear' => [
+                    'data' => $data->items(),
                     'current_page' => $data->currentPage(),
                     'per_page' => $data->perPage(),
                     'total' => $data->total(),
                     'last_page' => $data->lastPage(),
-                    'url' => url('api/AcademicYear?page=' . $data->currentPage() . '&per_page=' . $data->perPage()),
-                ],
+                ]
             ];
 
             $this->logAPICalls('getAcademicYear', "", $request->all(), $response);

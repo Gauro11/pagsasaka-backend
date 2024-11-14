@@ -42,6 +42,7 @@ class AccountController extends Controller
                 'role' => $request->role,
                 'org_log_id' => $request->org_log_id,
                 'password' => Hash::make($request->password ?? '123456789'),
+
             ]);
 
             $response = [
@@ -117,46 +118,50 @@ class AccountController extends Controller
         }
     }
 
-    public function changeStatusToInactive($id)
+    public function deactivateAccount($id)
     {
         try {
+            // Find the account by ID
             $account = Account::findOrFail($id);
-
-            // Ensure status is "A" before updating
-            if ($account->status === 'A') {
-                $account->update(['status' => 'I']);
-
+    
+            // Check if the account is not already archived
+            if ($account->is_archived === 0) {
+                // Update is_archived to 1 (archive the account)
+                $account->update(['is_archived' => 1]);
+    
                 $response = [
                     'isSuccess' => true,
-                    'message' => 'Account status is Inactive.',
+                    'message' => 'Account has been archived successfully.',
                     'account' => $account
                 ];
-
+    
                 $this->logAPICalls('changeStatusToInactive', $account->id, [], $response);
-
+    
                 return response()->json($response, 200);
             }
-
+    
+            // If the account is already archived
             $response = [
                 'isSuccess' => false,
-                'message' => 'Account is already inactive or not found.'
+                'message' => 'Account is already archived.'
             ];
-
+    
             $this->logAPICalls('changeStatusToInactive', $id, [], $response);
-
+    
             return response()->json($response, 400);
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to update account status.',
+                'message' => 'Failed to archive the account.',
                 'error' => $e->getMessage()
             ];
-
+    
             $this->logAPICalls('changeStatusToInactive', $id, [], $response);
-
+    
             return response()->json($response, 500);
         }
     }
+    
 
     public function resetPasswordToDefault(Request $request)
     {
@@ -218,81 +223,67 @@ class AccountController extends Controller
             $validated = $request->validate([
                 'paginate' => 'required',
             ]);
-    
+
             // Initialize the base query
-            $query = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'status', 'org_log_id')
-                            ->where('status', 'A')
-                            ->orderBy('created_at', 'desc');
-    
+            $query = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'is_archived', 'org_log_id')
+                ->where('is_archived', '0')
+                ->orderBy('created_at', 'desc');
+
             // Apply search term if present
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
                 $query->where(function ($query) use ($searchTerm) {
                     $query->whereRaw("CONCAT_WS(' ', first_name, middle_name, last_name) LIKE ?", ["%{$searchTerm}%"])
-                          ->orWhere('email', 'like', "%{$searchTerm}%");
+                        ->orWhereRaw("CONCAT_WS(' ', last_name, first_name, middle_name) LIKE ?", ["%{$searchTerm}%"])
+                        ->orWhereRaw("CONCAT_WS(' ', first_name, last_name, middle_name) LIKE ?", ["%{$searchTerm}%"])
+                        ->orWhere('email', 'like', "%{$searchTerm}%");
                 });
             }
-    
-            // Non-paginated data retrieval
-            if (!$validated['paginate']) {
-                $data = $query->get();
-    
-                // Add `org_log_name` for each item if org_log_id is present
-                $data->transform(function ($item) {
-                    $org_log = OrganizationalLog::find($item->org_log_id);
-                    $item->org_log_name = optional($org_log)->name;
-                    return $item;
-                });
-    
-                // Log API call and return response
-                $this->logAPICalls('getAccounts', "", $request->all(), $data);
-    
-                return response()->json([
-                    'isSuccess' => true,
-                    'Accounts' => $data,
-                ], 200);
-    
-            } else {
-                // Paginated data retrieval
-                $perPage = $request->input('per_page', 10);
-                $data = $query->paginate($perPage);
-    
-                // Transform to add `org_log_name` based on `org_log_id`
-                $data->getCollection()->transform(function ($item) {
-                    $org_log = OrganizationalLog::find($item->org_log_id);
-                    $item->org_log_name = optional($org_log)->name;
-                    return $item;
-                });
-    
-                // Log API call and return response with pagination data
-                $response = [
-                    'isSuccess' => true,
-                    'Accounts' => $data,
-                   
-                ];
-                $this->logAPICalls('getAccounts', "", $request->all(), $response);
-                return response()->json($response, 200);
-            }
-    
+
+            // Paginated data retrieval
+            $perPage = $request->input('per_page', 10);
+            $data = $query->paginate($perPage);
+
+            // Transform to add `org_log_name` based on `org_log_id`
+            $data->getCollection()->transform(function ($item) {
+                $org_log = OrganizationalLog::find($item->org_log_id);
+                $item->org_log_name = optional($org_log)->name;
+                return $item;
+            });
+
+            // Prepare the response with only required pagination metadata
+            $response = [
+                'isSuccess' => true,
+                'Accounts' => [
+                    'data' => $data->items(),
+                    'current_page' => $data->currentPage(),
+                    'per_page' => $data->perPage(),
+                    'total' => $data->total(),
+                    'last_page' => $data->lastPage(),
+                ],
+            ];
+
+            $this->logAPICalls('getAccounts', "", $request->all(), $response);
+            return response()->json($response, 200);
         } catch (ValidationException $e) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Invalid input. Please ensure all required fields are provided correctly.',
                 'errors' => $e->errors(),
             ], 422);
-    
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
                 'message' => "Failed to retrieve accounts. Please contact support.",
                 'error' => 'An unexpected error occurred: ' . $e->getMessage(),
             ];
-    
+
             $this->logAPICalls('getAccounts', "", $request->all(), $response);
             return response()->json($response, 500);
         }
     }
-    
+
+
     public function getOrganizationLogs()
     {
         try {

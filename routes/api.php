@@ -28,7 +28,7 @@ use App\Http\Controllers\HistoryDocumentController;
 Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 
-Route::post('/academic-year', [AcademicYearController::class, 'addAcademicYear']);
+Route::post('academic-year/create', [AcademicYearController::class, 'addAcademicYear']);
 Route::post('/delete-year/{id}', [AcademicYearController::class, 'deleteAcademicYear']);
 Route::post('/getacademic-year', [AcademicYearController::class, 'getAcademicYear']);
 
@@ -49,15 +49,15 @@ Route::controller(AuthController::class)->group(function () {
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
 
-Route::post('/reset-password-to-default', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
+Route::post('password/reset', [AccountController::class, 'resetPasswordToDefault'])->middleware('auth:sanctum');
 
 
 //create acc///
 Route::controller(AccountController::class)->group(function () {
-    Route::post('getAccounts', 'getAccounts');
-    Route::post('Add', 'createAccount');
-    Route::post('updateAccounts/{id}', 'updateAccount');
-    Route::post('/softdelete/{id}', 'changeStatusToInactive');
+    Route::post('accounts/get', 'getAccounts');
+    Route::post('account/create', 'createAccount');
+    Route::post('account/update/{id}', 'updateAccount');
+    Route::post('account/deactivate/{id}', 'deactivateAccount');
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
