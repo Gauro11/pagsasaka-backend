@@ -34,7 +34,6 @@ class AcademicYearController extends Controller
                 return response()->json($response, 422);
             }
     
-            // Ensure we're only comparing the date portion, not time
             $startDate = Carbon::parse($request->start_date)->format('Y-m-d');
             $endDate = Carbon::parse($request->end_date)->format('Y-m-d');
     
@@ -49,7 +48,7 @@ class AcademicYearController extends Controller
                     'message' => 'An academic year with these dates already exists.',
                 ];
                 $this->logAPICalls('addAcademicYear', "", $request->all(), $response);
-                return response()->json($response, 409); // HTTP status 409 for conflict
+                return response()->json($response, 409);
             }
     
             // Set `status` to 'A' and `Isarchive` to 0
@@ -85,8 +84,7 @@ class AcademicYearController extends Controller
     }
     
 
-
-    public function deleteAcademicYear(Request $request, $id)
+    public function deactivateAcademicYear(Request $request, $id)
     {
         try {
             // Find the academic year by ID
@@ -114,7 +112,7 @@ class AcademicYearController extends Controller
     
             // Update the academic year to mark as archived and inactive instead of deleting
             $academicYear->update([
-                'Isarchive' => 1, // Archive the record
+                'is_archived' => 1, // Archive the record
                 'status' => 'I'   // Set status to inactive
             ]);
     
@@ -146,7 +144,7 @@ class AcademicYearController extends Controller
 
             // Initialize the base query
             $query = AcademicYear::select('id', 'Academic_year', 'start_date', 'end_date', 'status')
-                ->whereIn('status', ['0', '1'])
+                ->whereIn('status', ['A', 'I'])
                 ->orderBy('start_date', 'desc');
 
             // Apply search term if present

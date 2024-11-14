@@ -28,9 +28,9 @@ use App\Http\Controllers\HistoryDocumentController;
 Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 
-Route::post('academicyear/create', [AcademicYearController::class, 'addAcademicYear']);
-Route::post('/delete-year/{id}', [AcademicYearController::class, 'deleteAcademicYear']);
-Route::post('/getacademic-year', [AcademicYearController::class, 'getAcademicYear']);
+Route::post('academic-year/create', [AcademicYearController::class, 'addAcademicYear']);
+Route::post('academic-year/deactivate/{id}', [AcademicYearController::class, 'deactivateAcademicYear']);
+Route::post('/getacademic-years', [AcademicYearController::class, 'getAcademicYear']);
 
 
 //connection//
@@ -57,7 +57,7 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('accounts/get', 'getAccounts');
     Route::post('account/create', 'createAccount');
     Route::post('account/update/{id}', 'updateAccount');
-    Route::post('account/status-update/{id}', 'changeStatusToInactive');
+    Route::post('account/deactivate/{id}', 'deactivateAccount');
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
@@ -86,16 +86,15 @@ Route::controller(EventController::class)->group(function () {
 
     Route::get('active-event', 'getActiveEvent'); // ADMIN AND STAFF ONLY
     Route::post('all-events', 'getEvent');
-  //  Route::get('get-academic-year', 'getAcademicYear');
     Route::post('view-event', 'viewEvent');
     Route::post('event/create', 'createEvent');
     Route::post('event/update', 'updateEvent');
-    Route::post('event/delete', 'deleteEvent');// need baguhin
+    Route::post('event/delete', 'deleteEvent');
 });
 
 Route::controller(RequirementController::class)->group(function () {
     Route::post('requirements', 'getRequirement');
-    Route::post('requirement/delete', 'deleteRequirement');// need baguhin
+    Route::post('requirement/delete', 'deleteRequirement');
 });
 
 Route::controller(FileRequirementController::class)->group(function () {
