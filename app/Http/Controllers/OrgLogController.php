@@ -10,9 +10,17 @@ use App\Http\Requests\OrgLogRequest;
 use Throwable;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 
 class OrgLogController extends Controller
 {
+
+            //////////////////////////                    
+            //      ORG_ID VALUE   
+            //       1- College
+            //       2- Office
+            //       3- Program
+            ///////////////////////////
 
     public function getConcernedOffice(){
 
@@ -47,12 +55,14 @@ class OrgLogController extends Controller
     public function getDropdownOrganization(Request $request){
 
         try{
+
             $orgLog=[];
             $validated = $request->validate([
                 'org_id' => 'required'
             ]);
 
             $datas = OrganizationalLog::where('org_id',$validated['org_id'])->get();
+
             if($datas){
 
                 $response = [];
@@ -116,6 +126,14 @@ class OrgLogController extends Controller
                 'org_id' => 'required'
             ]);
 
+            $response = [];
+
+            ///////////////////////////////////////////////////////
+            //
+            // PAGINATE : 0 -> return lahat ng data
+            // PAGINATE : 1  -> return lahat ng data with paginate
+            //
+            ////////////////////////////////////////////////////////
 
             if ($validated['paginate'] == 0) {
                 // Build the query
@@ -142,6 +160,7 @@ class OrgLogController extends Controller
                     });
                 }
             
+
                 // Log the API call
                 $this->logAPICalls('getOrgnization', "", $request->all(), [$data]);
             
@@ -151,17 +170,17 @@ class OrgLogController extends Controller
                  if($org_id==1){
                      $response = [
                          'isSuccess' => true,
-                         'colleges' => $data
+                         'colleges' =>  $data_convert_to_array 
                      ];
                  }elseif($org_id==2){
                      $response = [
                          'isSuccess' => true,
-                         'offices' => $data
+                         'offices' => $data_convert_to_array 
                      ];
                  }else{
                      $response = [
                          'isSuccess' => true,
-                         'programs' => $data
+                         'programs' =>  $data_convert_to_array 
                      ];
                  }
          
@@ -171,7 +190,7 @@ class OrgLogController extends Controller
            
                $perPage = 10;
        
-              $query = OrganizationalLog::where('org_id', $request->org_id)
+               $query = OrganizationalLog::where('org_id', $request->org_id)
                                                  ->where('is_archived', 0);
                                        
 
@@ -200,34 +219,43 @@ class OrgLogController extends Controller
                         }
                         return $item;
                     });
+
                 } else {
-                    $data = $query->orderBy('created_at', 'desc')->paginate($perPage);
+                   $data = $query->orderBy('created_at', 'desc')->paginate($perPage);
                 }
+
+                // Removing URL in response.
+                $data_convert_to_array = $data->toArray();
+                unset($data_convert_to_array['path']); 
+                unset($data_convert_to_array['links']); 
+                unset($data_convert_to_array['first_page_url']);
+                unset($data_convert_to_array['last_page_url']);
+                unset($data_convert_to_array['next_page_url']);
+                unset($data_convert_to_array['prev_page_url']);
+                $org_id = $validated['org_id'];
 
                 // Log API call
                $this->logAPICalls('getOrgnization', "", $request->all(), [$data]);
 
                 // Return the response
-                $org_id = $validated['org_id'];
-
                 if($org_id==1){
                     $response = [
                         'isSuccess' => true,
-                        'colleges' => $data
+                        'colleges' =>   $data_convert_to_array
                     ];
                 }elseif($org_id==2){
                     $response = [
                         'isSuccess' => true,
-                        'offices' => $data
+                        'offices' =>  $data_convert_to_array
                     ];
                 }else{
                     $response = [
                         'isSuccess' => true,
-                        'programs' => $data
+                        'programs' =>  $data_convert_to_array
                     ];
                 }
         
-                return response()->json($response);
+                return response()->json($response,200);
 
         }
 
@@ -244,34 +272,32 @@ class OrgLogController extends Controller
         }
     }
 
-
     public function createOrganization(OrgLogRequest $request){
 
        try{
-        
+
           $exists = false;
 
            $validate = $request->validate([
                 'name' => 'required',
                 'acronym' => ['required','min:2'],
-                'org_id' => ['required', 'exists:organizations,id'],
+                'org_id' => ['required'],
                 'college_entity_id' => ['nullable']
            ]);
+           
 
+           if($validate['org_id'] == "3"){ // executed if organization is a program.
 
-           if($validate['org_id'] == "3"){
-
-                
                 $data = OrganizationalLog::where('name',$validate['name'])
                                         ->where('acronym',$validate['acronym'] )->get();
 
 
-                if($data->isNotEmpty()){
-                   $program_id =  $data->first()->id;
+                if($data->isNotEmpty()){ 
+                   $program_id =  $data->first()->id; 
 
                    $exists = Program::where('program_entity_id', $program_id)
                                     ->where('college_entity_id', $validate['college_entity_id'])
-                                    ->exists();
+                                    ->exists(); 
     
                 }else{
                     $exists =false;
@@ -301,11 +327,9 @@ class OrgLogController extends Controller
                 ]);
 
                 ////  CODE FOR STORE PROGRAMS ////
-
                 if($request->org_id == '3'){
-                    $this->storePorgram($request->college_entity_id,$validate);
+                    $this->storePorgram($request->college_entity_id,$validate);  
                 }
-                
                
                 $response = [
                           'isSuccess' => true,
@@ -325,12 +349,10 @@ class OrgLogController extends Controller
                  'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
  
-             $this->logAPICalls('storeOrgLog', "", $request->all(), [$response]);
+             $this->logAPICalls('createOrganization', "", $request->all(), [$response]);
              return response()->json($response, 500);
  
          }
-        
-
     }
 
     public function updateOrganization(Request $request){
@@ -404,56 +426,6 @@ class OrgLogController extends Controller
         
     }
 
-    // public function editOrgLog(Request $request){
-
-    //  try{
-
-    //     $college  = "";
-    //     $request->validate( [
-    //             'id' => 'required|exists:organizational_logs,id'
-    //         ] );
-
-    //     $data = OrganizationalLog::find($request->id);
-
-    //     if($data->org_id == '3'){
-    //         $program  = Program::where('program_entity_id',$request->id)->get();
-    //         if ($program->isNotEmpty()){
-    //             $college = OrganizationalLog::where('id',$program->first()->college_entity_id)->get();
-    //             $data = [
-    //                 'id' => $data->id,
-    //                 'name' => $data->name,
-    //                 'acronym' =>  $data->acronym,
-    //                 'college_id' => $program->first()->college_entity_id,
-    //                 'college_name' => $college->first()->name,
-    //                 'org_id' => $data->org_id,
-    //                 'created_at' =>  $data->created_at,
-    //                 'updated_at' =>  $data->updated_at
-
-    //             ];
-    //         }        
-    //    }
-
-    //     $response = [
-    //         'isSuccess' => true,
-    //          'edit_OrgLog' => $data
-    //     ];
-
-    //     $this->logAPICalls('editOrgLog', "", $request->all(), [$response]);
-    //     return response()->json($response);
-
-    //  }catch(Throwable $e){
-
-    //      $response = [
-    //             'isSuccess' => false,
-    //             'message' => "Unsuccessfully edited. Please check your inputs.",
-    //             'error' => 'An unexpected error occurred: ' . $e->getMessage()
-    //        ];
-
-    //         $this->logAPICalls('editOrgLog', "", $request->all(), [$response]);
-    //         return response()->json($response, 500);
-    //  }
-       
-    // }
 
     public function updateOrganizationStatus(Request $request){
         
@@ -551,48 +523,6 @@ class OrgLogController extends Controller
         
     }
 
-
-    public function isExist($validate){
-        
-        $data = OrganizationalLog::where('id',$validate['id'])->get();
-
-          
-          if($data->first()->org_id != "3"){
-
-                return OrganizationalLog::where('name', $validate['name'])
-                ->where('acronym', $validate['acronym'])
-                ->exists();
-
-          }else{
-           
-            if (OrganizationalLog::where('name', $validate['name'])
-            ->where('acronym', $validate['acronym'])
-            ->exists() && Program::where('program_entity_id',$validate['id'])
-                     ->where('college_entity_id',$validate['college_entity_id'])
-                     ->exists() ){
-                         return true;
-                        
-                        
-                        }
-         
-          }     
-    }
-    
-    
-    public function storePorgram($college_id,$validate){
-
-            $program = OrganizationalLog::where('name', $validate['name'])
-                        ->where('acronym', $validate['acronym'])
-                        ->where('org_id', $validate['org_id'])
-                        ->first();
-            
-            Program::create([
-                'program_entity_id' => $program->id ,
-                'college_entity_id' => $college_id
-            ]);
-
-    }
-
     public function getFilteredPrograms(Request $request){
         try{
 
@@ -660,9 +590,7 @@ class OrgLogController extends Controller
                         'total' => $paginatedPrograms->total(),
                         'current_page' => $paginatedPrograms->currentPage(),
                         'last_page' => $paginatedPrograms->lastPage(),
-                        'per_page' => $paginatedPrograms->perPage(),
-                        'next_page_url' => $paginatedPrograms->nextPageUrl(),
-                        'prev_page_url' => $paginatedPrograms->previousPageUrl(),
+                        'per_page' => $paginatedPrograms->perPage()
                   
                 ];
             
@@ -714,9 +642,7 @@ class OrgLogController extends Controller
                     'total' => $datas->total(),
                     'current_page' => $datas->currentPage(),
                     'last_page' => $datas->lastPage(),
-                    'per_page' => $datas->perPage(),
-                    'next_page_url' => $datas->nextPageUrl(),
-                    'prev_page_url' => $datas->previousPageUrl(),
+                    'per_page' => $datas->perPage()
                 
             ];
             
@@ -742,27 +668,44 @@ class OrgLogController extends Controller
    
     }
 
-    public function getResponse($org_id,$data){
+    public function isExist($validate){
+        
+        $data = OrganizationalLog::where('id',$validate['id'])->get();
 
-        // Return the response
-        if($org_id==1){
-           $response = [
-               'isSuccess' => true,
-               'colleges' => $data
-           ];
-       }elseif($org_id==2){
-           $response = [
-               'isSuccess' => true,
-               'offices' => $data
-           ];
-       }else{
-           $response = [
-               'isSuccess' => true,
-               'programs' => $data
-           ];
-       }
-       return "h";
-      // return response()->json($response);
+          
+          if($data->first()->org_id != "3"){
+
+                return OrganizationalLog::where('name', $validate['name'])
+                ->where('acronym', $validate['acronym'])
+                ->exists();
+
+          }else{
+           
+            if (OrganizationalLog::where('name', $validate['name'])
+            ->where('acronym', $validate['acronym'])
+            ->exists() && Program::where('program_entity_id',$validate['id'])
+                     ->where('college_entity_id',$validate['college_entity_id'])
+                     ->exists() ){
+                         return true;
+                        
+                        
+                        }
+         
+          }     
+    }
+    
+    public function storePorgram($college_id,$validate){
+
+            $program = OrganizationalLog::where('name', $validate['name'])
+                        ->where('acronym', $validate['acronym'])
+                        ->where('org_id', $validate['org_id'])
+                        ->first();
+            
+            Program::create([
+                'program_entity_id' => $program->id ,
+                'college_entity_id' => $college_id
+            ]);
+
     }
 
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp)
