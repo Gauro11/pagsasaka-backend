@@ -34,12 +34,12 @@ class AcademicYearController extends Controller
                 return response()->json($response, 422);
             }
     
-            $startDate = Carbon::parse($request->start_date)->format('Y-m-d');
-            $endDate = Carbon::parse($request->end_date)->format('Y-m-d');
+            $Date = Carbon::parse($request->start_date)->format('Y-m-d');
+            $Date = Carbon::parse($request->end_date)->format('Y-m-d');
     
             // Check if an academic year with the same start and end dates already exists
-            $existingAcademicYear = AcademicYear::whereDate('start_date', $startDate)
-                ->whereDate('end_date', $endDate)
+            $existingAcademicYear = AcademicYear::whereDate('start_date', $Date)
+                ->whereDate('end_date', $Date)
                 ->first();
     
             if ($existingAcademicYear) {
@@ -54,8 +54,8 @@ class AcademicYearController extends Controller
             // Set `status` to 'A' and `Isarchive` to 0
             $academicYear = AcademicYear::create([
                 'academic_year' => $request->academic_year,
-                'start_date' => $startDate,
-                'end_date' => $endDate,
+                'start_date' => $Date,
+                'end_date' => $Date,
                 'status' => 'A', // Status set to 'A' (active)
                 'is_archived' => 0, // Isarchive set to 0 (not archived)
             ]);
@@ -84,8 +84,7 @@ class AcademicYearController extends Controller
     }
     
 
-
-    public function deleteAcademicYear(Request $request, $id)
+    public function deactivateAcademicYear(Request $request, $id)
     {
         try {
             // Find the academic year by ID
@@ -113,7 +112,7 @@ class AcademicYearController extends Controller
     
             // Update the academic year to mark as archived and inactive instead of deleting
             $academicYear->update([
-                'Isarchive' => 1, // Archive the record
+                'is_archived' => 1, // Archive the record
                 'status' => 'I'   // Set status to inactive
             ]);
     
@@ -145,7 +144,7 @@ class AcademicYearController extends Controller
 
             // Initialize the base query
             $query = AcademicYear::select('id', 'Academic_year', 'start_date', 'end_date', 'status')
-                ->whereIn('status', ['0', '1'])
+                ->whereIn('status', ['A', 'I'])
                 ->orderBy('start_date', 'desc');
 
             // Apply search term if present
