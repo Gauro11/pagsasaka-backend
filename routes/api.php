@@ -29,8 +29,8 @@ Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 
 Route::post('academic-year/create', [AcademicYearController::class, 'addAcademicYear']);
-Route::post('/delete-year/{id}', [AcademicYearController::class, 'deleteAcademicYear']);
-Route::post('/getacademic-year', [AcademicYearController::class, 'getAcademicYear']);
+Route::post('academic-year/deactivate/{id}', [AcademicYearController::class, 'deactivateAcademicYear']);
+Route::post('/getacademic-years', [AcademicYearController::class, 'getAcademicYear']);
 
 
 //connection//
