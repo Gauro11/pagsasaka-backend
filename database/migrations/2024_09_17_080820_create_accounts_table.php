@@ -21,7 +21,7 @@ class CreateAccountsTable extends Migration
             $table->string('email');
             $table->string('password');
             $table->string('role');
-            $table->string('status')->default('A');
+            $table->string('status')->default('0');
             $table->string('org_log_id');
             $table->timestamps();
         });
