@@ -122,7 +122,7 @@ class EventController extends Controller
     }
 
  
-    public function storeEvent(EventRequest $request){
+    public function createEvent(EventRequest $request){
 
         try{
             
@@ -133,7 +133,7 @@ class EventController extends Controller
                      'message'=> 'The event you are trying to register already exists. Please verify your input and try again.'
                  ];
  
-                 $this->logAPICalls('storeEvent', "", $request->all(), [$response]);
+                 $this->logAPICalls('createEvent', "", $request->all(), [$response]);
  
                  return response()->json($response, 500);
  
@@ -201,7 +201,7 @@ class EventController extends Controller
                                 'duplicate_requirements' => $duplicateRequirements
                         ];
 
-                    $this->logAPICalls('storeEvent', "", $request->all(), [$response]);
+                    $this->logAPICalls('createEvent', "", $request->all(), [$response]);
                     return response()->json($response);
 
                 }else{
@@ -213,7 +213,7 @@ class EventController extends Controller
                         'message' => "You are attempting to input org_log_id for College. Please note that only programs and offices have the authority to create events."
                    ];
 
-                    $this->logAPICalls('storeEvent', "", $request->all(), [$response]);
+                    $this->logAPICalls('createEvent', "", $request->all(), [$response]);
                     return response()->json($response, 500);
 
                 }
@@ -373,30 +373,30 @@ class EventController extends Controller
     }
     
 
-    public function getAcademicYear(){
-        try{
-            $data = AcademicYear::all();
-            $response = [
-                'isSuccess' => true,
-                'data' => $data
-            ];
+    // public function getAcademicYear(){
+    //     try{
+    //         $data = AcademicYear::all();
+    //         $response = [
+    //             'isSuccess' => true,
+    //             'data' => $data
+    //         ];
     
-            $this->logAPICalls('getAcademicYear', "", [], [$response]);  // No $request data needed here
-            return response()->json($response, 200);
+    //         $this->logAPICalls('getAcademicYear', "", [], [$response]);  // No $request data needed here
+    //         return response()->json($response, 200);
     
-        } catch (Exception $e) {  // Use Exception instead of Throwable for consistency
+    //     } catch (Exception $e) {  // Use Exception instead of Throwable for consistency
     
-            $response = [
-                'isSuccess' => false,
-                'message' => "Please contact support.",
-                'error' => 'An unexpected error occurred: ' . $e->getMessage()
-            ];
+    //         $response = [
+    //             'isSuccess' => false,
+    //             'message' => "Please contact support.",
+    //             'error' => 'An unexpected error occurred: ' . $e->getMessage()
+    //         ];
     
-            // Removed the undefined $request variable
-            $this->logAPICalls('getAcademicYear', "", [], [$response]);
-            return response()->json($response, 500);
-        }
-    }
+    //         // Removed the undefined $request variable
+    //         $this->logAPICalls('getAcademicYear', "", [], [$response]);
+    //         return response()->json($response, 500);
+    //     }
+    // }
     
 
     // DONE //

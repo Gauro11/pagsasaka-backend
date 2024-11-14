@@ -110,7 +110,7 @@ public function getAllfile(Request $request)
 }
 
 
-    public function getFolder(Request $request){
+    public function getFilesInsideFolder(Request $request){
 
        try{
 
@@ -171,7 +171,7 @@ public function getAllfile(Request $request)
                 'folder' =>  $allfiles
             ];
             
-            $this->logAPICalls('getFolder', "", $request->all(), [$response]);
+            $this->logAPICalls('getFilesInsideFolder', "", $request->all(), [$response]);
             return response($response, 200);
 
 
@@ -183,7 +183,7 @@ public function getAllfile(Request $request)
                     'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
 
-                $this->logAPICalls('getFolder', "", $request->all(), [$response]);
+                $this->logAPICalls('getFilesInsideFolder', "", $request->all(), [$response]);
                 return response()->json($response, 500);
        }
 
@@ -379,7 +379,7 @@ public function getAllfile(Request $request)
     }
 
 
-    public function updateFile(Request $request){
+    public function updateFileOrFolder(Request $request){
 
         try{
             
@@ -447,7 +447,7 @@ public function getAllfile(Request $request)
                         'File' => $data
                     ];
                     
-                    $this->logAPICalls('getEditFile', "", $request->all(), [$response]);
+                    $this->logAPICalls('updateFileOrFolder', "", $request->all(), [$response]);
                     return response($response,200);
             }
 
@@ -459,7 +459,7 @@ public function getAllfile(Request $request)
               
             ];
 
-            $this->logAPICalls('getEditFile', "", $request->all(), [$response]);
+            $this->logAPICalls('updateFileOrFolder', "", $request->all(), [$response]);
             return response($response,500);
 
         
@@ -471,14 +471,14 @@ public function getAllfile(Request $request)
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
         ];
 
-            $this->logAPICalls('getEditFile', "", $request->all(), [$response]);
+            $this->logAPICalls('updateFileOrFolder', "", $request->all(), [$response]);
             return response()->json($response, 500);
 
         }
     }
 
     // API for Changing Confirmation under on UI DMO Files  //
-    public function confirmationPass(Request $request){
+    public function confirmationForEditDelete(Request $request){
         
         $validated = $request->validate([
             'account_id' => 'required|exists:accounts,id',
@@ -536,7 +536,7 @@ public function getAllfile(Request $request)
 
     // METHOD THAT CAN STORE FILES INSIDE REQUIREMENTS //
     // DONE //
-    public function storeFileRequirement(Request $request){
+    public function createFileRequirement(Request $request){
 
            try{
 
@@ -623,7 +623,7 @@ public function getAllfile(Request $request)
 
            }
             
-            $this->logAPICalls('storeFileRequirement', "", $request->all(), [$response]);
+            $this->logAPICalls('createFileRequirement', "", $request->all(), [$response]);
             return response()->json(['message' => 'No file uploaded'], 400);
 
            }catch(Throwable $e){
@@ -634,14 +634,14 @@ public function getAllfile(Request $request)
                     'error' => 'An unexpected error occurred: ' . $e->getMessage()
                 ];
 
-                $this->logAPICalls('storeFileRequirement', "", $request->all(), [$response]);
+                $this->logAPICalls('createFileRequirement', "", $request->all(), [$response]);
                 return response()->json($response, 500);
 
            }
 
     }
 
-    public function storeFolderRequirement(Request $request){
+    public function createFolderRequirement(Request $request){
 
         try{
 
@@ -677,11 +677,11 @@ public function getAllfile(Request $request)
                                 'message' => 'Successfully created',
                                 'data' => $data
                             ];
-                            $this->logAPICalls('storeFolderRequirement', "", $request->all(), [$response]);
+                            $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
                             return response()->json($response);
                     }
     
-                    $this->logAPICalls('storeFolderRequirement', "", $request->all(), [$response]);
+                    $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
                     $response = [
                         'isSuccess'=> false,
                         'message'=> 'The folder you are trying to register already exists. Please verify your input and try again.'
@@ -694,7 +694,7 @@ public function getAllfile(Request $request)
                         'message' => 'Successfully created',
                         'data' => $data
                     ];
-                    $this->logAPICalls('storeFolderRequirement', "", $request->all(), [$response]);
+                    $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
                     return response()->json($response,500);
                 }
     
@@ -731,13 +731,13 @@ public function getAllfile(Request $request)
                     ]);
                 }
     
-                $this->logAPICalls('storeFolderRequirement', "", $request->all(), [$response]);
+                $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
                 $response = [
                     'isSuccess'=> false,
                     'message'=> 'The folder you are trying to register already exists. Please verify your input and try again.'
                 ];
     
-                $this->logAPICalls('storeFolderRequirement', "", $request->all(), [$response]);
+                $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
                 return response()->json($response, 422);
     
             }
@@ -750,14 +750,13 @@ public function getAllfile(Request $request)
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
            ];
 
-            $this->logAPICalls('storeFolderRequirement', "", $request->all(), [$response]);
+            $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
             return response()->json($response, 500);
         }
         
     }
 
     public function downloadFileRequirement(Request $request){
-
 
             try {
 
@@ -885,7 +884,7 @@ public function getAllfile(Request $request)
         }
     }
     
-    public function storeDMO_files(Request $request){
+    public function createDMOFiles(Request $request){
       
         try{
 
@@ -986,17 +985,10 @@ public function getAllfile(Request $request)
 
                     }
 
-                     
-
-
-
-
                 }else{
                     $exists_file[] = $filename;
                 }
 
-                
-               
             }
 
             if(!empty($uploadedFiles)){
@@ -1007,7 +999,7 @@ public function getAllfile(Request $request)
                 'upload_files' => $uploadedFiles,
                 'exists_file' =>$exists_file
                 ];
-                $this->logAPICalls('storeDMO_files',"", $request->all(), [$response]);
+                $this->logAPICalls('createDMOFiles',"", $request->all(), [$response]);
                 return response($response,200);
 
             }else{
@@ -1016,7 +1008,7 @@ public function getAllfile(Request $request)
                     'upload_files' => $uploadedFiles,
                     'exists_file' =>$exists_file
                     ];
-                    $this->logAPICalls('storeDMO_files', "", $request->all(), [$response]);
+                    $this->logAPICalls('createDMOFiles', "", $request->all(), [$response]);
                     return response($response,500);
             }
          //  return response(,200)
@@ -1029,7 +1021,7 @@ public function getAllfile(Request $request)
 
         }
         
-        $this->logAPICalls('storeDMO_files', "", $request->all(), [$response]);
+        $this->logAPICalls('createDMOFiles', "", $request->all(), [$response]);
         return response()->json(['message' => 'No file uploaded'], 400);
 
        }catch(Exception $e){
@@ -1040,14 +1032,14 @@ public function getAllfile(Request $request)
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
 
-            $this->logAPICalls('storeDMO_files', "", $request->all(), [$response]);
+            $this->logAPICalls('createDMOFiles', "", $request->all(), [$response]);
             return response()->json($response, 500);
 
        }
 
     }
 
-    public function createDMO_folder(Request $request){
+    public function createDMOFolder(Request $request){
 
         try{
 
