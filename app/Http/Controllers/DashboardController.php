@@ -102,7 +102,7 @@ class DashboardController extends Controller
     //    IF Program chair / Program Head - Lalabas yung mga recent created na request na ginawa nila.                //
     //                                                                                                               //
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public function getDocumentRequest(Request $request){
+    public function getDocumentRequestDashboard(Request $request){
 
         try{
 
@@ -185,7 +185,7 @@ class DashboardController extends Controller
                 'document_request' => $requirement
             ];  
 
-            $this->logAPICalls('getDocumentRequest', "", $request->all(), $response);
+            $this->logAPICalls('getDocumentRequestDashboard', "", $request->all(), $response);
             return response()->json($response,200);
         
         }catch(Exception $e){
@@ -211,7 +211,7 @@ class DashboardController extends Controller
     //    IF Program chair / Program Head - Lalabas yung mga recent upload files na ginawa nila.                       //
     //                                                                                                                //
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public function getRecentUpload(Request $request){
+    public function getRecentUploadDashboard(Request $request){
 
         $validated = $request->validate([
             'account_id' => ['required','exists:accounts,id']
@@ -275,7 +275,7 @@ class DashboardController extends Controller
 
 
     // DONE //
-    public function getCompliance(Request $request){
+    public function getComplianceDasboard(Request $request){
        try{
 
             $requirement = [];
@@ -293,6 +293,49 @@ class DashboardController extends Controller
                                     ->where('status', 'A')
                                     ->orderBy('created_at', 'desc')
                                     ->get();
+                
+                $datasCollection = collect($datas);
+                
+                $get_programs_id =  Program::where('college_entity_id',$account->first()->org_log_id)
+                                            ->where('status','A')
+                                            ->get();
+
+
+                foreach($get_programs_id as $program_id){
+
+                    $exists = Requirement::where('org_log_id', $program_id->id)
+                                          ->orWhere('org_log_id',$account->first()->org_log_id)->get();
+
+                        if($exists->isNotEmpty()){
+
+                            if (!$datasCollection->contains('id',$exists->first()->event_id)) {
+
+                                $data = Event::find($exists->first()->event_id);
+
+                                // $newEvent = {
+                                //     'id' =>  $data->id,
+                                //     "name": "Event 7",
+                                //     "org_log_id": "65",
+                                //     "college_entity_id": "11",
+                                //     "description": "Description 7",
+                                //     "academic_year": "2024-2025",
+                                //     "submission_date": "November 22 2024",
+                                //     "approval_status": null,
+                                //     "status": "A",
+                                //     "created_at": "2024-10-21T03:06:37.000000Z",
+                                //     "updated_at": "2024-10-21T03:06:37.000000Z"
+                                // };
+
+                                // If the id does not exist, add the new event to the collection
+                                $datasCollection->push($newEvent);
+                            }
+                        }
+                }
+
+                return  $datasCollection->all();
+
+
+
 
                 $requirement = []; // Initialize as an array
 

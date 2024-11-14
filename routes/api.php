@@ -72,87 +72,85 @@ Route::post('/sample', function (Request $request) {
 
 Route::controller(OrgLogController::class)->group(function () {
 
-    Route::post('getOrgLog', 'getOrgLog');
-    Route::post('getDropdownOrg', 'getDropdownOrg');
-    Route::post('storeOrgLog', 'storeOrgLog');
-    Route::post('editOrgLog', 'editOrgLog');
-    Route::post('updateOrgLog', 'updateOrgLog');
-    Route::post('deleteOrgLog', 'deleteOrgLog');
-    Route::post('searchOrgLog', 'searchOrgLog');
-    Route::post('getFilteredPrograms', 'getFilteredPrograms');
-    Route::post('getOrgLogInfo', 'getOrgLogInfo');
+    Route::post('organizations', 'getOrganization');
+    Route::post('dropdown-organization', 'getDropdownOrganization');
+    Route::post('organization/create', 'createOrganization');
+    Route::post('organization/update', 'updateOrganization');
+    Route::post('organization/delete', 'deleteOrganization');
+    Route::post('organization-status/update', 'updateOrganizationStatus');
+    Route::post('programs/filter', 'getFilteredPrograms');
 });
 
-Route::controller(ProgramController::class)->group(function () {
-
-    Route::post('getProgram', 'getProgram');
-});
 
 Route::controller(EventController::class)->group(function () {
 
-    Route::get('getActiveEvent', 'getActiveEvent'); // ADMIN AND STAFF ONLY
-    Route::post('getEvent', 'getEvent');
-    Route::get('getAcademicYear', 'getAcademicYear');
-    Route::post('viewEvent', 'viewEvent');
-    Route::post('storeEvent', 'storeEvent');
-    Route::post('editEvent', 'editEvent');
-    Route::post('updateEvent', 'updateEvent');
-    Route::post('deleteEvent', 'deleteEvent');
+    Route::get('active-event', 'getActiveEvent'); // ADMIN AND STAFF ONLY
+    Route::post('all-events', 'getEvent');
+  //  Route::get('get-academic-year', 'getAcademicYear');
+    Route::post('view-event', 'viewEvent');
+    Route::post('event/create', 'createEvent');
+    Route::post('event/update', 'updateEvent');
+    Route::post('event/delete', 'deleteEvent');// need baguhin
 });
 
 Route::controller(RequirementController::class)->group(function () {
-    Route::post('getRequirement', 'getRequirement');
-    Route::post('deleteRequirement', 'deleteRequirement');
+    Route::post('requirements', 'getRequirement');
+    Route::post('requirement/delete', 'deleteRequirement');// need baguhin
 });
 
 Route::controller(FileRequirementController::class)->group(function () {
 
-    Route::post('getAllfile', 'getAllfile'); // DMO FILES
-    Route::post('getFileRequirement', 'getFileRequirement');
-    Route::post('storeFileRequirement', 'storeFileRequirement');
-    Route::post('storeFolderRequirement', 'storeFolderRequirement');
-    Route::post('storeDMO_files', 'storeDMO_files');
-    Route::post('createDMO_folder', 'createDMO_folder');
-    Route::post('downloadFileRequirement', 'downloadFileRequirement');
-    Route::post('updateFile', 'updateFile');
-    Route::post('confirmationPass', 'confirmationPass');
-    Route::get('makefolder', 'makefolder');
-    Route::post('deleteFile', 'deleteFile');
-    Route::post('getFolder', 'getFolder');
+    Route::post('all-files', 'getAllfile'); // ADMIN AND STAFF ONLY
+    Route::post('files-requirement', 'getFileRequirement');
+
+    Route::post('file-requirement/create', 'createFileRequirement');
+    Route::post('file-requirement/download', 'downloadFileRequirement');
+    Route::post('folder-requirement/create', 'createFolderRequirement');
+
+
+    Route::post('dmo-files/create', 'createDMOFiles');
+    Route::post('dmo-folder/create', 'createDMOFolder');
+
+    Route::post('file-folder/update', 'updateFileOrFolder');
+    Route::post('file-folder/delete', 'deleteFile');
+
+    Route::post('confirmation', 'confirmationForEditDelete');
+    Route::post('files-inside-folder', 'getFilesInsideFolder');
+
 });
 
 Route::controller(ConversationController::class)->group(function () {
-    Route::post('storeConverstation', 'storeConverstation');
+    Route::post('storeConverstation', 'createConverstation');
     Route::post('getConvesation', 'getConvesation');
 });
 
 Route::controller(RequestController::class)->group(function () {
-    Route::post('rejectRequest', 'rejectRequest');
-    Route::post('storeRequest', 'storeRequest');
-    Route::post('getRequest', 'getRequest');
-    Route::post('getReqInfo', 'getReqInfo');
-    Route::post('getAcceptRequest', 'getAcceptRequest');
+    Route::post('request', 'getRequest');
+    Route::post('request/reject', 'rejectRequest');
+    Route::post('request/create', 'storeRequest');
+    Route::post('request/accept', 'getAcceptRequest');
+    Route::post('requirement-information', 'getRequestInformation');
 });
 
 Route::controller(DashboardController::class)->group(function () {
-    Route::post('getAdminDashboard', 'getAdminDashboard');
-    Route::post('getDeanDashboard', 'getDeanDashboard');
-    Route::post('getProgramDashboard', 'getProgramDashboard');
-    Route::post('getHeadDashboard', 'getHeadDashboard');
+    Route::post('admin-dashboard', 'getAdminDashboard');
+    Route::post('dean-dashboard', 'getDeanDashboard');
+    Route::post('program-dashboard', 'getProgramDashboard');
+    Route::post('head-dashboard', 'getHeadDashboard');
 
-    Route::post('getDocumentRequest', 'getDocumentRequest');
-    Route::post('getCompliance', 'getCompliance');
-    Route::post('getRecentUpload', 'getRecentUpload');
+    Route::post('document-request-dashboard', 'getDocumentRequestDashboard');
+    Route::post('compliance-dashboard', 'getComplianceDashboard');
+    Route::post('recent-upload-dashboard', 'getRecentUploadDashboard');
 });
 
 Route::controller(ReportController::class)->group(function () {
 
-    Route::post('getReportRequest', 'getReportRequest');
-    Route::post('getComplianceReport', 'getComplianceReport');
+    Route::post('report-request', 'getReportRequest');
+    Route::post('compliance-report', 'getComplianceReport');
 });
 
 Route::controller(HistoryDocumentController::class)->group(function () {
 
-    Route::post('getHistory', 'getHistory');
+    Route::post('history', 'history');
 
 });
