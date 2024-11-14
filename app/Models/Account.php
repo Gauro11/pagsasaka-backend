@@ -23,7 +23,7 @@ class Account extends Authenticatable
             'email',
             'role',
             'password',
-            'status',
+            'is_archived',
             'org_log_id'
             
         ];
