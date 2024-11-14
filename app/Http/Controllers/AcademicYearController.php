@@ -34,7 +34,6 @@ class AcademicYearController extends Controller
                 return response()->json($response, 422);
             }
     
-            // Ensure we're only comparing the date portion, not time
             $startDate = Carbon::parse($request->start_date)->format('Y-m-d');
             $endDate = Carbon::parse($request->end_date)->format('Y-m-d');
     
@@ -49,7 +48,7 @@ class AcademicYearController extends Controller
                     'message' => 'An academic year with these dates already exists.',
                 ];
                 $this->logAPICalls('addAcademicYear', "", $request->all(), $response);
-                return response()->json($response, 409); // HTTP status 409 for conflict
+                return response()->json($response, 409);
             }
     
             // Set `status` to 'A' and `Isarchive` to 0

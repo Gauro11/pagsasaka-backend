@@ -118,7 +118,7 @@ class AccountController extends Controller
         }
     }
 
-    public function changeStatusToInactive($id)
+    public function deactivateAccount($id)
     {
         try {
             // Find the account by ID
@@ -225,7 +225,7 @@ class AccountController extends Controller
             ]);
 
             // Initialize the base query
-            $query = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'status', 'org_log_id')
+            $query = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'role', 'is_archived', 'org_log_id')
                 ->where('is_archived', '0')
                 ->orderBy('created_at', 'desc');
 

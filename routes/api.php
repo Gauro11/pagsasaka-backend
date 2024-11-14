@@ -28,7 +28,7 @@ use App\Http\Controllers\HistoryDocumentController;
 Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 
-Route::post('academicyear/create', [AcademicYearController::class, 'addAcademicYear']);
+Route::post('academic-year/create', [AcademicYearController::class, 'addAcademicYear']);
 Route::post('/delete-year/{id}', [AcademicYearController::class, 'deleteAcademicYear']);
 Route::post('/getacademic-year', [AcademicYearController::class, 'getAcademicYear']);
 
@@ -57,7 +57,7 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('accounts/get', 'getAccounts');
     Route::post('account/create', 'createAccount');
     Route::post('account/update/{id}', 'updateAccount');
-    Route::post('account/status-update/{id}', 'changeStatusToInactive');
+    Route::post('account/deactivate/{id}', 'deactivateAccount');
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
