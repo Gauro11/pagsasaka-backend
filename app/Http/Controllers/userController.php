@@ -8,4 +8,6 @@ use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 
 class userController extends Controller
-{}
+{
+    //user
+}
