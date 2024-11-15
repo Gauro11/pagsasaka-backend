@@ -148,7 +148,7 @@ class EventController extends Controller
 
             $response = [
                 'isSuccess' => true,
-                'data' => $data,
+                'events' => $data,
                 'org_name' => $org_name->name
            ];
 
