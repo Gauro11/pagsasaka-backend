@@ -8,7 +8,6 @@ use App\Models\UserRequest;
 use App\Models\OrganizationalLog;
 use App\Models\Account;
 use App\Models\Program;
-
 use Carbon\Carbon;
 use Throwable;
 
@@ -89,7 +88,7 @@ class RequestController extends Controller
             $this->logAPICalls('updateReqStatus', "", $request->all(), $response);
             return response()->json($response, 403);
 
-        }catch(Exception $e){
+        }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
@@ -106,13 +105,13 @@ class RequestController extends Controller
         
         try{
 
-            $validate = $request->validate([
-                'account_id' => 'required'
+            $validated = $request->validate([
+                'account_id' => 'required|exists:accounts,id'
             ]);
             $perPage = 10;
             $page = $request->input('page', 1);
             $search = $request->input('search', ''); 
-            $role = $this->getRole($validate['account_id']);
+            $role = $this->getRole($validated['account_id']);
     
             if(empty($search)){
                 
@@ -160,6 +159,7 @@ class RequestController extends Controller
                 
     
             }else{
+
 
                 if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
 
@@ -294,7 +294,7 @@ class RequestController extends Controller
 
 
             
-        }catch (Exception $e) {
+        }catch (Throwable $e) {
 
             $response = [
                 'isSuccess' => false,
@@ -330,7 +330,7 @@ class RequestController extends Controller
             $this->logAPICalls('getRequestInformation', "", $request->all(), $response);
             return response()->json($response);
 
-        }catch(Exception $e){
+        }catch(Throwable $e){
             $response = [
                 'isSuccess' => false,
                 'message' => 'Failed to create the Account.',

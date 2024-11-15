@@ -135,7 +135,7 @@ class RequirementController extends Controller
             ]);
         
            $requirement = Requirement::find($validated['id']);
-           $requirement_event_id = $requirement->event_id;
+           $requirement_event_id = $requirement->event_id; // getting the event id ng requirement kung saan siya under na event.
 
            $isRequirementExists =  Requirement::where('name',$validated['name'])
                                                 ->where('event_id', $requirement_event_id)
