@@ -79,6 +79,7 @@ Route::controller(OrgLogController::class)->group(function () {
     Route::post('organization/delete', 'deleteOrganization');
     Route::post('organization-status/update', 'updateOrganizationStatus');
     Route::post('programs/filter', 'getFilteredPrograms');
+    Route::get('dropdown-office-program', 'getConcernedOfficeProgram');
 });
 
 

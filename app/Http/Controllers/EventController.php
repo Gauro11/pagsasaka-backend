@@ -68,38 +68,87 @@ class EventController extends Controller
        
     }
 
+
     public function getEvent(Request $request){
 
         try{
 
             $validated = $request->validate([
-                'org_log_id' => 'required|exists:organizational_logs,id',
+                'org_log_id' => 'required|exists:organizational_logs,id', // ID Of Colleges/Offices/Programs
                 'search' => 'nullable|string',
                 'academic_year' => 'nullable|string' 
             ]);
             
+
             $query = Event::where('org_log_id', $validated['org_log_id'])
+                    ->where('is_archived',0)
+                    ->orderBy('created_at', 'desc')->get();
+            
+            // Wrap the $query result into a Laravel Collection para po sa mga requirements na query ko po
+            $eventCollection = collect($query);
+
+            $org_requirements =  Requirement::where('org_log_id',$validated['org_log_id'])
+                                            ->where('is_archived',0)->get();
+            
+            if( $org_requirements->isNotEmpty()){
+
+                foreach($org_requirements as $requirement){
+
+                    if (!$eventCollection->contains('id', $requirement->event_id)){
+                        
+                        $data = Event::find($requirement->event_id);
+
+                        if($data){
+                            $eventCollection->push($data);
+                        }
+
+                    }
+
+                }
+
+                if (!empty($validated['search'])) {
+                    // Use the collection's `filter` method to search the events by name
+                    $eventCollection = $eventCollection->filter(function ($event) use ($validated) {
+                        return strpos(strtolower($event->name), strtolower($validated['search'])) !== false;
+                    });
+                }
+
+                if (!empty($validated['academic_year'])) {
+                    // Filter the collection by academic_year
+                    $eventCollection = $eventCollection->filter(function ($event) use ($validated) {
+                        return $event->academic_year == $validated['academic_year'];
+                    });
+                }
+
+                // Sort the collection in descending order by `created_at`
+                $eventCollection = $eventCollection->sortByDesc(function ($event) {
+                    return $event['created_at']; 
+                });
+
+                $data =  $eventCollection->values();
+                
+            }else{
+
+                if (!empty($validated['search'])) {
+                    $query->where('name', 'like', '%' . $validated['search'] . '%')
                     ->where('status','A')
                     ->orderBy('created_at', 'desc');
-            
-            if (!empty($validated['search'])) {
-                $query->where('name', 'like', '%' . $validated['search'] . '%')
-                ->where('status','A')
-                ->orderBy('created_at', 'desc');
+                }
+                
+                if (!empty($validated['academic_year'])) {
+                    $query->where('academic_year', $validated['academic_year'])
+                    ->where('status','A')
+                    ->orderBy('created_at', 'desc');
+                }
+               
+                $data = $query->get();
             }
-            
-            if (!empty($validated['academic_year'])) {
-                $query->where('academic_year', $validated['academic_year'])
-                ->where('status','A')
-                ->orderBy('created_at', 'desc');
-            }
-            
-            $data = $query->get();
+   
             $org_name = OrganizationalLog::find($validated['org_log_id']);
 
             $response = [
                 'isSuccess' => true,
-                'data' => $data,
+                'events' => $data,
                 'org_name' => $org_name->name
            ];
 
@@ -120,7 +169,6 @@ class EventController extends Controller
         }
 
     }
-
  
     public function createEvent(EventRequest $request){
 
@@ -139,21 +187,13 @@ class EventController extends Controller
  
              }else{
                
-                $this->makeFolder($request->org_log_id, $request->name,$request->requirements);
+                $this->makeFolder($request->org_log_id, $request->name,$request->requirements); // Create ng folder sa repository base kung anong offices/programs/colleges and mag create rin ng subfolder kung ano mga event naka assign sa kanila.
               
                 $organizationalLog = OrganizationalLog::where('id', $request->validated())->get();
 
                // Test if the input org_log_id is for College. //
-
                if($organizationalLog->first()->org_id != "1"){
 
-                    $exists = AcademicYear::where('name', $request->academic_year)
-                                ->exists();
-
-                    if(!$exists){
-                        AcademicYear::create(['name' => $request->academic_year]);
-                    }
-                    
                     $program = Program::where('program_entity_id', $request->validated('org_log_id'))->get();
                     $college_id = !$program->isEmpty() ? $program->first()->college_entity_id : null;
 
@@ -161,14 +201,19 @@ class EventController extends Controller
                         "college_entity_id" => $college_id,
                     ]));
 
-            
                     $eventid= $this->getEventID($request->org_log_id,$request->name,$request->description,$request->academic_year,$request->submission_date);
 
                     $invalidRequirements = [];
                     $duplicateRequirements = [];
 
                     foreach ($request->requirements as $requirement) {
-                        if (!OrganizationalLog::find($requirement['org_log_id'])) {
+
+                        if ($requirement['org_log_id'] == null) {
+                            $validated = $request->validated();
+                            $requirement['org_log_id'] = $validated['org_log_id'];
+                        }
+                      
+                        if (!OrganizationalLog::find($requirement['org_log_id'])  ) {
                 
                             $invalidRequirements[] = $requirement;
                             continue; 
@@ -207,7 +252,6 @@ class EventController extends Controller
                 }else{
                 
                  //  Response when input detected corresponds to a College.  //
-
                     $response = [
                         'isSuccess' => false,
                         'message' => "You are attempting to input org_log_id for College. Please note that only programs and offices have the authority to create events."
@@ -235,41 +279,6 @@ class EventController extends Controller
  
     }
 
-
-    public function editEvent(Request $request){
-
-        try{
-
-            $request->validate([
-
-                'id' => 'required|exists:events,id'
-            ]);
-
-            $data = Event::find($request->id);
-
-            $response = [
-                'isSuccess' => true,
-                    'data' => $data
-            ];
-   
-           $this->logAPICalls('editEvent', "", $request->all(), [$response]);
-           return response()->json($response);
-   
-        }catch(Throwable $e){
-   
-            $response = [
-                   'isSuccess' => false,
-                   'message' => "Unsuccessfully edited. Please check your inputs.",
-                   'error' => 'An unexpected error occurred: ' . $e->getMessage()
-              ];
-   
-               $this->logAPICalls('editEvent', "", $request->all(), [$response]);
-               return response()->json($response, 500);
-        }
-          
-    }
-
-  
     public function updateEvent(Request $request){
 
         try{
@@ -320,17 +329,16 @@ class EventController extends Controller
         
     }
 
-   
     public function deleteEvent(Request $request){
 
         try{
 
-            $validated = $validate = $request->validate([
+            $validated = $request->validate([
                 'id' => 'required|exists:events,id'
             ]);
     
             // Find the event by ID
-            $event = Event::find($request->id);
+            $event = Event::find($validated['id']);
     
             // Check if the event exists (although validation should handle this)
             if (!$event) {
@@ -340,13 +348,24 @@ class EventController extends Controller
                 ], 404);
             }
     
-            // Hard delete the event from the database
+            //delete the event from the database
             $event->update(
                 [
-                    'status' => 'I'
+                    'is_archived' =>  1
                 ]
             );
-    
+
+             //delete the requirements under that event
+            $requirements = Requirement::where('event_id',$validated['id'])->where('is_archived',0)->get();
+
+            if($requirements){
+                foreach($requirements as $requirement){
+                    $requirement->update([
+                        'is_archived' =>  1
+                    ]);
+                }
+            }
+
             // Return success response
             $response = [
                 'isSuccess' => true,
@@ -371,35 +390,7 @@ class EventController extends Controller
             return response()->json($response, 500);
         }
     }
-    
 
-    // public function getAcademicYear(){
-    //     try{
-    //         $data = AcademicYear::all();
-    //         $response = [
-    //             'isSuccess' => true,
-    //             'data' => $data
-    //         ];
-    
-    //         $this->logAPICalls('getAcademicYear', "", [], [$response]);  // No $request data needed here
-    //         return response()->json($response, 200);
-    
-    //     } catch (Exception $e) {  // Use Exception instead of Throwable for consistency
-    
-    //         $response = [
-    //             'isSuccess' => false,
-    //             'message' => "Please contact support.",
-    //             'error' => 'An unexpected error occurred: ' . $e->getMessage()
-    //         ];
-    
-    //         // Removed the undefined $request variable
-    //         $this->logAPICalls('getAcademicYear', "", [], [$response]);
-    //         return response()->json($response, 500);
-    //     }
-    // }
-    
-
-    // DONE //
     public function viewEvent(Request $request){
 
         try{
