@@ -135,13 +135,17 @@ class RequirementController extends Controller
             ]);
         
            $requirement = Requirement::find($validated['id']);
-           $requirement_event_id = $requirement->event_id; // getting the event id ng requirement kung saan siya under na event.
 
+           // Retrieve the event_id associated with the requirement
+           $requirement_event_id = $requirement->event_id; 
+
+            // Check if a requirement with the same name, event_id, and org_log_id already exists
            $isRequirementExists =  Requirement::where('name',$validated['name'])
                                                 ->where('event_id', $requirement_event_id)
                                                 ->where('org_log_id',$validated['org_log_id'])
                                                 ->exists();
 
+            // If the requirement already exists, return an error message
             if($isRequirementExists) {
     
                 $response = [
@@ -189,11 +193,16 @@ class RequirementController extends Controller
                 'id' => 'required|exists:requirements,id'
             ]);
 
+            // Retrieve the 'Requirement' model using the provided 'id'
             $organization = Requirement::find($request->id);
+
+            // Mark the requirement as archived by setting 'is_archived' to 1
             $organization->update(['is_archived' => 1]);
 
+            // Retrieve all files associated with the requirement that is being archived
             $files = RequirementFile::where('requirement_id',$validated['id'])->get();
 
+            // Check if there are any files associated with the requirement
             if($files){
                 foreach($files as $file){
                     $file->update(['is_archived' => 1]);
