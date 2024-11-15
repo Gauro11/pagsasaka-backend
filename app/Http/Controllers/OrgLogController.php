@@ -47,7 +47,7 @@ class OrgLogController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
 
-            $this->logAPICalls('getConcernedOfficeProgram', "", [] [$response]);
+            $this->logAPICalls('getConcernedOfficeProgram', "", [],[$response]);
             return response($response, 500);
         }
                           
@@ -173,17 +173,17 @@ class OrgLogController extends Controller
                  if($org_id==1){
                      $response = [
                          'isSuccess' => true,
-                         'colleges' =>  $data_convert_to_array 
+                         'colleges' =>  $data
                      ];
                  }elseif($org_id==2){
                      $response = [
                          'isSuccess' => true,
-                         'offices' => $data_convert_to_array 
+                         'offices' => $data
                      ];
                  }else{
                      $response = [
                          'isSuccess' => true,
-                         'programs' =>  $data_convert_to_array 
+                         'programs' => $data
                      ];
                  }
          

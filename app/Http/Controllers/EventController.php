@@ -68,7 +68,6 @@ class EventController extends Controller
        
     }
 
-
     public function getEvent(Request $request){
 
         try{
@@ -83,7 +82,7 @@ class EventController extends Controller
             $query = Event::where('org_log_id', $validated['org_log_id'])
                     ->where('is_archived',0)
                     ->orderBy('created_at', 'desc')->get();
-            
+                
             // Wrap the $query result into a Laravel Collection para po sa mga requirements na query ko po
             $eventCollection = collect($query);
 
@@ -391,7 +390,7 @@ class EventController extends Controller
         }
     }
 
-    public function viewEvent(Request $request){
+    public function eventDetails(Request $request){
 
         try{
 
@@ -407,7 +406,7 @@ class EventController extends Controller
 
             $response = [
                 'isSuccess' => true,
-                'viewEvent' =>  [
+                'event-details' =>  [
                         'id' => $data->id,
                         'name' => $data->name,
                         'org_log_id' => $data->org_log_id,
@@ -426,7 +425,7 @@ class EventController extends Controller
                 
            ];
 
-            $this->logAPICalls('viewEvent', "", $request->all(), [$response]);
+            $this->logAPICalls('eventDetails', "", $request->all(), [$response]);
             return response()->json($response);
     
         } catch (Exception $e) {
@@ -438,9 +437,53 @@ class EventController extends Controller
             ];
     
             // Log the API call with the error response
-            $this->logAPICalls('viewEvent', "", $request->all(), [$response]);
+            $this->logAPICalls('eventDetails', "", $request->all(), [$response]);
             return response()->json($response, 500);
         }
+    }
+
+    public function eventApprovalStatus(Request $request){
+        
+        ////////////////////////////////////////////////////////
+        //  PROGRAM CHAIR AND HEAD -> status: submited
+        //  DEAN -> status: endorsed
+        //  STAFF -> status : validated
+        //  ADMIN -> status : Approved
+        ////////////////////////////////////////////////////////
+
+        try{
+
+            $validated = $request->validate([
+                'event_id' => 'required|exists:events,id',
+                'status' => 'required'
+            ]);
+    
+            $event = Event::find($validated['event_id']);
+            
+            if($event->update([
+                'approval_status' => $validated['status']
+            ])){
+    
+                $response = [
+                    'isSuccess' => true,
+                     'message' => "Successfully updated."
+                ];
+    
+                $this->logAPICalls('approvalStatus', "", $request->all(), [$response]);
+                return response()->json($response);
+            }
+    
+        }catch(Throwable $e){
+            $response = [
+                'isSuccess' => false,
+                'message' => "Unsucessfully updated. Please check your inputs.",
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
+            ];
+
+            $this->logAPICalls('approvalStatus', "", $request->all(), [$response]);
+            return response($response, 500);
+        }
+
     }
 
     public function getEventID($org_log_id,$name,$descrip,$acadyear,$submdate){
