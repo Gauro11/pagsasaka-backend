@@ -81,10 +81,13 @@ class EventController extends Controller
 
             $query = Event::where('org_log_id', $validated['org_log_id'])
                     ->where('is_archived',0)
-                    ->orderBy('created_at', 'desc')->get();
-                
+
+                    ->orderBy('created_at', 'desc');
+                    
+            $events = $query->get();
+
             // Wrap the $query result into a Laravel Collection para po sa mga requirements na query ko po
-            $eventCollection = collect($query);
+            $eventCollection = collect($events);
 
             $org_requirements =  Requirement::where('org_log_id',$validated['org_log_id'])
                                             ->where('is_archived',0)->get();
