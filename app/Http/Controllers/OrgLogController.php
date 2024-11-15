@@ -22,20 +22,21 @@ class OrgLogController extends Controller
             //       3- Program
             ///////////////////////////
 
-    public function getConcernedOffice(){
+    //under po ito getConcernedOfficeProgram() under po yan ng creation ng events po. 
+    public function getConcernedOfficeProgram(){
 
         try{
 
-            $college_program_office =  OrganizationalLog::where('org_id','!=',1)
+            $programs_offices =  OrganizationalLog::where('org_id','!=',1)
                                         ->where('status','A')
                                         ->orderBy('created_at','desc')->get();
 
             $response = [
                 'isSuccess' => true,
-                'concerned_office' => $college_program_office
+                'offices-programs' => $programs_offices
             ];
             
-            $this->logAPICalls('getConcernedOffice', "", [], [$response]);
+            $this->logAPICalls('getConcernedOfficeProgram', "", [], [$response]);
             return response($response,200);
 
         }catch(Throwable $e){
@@ -46,7 +47,7 @@ class OrgLogController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
 
-            $this->logAPICalls('getConcernedOffice', "", [] [$response]);
+            $this->logAPICalls('getConcernedOfficeProgram', "", [] [$response]);
             return response($response, 500);
         }
                           
@@ -56,19 +57,21 @@ class OrgLogController extends Controller
 
         try{
 
-            $orgLog=[];
+            $orgLog=[]; 
             $validated = $request->validate([
                 'org_id' => 'required'
             ]);
-
-            $datas = OrganizationalLog::where('org_id',$validated['org_id'])->get();
+            
+            // Query the OrganizationalLog model to find all records with a specific org_id
+            $datas = OrganizationalLog::where('org_id',$validated['org_id'])
+                                        ->where('status','A')->get();
 
             if($datas){
 
                 $response = [];
 
                 foreach($datas as $data){
-                
+                    // Add a new associative array to the $orgLog array na masesesave lang po na key and value ay id and name.
                     $orgLog[] = [
     
                         'id' => $data->id,
@@ -425,7 +428,6 @@ class OrgLogController extends Controller
         }
         
     }
-
 
     public function updateOrganizationStatus(Request $request){
         

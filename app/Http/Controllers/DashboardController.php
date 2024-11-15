@@ -99,7 +99,7 @@ class DashboardController extends Controller
     //    Dito po kinuha ko yung account id ng nag login po para makuha yung role nila.                                  //
     //    IF Admin or Staff - Ma view niya lahat ng request ng mga Offices/Programs/Colleges.                           //
     //    IF Dean - Lalabas yung mga recent created na request na ginawa nila pati yung mga program na under nila.     //
-    //    IF Program chair / Program Head - Lalabas yung mga recent created na request na ginawa nila.                //
+    //    IF Program chair /  Head - Lalabas yung mga recent created na request na ginawa nila.                //
     //                                                                                                               //
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     public function getDocumentRequestDashboard(Request $request){
