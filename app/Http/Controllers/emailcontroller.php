@@ -13,7 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache; // Use cache for simple tracking
 use Illuminate\Support\Facades\Log;
 
-class emailcontroller extends Controller
+class EmailController extends Controller
 {
 
     public function sendEmail(Request $request)
