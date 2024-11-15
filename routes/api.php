@@ -71,7 +71,6 @@ Route::post('/sample', function (Request $request) {
 });
 
 Route::controller(OrgLogController::class)->group(function () {
-
     Route::post('organizations', 'getOrganization');
     Route::post('dropdown-organization', 'getDropdownOrganization');
     Route::post('organization/create', 'createOrganization');
@@ -84,17 +83,18 @@ Route::controller(OrgLogController::class)->group(function () {
 
 
 Route::controller(EventController::class)->group(function () {
-
     Route::get('active-event', 'getActiveEvent'); // ADMIN AND STAFF ONLY
     Route::post('all-events', 'getEvent');
-    Route::post('view-event', 'viewEvent');
+    Route::post('event-details', 'eventDetails');
     Route::post('event/create', 'createEvent');
     Route::post('event/update', 'updateEvent');
     Route::post('event/delete', 'deleteEvent');
+    Route::post('event-status', 'eventApprovalStatus');
 });
 
 Route::controller(RequirementController::class)->group(function () {
     Route::post('requirements', 'getRequirement');
+    Route::post('requirement/update', 'updateRequirement');
     Route::post('requirement/delete', 'deleteRequirement');
 });
 

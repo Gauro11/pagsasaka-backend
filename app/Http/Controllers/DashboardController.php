@@ -11,6 +11,7 @@ use App\Models\UserRequest;
 use App\Models\RequirementFile;
 use App\Models\Event;
 use App\Models\Apilog;
+use Throwable;
 
 class DashboardController extends Controller
 {
@@ -40,28 +41,28 @@ class DashboardController extends Controller
             'college_id' => ['required', 'exists:organizational_logs,id']
         ]);
         
-        $datas = collect($this->percentColleges()); 
+    //     $datas = collect($this->percentColleges()); 
         
-        $college = $datas->firstWhere('id', $validated['college_id']);
+    //     $college = $datas->firstWhere('id', $validated['college_id']);
         
-       $datas = Program::where('college_entity_id',$validated['college_id'] )->get();
+    //    $datas = Program::where('college_entity_id',$validated['college_id'] )->get();
 
-        foreach( $datas as $data ){
+    //     foreach( $datas as $data ){
 
-                $program = OrganizationalLog::where('id',$data->program_entity_id)->get();
-                $programs[] = [
-                    'id' => $data->program_entity_id,
-                    'name' => $program->first()->name,
-                    'acronym' => $program->first()->acronym,
-                    'percentage' => $program->first()->percentage
-                ];
+    //             $program = OrganizationalLog::where('id',$data->program_entity_id)->get();
+    //             $programs[] = [
+    //                 'id' => $data->program_entity_id,
+    //                 'name' => $program->first()->name,
+    //                 'acronym' => $program->first()->acronym,
+    //                 'percentage' => $program->first()->percentage
+    //             ];
 
-        }
+    //     }
 
-        return [
-            'college' => $college ,
-            'programs' =>  $programs
-        ];
+    //     return [
+    //         'college' => $college ,
+    //         'programs' =>  $programs
+    //     ];
 
     }
 
@@ -84,11 +85,11 @@ class DashboardController extends Controller
             'office_id' => ['required', 'exists:organizational_logs,id']
         ]);
         
-        $datas = collect($this->percentOffice()); 
+        // $datas = collect($this->percentOffice()); 
         
-        $office = $datas->firstWhere('id', $validated['office_id']);
+        // $office = $datas->firstWhere('id', $validated['office_id']);
 
-        return $office;
+        // return $office;
 
     }
 
@@ -188,7 +189,7 @@ class DashboardController extends Controller
             $this->logAPICalls('getDocumentRequestDashboard', "", $request->all(), $response);
             return response()->json($response,200);
         
-        }catch(Exception $e){
+        }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
@@ -327,7 +328,7 @@ class DashboardController extends Controller
                                 // };
 
                                 // If the id does not exist, add the new event to the collection
-                                $datasCollection->push($newEvent);
+                              //  $datasCollection->push($newEvent);
                             }
                         }
                 }
@@ -371,7 +372,7 @@ class DashboardController extends Controller
 
             return response()->json($response);
 
-       }catch(Exception $e){
+       }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
