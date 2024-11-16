@@ -98,6 +98,15 @@ Route::controller(RequirementController::class)->group(function () {
     Route::post('requirement/delete', 'deleteRequirement');
 });
 
+Route::controller(RequestController::class)->group(function () {
+    Route::post('request', 'getRequest');
+    Route::post('request/create', 'createRequest');
+    Route::post('request/reject', 'rejectRequest');
+    Route::post('request/accept', 'getAcceptRequest');
+    Route::post('requirement-information', 'getRequestInformation');
+});
+
+
 Route::controller(FileRequirementController::class)->group(function () {
 
     Route::post('all-files', 'getAllfile'); // ADMIN AND STAFF ONLY
@@ -124,13 +133,6 @@ Route::controller(ConversationController::class)->group(function () {
     Route::post('getConvesation', 'getConvesation');
 });
 
-Route::controller(RequestController::class)->group(function () {
-    Route::post('request', 'getRequest');
-    Route::post('request/reject', 'rejectRequest');
-    Route::post('request/create', 'storeRequest');
-    Route::post('request/accept', 'getAcceptRequest');
-    Route::post('requirement-information', 'getRequestInformation');
-});
 
 Route::controller(DashboardController::class)->group(function () {
     Route::post('admin-dashboard', 'getAdminDashboard');

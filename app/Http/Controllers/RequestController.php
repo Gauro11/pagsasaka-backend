@@ -10,46 +10,13 @@ use App\Models\Account;
 use App\Models\Program;
 use Carbon\Carbon;
 use Throwable;
+use Illuminate\Pagination\Paginator;
+use Illuminate\Pagination\LengthAwarePaginator;
+
 
 class RequestController extends Controller
 {
     
-    public function rejectRequest(Request $request){
-
-        try{
-
-        
-            $validated = $request->validate([
-                'request_id' => ['required']
-            ]);
-
-        $data = UserRequest::where('id',$validated['request_id'])->first();
-        $data->update([
-            'approval_status' => 'rejected'
-        ]);
-
-        $response = [
-            'isSuccess' => true,
-            'rejected_request' => $data
-        ];
-
-        $this->logAPICalls('rejectRequest', "", $request->all(), $response);
-        return response($response ,200);
-
-        }catch(Throwable $e){
-
-             $response = [
-                'isSuccess' => false,
-                'message' => "Please contact support.",
-                'error' => $e->getMessage()
-            ];
-            $this->logAPICalls('rejectRequest', "", $request->all(), $response);
-            return response()->json($response, 500);
-
-        }
-        
-    }
-
     public function updateReqStatus(Request $request){
 
         try{
@@ -108,35 +75,50 @@ class RequestController extends Controller
             $validated = $request->validate([
                 'account_id' => 'required|exists:accounts,id'
             ]);
+
             $perPage = 10;
+            $datas = null;
             $page = $request->input('page', 1);
             $search = $request->input('search', ''); 
             $role = $this->getRole($validated['account_id']);
+
     
+            // Check if the search term is empty
             if(empty($search)){
                 
+                // If user has roles Admin, 1, Staff, or 2, fetch paginated data for all active (non-archived) requests
                 if ($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2") {
-
-                 $datas = UserRequest::orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
-                
-
+                    
+                    // Get paginated user requests, ordered by creation date, where the request is not archived
+                    $datas = UserRequest::where('is_archived', 0)
+                                        ->orderBy('created_at', 'desc')
+                                        ->paginate($perPage, ['*'], 'page', $page);
+                    
                 } else {
+                    
+                    // For other roles, fetch user requests where role matches and the request is not archived
                     $datas = UserRequest::where('role', $role)
+                                        ->where('is_archived', 0)
                                         ->orderBy('created_at', 'desc')
                                         ->get();
                 }
 
-                $requestData =[];
+                // Initialize the arrays to store formatted data
+                $requestData = $response = [];
 
+                // Loop through each request data to retrieve additional information (like org_log acronym)
                 foreach($datas as $data){
-                    $org = OrganizationalLog::where('id',$data->org_log_id)->first();
+                    $org = OrganizationalLog::where('id', $data->org_log_id)->first();
+                    $date = new \DateTime($data->created_at);
+                    $formattedDate = $date->format('F j, Y');
+
                     $requestData[] = [
                         'id' => $data->id,
                         'request_no' => $data->request_no,
                         'account_id' => $data->account_id,
                         'org_log_acronym' =>  $org->acronym ,
                         'purpose' => $data->purpose,
-                        'requested_date' => $data->requested_date,
+                        'requested_date' => $formattedDate,
                         'files' =>  $data->files,
                         'qtyfile' => $data->qtyfile,
                         'approval_status' => $data->approval_status,
@@ -144,74 +126,109 @@ class RequestController extends Controller
                     ];
                 }
 
-                $response = [
-                    'isSuccess' => true,
-                    'requestData' => $requestData,
-                    'current_page' => $datas->currentPage(),
-                    'from' => $datas->firstItem(),
-                    'last_page' => $datas->lastPage(),
-                    'next_page_url' => $datas->nextPageUrl(),
-                    'per_page' => $datas->perPage(),
-                    'prev_page_url' => $datas->previousPageUrl(),
-                    'to' => $datas->lastItem(),
-                    'total' => $datas->total()
-                ];
-                
-    
-            }else{
+            } else {
 
-
+                // If a search term is provided, perform a search based on the request number
                 if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
 
-                    $results = UserRequest::orderBy('created_at', 'desc')
-                                ->where(function($q) use ($search) {
-                                    $q->where('request_no', 'LIKE', "%{$search}%");
-                                })
-                                ->paginate($perPage, ['*'], 'page', $page);;
+                    // Fetch paginated results for non-archived requests and search by request_no
+                    $datas = UserRequest::where('is_archived',0)
+                                        ->orderBy('created_at', 'desc')
+                                        ->where(function($q) use ($search) {
+                                            $q->where('request_no', 'LIKE', "%{$search}%");
+                                        })
+                                        ->paginate($perPage, ['*'], 'page', $page);
                     
-                }else{
-                    $results = UserRequest::where('role', $role)
-                    ->when($query, function ($q) use ($query) {
-                        return $q->where(function ($queryBuilder) use ($query) {
-                            $queryBuilder->where('request_no', 'LIKE', "%{$request->search}%");
-                        });
-                    })->get();
+                } else {
+                    
+                    // For other roles, fetch non-archived requests with role matching, and search by request_no
+                    $datas = UserRequest::where('role', $role)
+                                        ->where('is_archived', 0)
+                                        ->orderBy('created_at','desc')
+                                        ->when($search, function ($q) use ($search) {
+                                            return $q->where('request_no', 'LIKE', "%{$search}%");
+                                        })
+                                        ->get();
                 }
 
-                $requestData =[];
+                // Initialize the array to store formatted data
+                $requestData = [];
 
-                foreach($results as $data){
-                    $org = OrganizationalLog::where('id',$data->org_log_id)->first();
-                    
+                // Loop through each request data to retrieve additional information (like org_log acronym)
+                foreach($datas as $data){
+                    $org = OrganizationalLog::where('id', $data->org_log_id)->first();
+                    $date = new \DateTime($data->created_at);
+                    $formattedDate = $date->format('F j, Y');
+
                     $requestData[] = [
                         'id' => $data->id,
                         'request_no' => $data->request_no,
                         'account_id' => $data->account_id,
                         'org_log_acronym' =>  $org->acronym ,
                         'purpose' => $data->purpose,
-                        'requested_date' => $data->requested_date,
+                        'requested_date' => $formattedDate,
                         'files' =>  $data->files,
                         'qtyfile' => $data->qtyfile,
                         'approval_status' => $data->approval_status,
                         'status' =>  $data->status
                     ];
                 }
-                
+            }
+           
+            // susunod na code para sa response ng pagination ng Admin/ staff and not admin.            
+            if ($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
+
                 $response = [
                     'isSuccess' => true,
                     'requestData' => $requestData,
-                    'current_page' => $results->currentPage(),
-                    'from' => $results->firstItem(),
-                    'last_page' => $results->lastPage(),
-                    'next_page_url' => $results->nextPageUrl(),
-                    'per_page' => $results->perPage(),
-                    'prev_page_url' => $results->previousPageUrl(),
-                    'to' => $results->lastItem(),
-                    'total' => $results->total()
+                    'current_page' => $datas->currentPage(),
+                    'from' => $datas->firstItem(),
+                    'last_page' => $datas->lastPage(),
+                    'per_page' => $datas->perPage(),
+                    'to' => $datas->lastItem(),
+                    'total' => $datas->total()
                 ];
-                
+
+            }else{
+                   // Pagination for the users na hindi admin and staff.
+                   // Get pagination parameters from request body (or query parameters)
+                    $page = $request->input('page', 1); // Current page (default to 1)
+                    $search = $request->input('search', ''); // Optional search term
+
+                    // Retrieve your data (filtered by search, etc.)
+                   // $requestData = $this->getRequestData($search);  // Example method to get the data
+
+                    // Calculate total count (total number of records)
+                    $totalItems = count($requestData); // Total records in the array
+
+                    // Slice the data to get the current page's items
+                    $slicedData = array_slice($requestData, ($page - 1) * $perPage, $perPage);
+
+                    // Create a LengthAwarePaginator instance
+                    $paginator = new LengthAwarePaginator(
+                        $slicedData,       // The actual data to paginate (current page's items)
+                        $totalItems,       // Total number of records
+                        $perPage,          // Items per page
+                        $page,             // Current page
+                        [
+                            'path' => Paginator::resolveCurrentPath(), // Resolve current path
+                            'pageName' => 'page'                       // Customize the page query parameter name
+                        ]
+                    );
+
+                    // Prepare the response with paginated data
+                    $response = [
+                        'isSuccess' => true,
+                        'requestData' => $paginator->items(),      // Current page's items
+                        'current_page' => $paginator->currentPage(), // Get the current page
+                        'from' => $paginator->firstItem(),         // The first item on this page
+                        'last_page' => $paginator->lastPage(),     // The last page
+                        'per_page' => $paginator->perPage(),       // Number of items per page
+                        'to' => $paginator->lastItem(),            // The last item on this page
+                        'total' => $totalItems,                    // Total number of records
+                    ];
+
             }
-    
 
             $this->logAPICalls('getRequest', "", $request->all(), $response);
             return response()->json($response,200);
@@ -230,68 +247,67 @@ class RequestController extends Controller
 
     }
 
-
-    public function storeRequest(requestUser $request){
+    public function createRequest(requestUser $request){
 
         try{
 
             $fileNames = [];
             $year = Carbon::now()->year;
-            $currentDate = Carbon::now()->format('F j, Y');
 
+            // Validate the incoming request data. Yung validataion po nito nasa http/requests/requestUser
             $validate = $request->validated();
 
+            // Retrieve the role of the account using the provided account_id
             $role = $this->getRole($validate['account_id']);
-            $account = Account::where('id',$validate['account_id'])->get();
-                    
+            $account = Account::find($validate['account_id']);   // Find the account associated with the account_id
+   
             foreach ($request->input('files') as $file) {
                 $fileNames[] = ['filename' => $file]; 
             }
             
-            $program = Program::where('program_entity_id',$account->first()->org_log_id)->get();
-            $college_id = !$program->isEmpty() ?   $program->first()->college_entity_id : "";
+            // Retrieve the associated program based on the account's organization log ID
+            $program = Program::where('program_entity_id',$account->org_log_id)->first();
+            $college_id = !empty($program) ? $program->college_entity_id : null; // Extract the college_entity_id if program exists, otherwise set it to an empty string
             
+            // Check if a similar request already exists in the database (same purpose, account, and files)
             if (UserRequest::where('purpose',$validate['purpose'])
                             ->where('account_id',$validate['account_id'])
                             ->where('files', json_encode($fileNames))
+                            ->where('is_archived',0)
                             ->exists()){
                                 
                     
                     $response = [
                         'isSuccess' => false,
                         'message'=> 'The Request you are trying to register already exists. Please verify your input and try again.'
-
                     ];
 
-                    $this->logAPICalls('storeRequest', "", $request->all(), [$response]);
-                    return response()->json($response,422);
+                    $this->logAPICalls('createRequest', "", $request->all(), [$response]);
+                    return response()->json($response,500);
             }
 
-                $data= UserRequest::create([
+                UserRequest::create([
                     'request_no' => $year,
                     'purpose' => $validate['purpose'],
                     'account_id' => $validate['account_id'],
-                    'org_log_id' => $account->first()->org_log_id,
+                    'org_log_id' => $account->org_log_id,
                     'college_entity_id' => $college_id,
-                    'requested_date' => $currentDate,
                     'approval_status' => "pending",
                     'qtyfile' =>count($fileNames),
                     'role' => $role ,
                     'files' => json_encode($fileNames)
                 ]);
                 
+                // Update the request number after successful creation
                 $this->updateReqNo();
-            
-
 
             $response = [
                 'isSuccess' => true,
                 'message' => "Successfully created."
             ];
 
-            $this->logAPICalls('storeRequest', "", $request->all(), [$response]);
-            return response()->json($response);
-
+            $this->logAPICalls('createRequest', "", $request->all(), [$response]);
+            return response()->json($response,200);
 
             
         }catch (Throwable $e) {
@@ -302,7 +318,7 @@ class RequestController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
 
-            $this->logAPICalls('storeRequest', "", $request->all(), [$response]);
+            $this->logAPICalls('createRequest', "", $request->all(), [$response]);
             return response()->json($response, 500);
 
         }
@@ -316,19 +332,26 @@ class RequestController extends Controller
                 'request_id' => ['required','exists:user_requests,id']
             ]);
 
+            // Retrieve the UserRequest record(s) based on the validated 'request_id'
             $data = UserRequest::where('id',$validated['request_id'])->get();
 
+            // Find the associated OrganizationalLog entry using the 'org_log_id' from the first retrieved UserRequest
+            $org = OrganizationalLog::find($data->first()->org_log_id);
+            $org_name = $org->name; // Get the organization name from the OrganizationalLog model
+
+            // Loop through the retrieved UserRequest data and decode the 'files' field from JSON format
             foreach ($data as $item) {
                 $item->files = json_decode($item->files, true);
             }
             
             $response = [
                 'isSuccess' => true,
-                'data' => $data
+                'request-information' => $data,
+                'org_log_name' => $org_name
             ];
 
             $this->logAPICalls('getRequestInformation', "", $request->all(), $response);
-            return response()->json($response);
+            return response()->json($response,200);
 
         }catch(Throwable $e){
             $response = [
@@ -341,7 +364,6 @@ class RequestController extends Controller
         }
     }
 
-  
     public function getAcceptRequest(Request $request){
         $invalidId = []; 
         $validated = $request->validate([
@@ -353,7 +375,7 @@ class RequestController extends Controller
             $data = UserRequest::where('id', $request_id)->first();
 
             if ($data) {
-                $data->update(['approval_status' => "completed"]);
+                $data->update(['status' => "completed"]);
             } else {
                 $invalidId[] = $request_id;
             }
@@ -363,7 +385,7 @@ class RequestController extends Controller
        $response = [
 
             'isSuccess' => true,
-            'message' => "Successfully updated!",
+            'message' => "Requests have been accepted successfully.",
             'invalid_id' =>$invalidId
 
        ];
@@ -371,6 +393,45 @@ class RequestController extends Controller
        return response()->json($response);
 
     }
+
+    public function rejectRequest(Request $request){
+
+        try{
+
+            $validated = $request->validate([
+                'request_id' => ['required', 'exists:user_requests,id']
+            ]);
+
+            // Retrieve the UserRequest record that matches the validated 'request_id'
+            $data = UserRequest::where('id',$validated['request_id'])->first();
+           
+           // Update the status of the retrieved UserRequest to 'rejected'
+            $data->update([
+                'status' => 'rejected'
+            ]);
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Request have been rejected successfully.'
+            ];
+
+            $this->logAPICalls('rejectRequest', "", $request->all(), $response);
+            return response($response ,200);
+
+            }catch(Throwable $e){
+
+                $response = [
+                    'isSuccess' => false,
+                    'message' => "Please contact support.",
+                    'error' => $e->getMessage()
+                ];
+                $this->logAPICalls('rejectRequest', "", $request->all(), $response);
+                return response()->json($response, 500);
+
+            }
+        
+    }
+
 
     private function getRole($account_id){
 
