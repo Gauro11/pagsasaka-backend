@@ -12,6 +12,8 @@ use App\Models\RequirementFile;
 use App\Models\Event;
 use App\Models\Apilog;
 use Throwable;
+use Illuminate\Pagination\Paginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class DashboardController extends Controller
 {
@@ -26,13 +28,12 @@ class DashboardController extends Controller
 
         $response = [
             'isSuccess' => true,
-            'colleges' => $this->percentColleges($currentPage_college), 
-            'offices' => $this->percentOffice($currentPage_office)
+            'colleges' => $this->percentColleges($currentPage_college,true), 
+            'offices' => $this->percentOffice($currentPage_office,true)
         ];
 
         return response()->json($response,200);
     }
-
 
     public function getDeanDashboard(Request $request){
 
@@ -41,28 +42,61 @@ class DashboardController extends Controller
             'college_id' => ['required', 'exists:organizational_logs,id']
         ]);
         
-    //     $datas = collect($this->percentColleges()); 
+        // Fetch college data using the 'percentColleges' method, passing '1' and 'false' as arguments.
+        // 'percentColleges' might return a collection of colleges and their percentage data.
+        $datas = collect($this->percentColleges(1,false)); 
         
-    //     $college = $datas->firstWhere('id', $validated['college_id']);
+        // Find the college data matching the 'college_id' from the validated input
+        $college = $datas->firstWhere('id', $validated['college_id']);
         
-    //    $datas = Program::where('college_entity_id',$validated['college_id'] )->get();
+        // Fetch all the programs associated with the validated college ID
+        $datas = Program::where('college_entity_id',$validated['college_id'] )->get();
 
-    //     foreach( $datas as $data ){
+        foreach( $datas as $data ){
+                    $program = OrganizationalLog::where('id',$data->program_entity_id)->first();
+                    if($program){
+                        $programs[] = [
+                            'id' => $data->program_entity_id,
+                            'name' => $program->name,
+                            'acronym' => $program->acronym,
+                            'percentage' => $program->percentage
+                        ];
+                    }
+        }
 
-    //             $program = OrganizationalLog::where('id',$data->program_entity_id)->get();
-    //             $programs[] = [
-    //                 'id' => $data->program_entity_id,
-    //                 'name' => $program->first()->name,
-    //                 'acronym' => $program->first()->acronym,
-    //                 'percentage' => $program->first()->percentage
-    //             ];
+        $perPage = 10;
+        $page = $request->input('page', 1);
+        $totalItems = count($programs);
 
-    //     }
 
-    //     return [
-    //         'college' => $college ,
-    //         'programs' =>  $programs
-    //     ];
+        // Slice the program data to only include the items for the current page
+        // This ensures that only a subset of the programs are shown per page
+        $slicedData = array_slice($programs, ($page - 1) * $perPage, $perPage);
+
+        $paginator = new LengthAwarePaginator(
+            $slicedData,       // The actual data to paginate (current page's items)
+            $totalItems,       // Total number of records
+            $perPage,          // Items per page
+            $page,             // Current page
+            [
+                'path' => Paginator::resolveCurrentPath(), // Resolve current path
+                'pageName' => 'page'                       // Customize the page query parameter name
+            ]
+        );
+
+        $response = [
+            'isSuccess' => true,
+            'college' => $college ,
+            'programs' => $paginator->items(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(), 
+            'total' => $totalItems, 
+            'from' => $paginator->firstItem(), 
+            'to' => $paginator->lastItem()
+        ];
+
+        return response()->json($response,200);
 
     }
 
@@ -72,11 +106,19 @@ class DashboardController extends Controller
             'program_id' => ['required', 'exists:organizational_logs,id']
         ]);
         
+        // Fetch data related to programs by calling the 'percentPrograms' method and converting the result to a collection
         $datas = collect($this->percentPrograms()); 
         
+        // Find the specific program data from the collection using the 'program_id' provided in the request
+        // The firstWhere method returns the first matching record based on the 'id'
         $program = $datas->firstWhere('id', $validated['program_id']);
 
-        return $program;
+        $response = [
+            'isSuccess' =>true,
+            'office' => $program
+        ];
+
+        return response()->json($response,200);
     }
 
     public function getHeadDashboard(Request $request){
@@ -85,11 +127,18 @@ class DashboardController extends Controller
             'office_id' => ['required', 'exists:organizational_logs,id']
         ]);
         
-        // $datas = collect($this->percentOffice()); 
+        // Fetch office data by calling the 'percentOffice' method and convert the result into a collection
+        $datas = collect($this->percentOffice(1,false)); 
         
-        // $office = $datas->firstWhere('id', $validated['office_id']);
+        // Find the specific office data from the collection using the 'office_id' provided in the validated request
+        // The 'firstWhere' method finds the first matching item in the collection based on the 'id' field
+        $office = $datas->firstWhere('id', $validated['office_id']);
 
-        // return $office;
+        $response = [
+            'isSuccess' =>true,
+            'office' => $office
+        ];
+        return response()->json($response,200);
 
     }
 
@@ -117,7 +166,7 @@ class DashboardController extends Controller
             if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
                 $requirement= [];
 
-            $datas = UserRequest::where('status', 'A')
+            $datas = UserRequest::where('is_archived', 0)
                         ->orderBy('created_at', 'desc')
                         ->get();
 
@@ -387,14 +436,18 @@ class DashboardController extends Controller
     }
 
 
-    private function percentOffice($currentPage){
+    private function percentOffice($currentPage,$isPaginate){
 
         $perPage = 10; // Set items per page
 
         $ReqOffice = [];
         
         // Paginate the results
-        $datas = OrganizationalLog::where('org_id', '2')->paginate($perPage, ['*'], 'page', $currentPage);
+        if($isPaginate){
+             $datas = OrganizationalLog::where('org_id', '2')->paginate($perPage, ['*'], 'page', $currentPage);
+        }else{
+            $datas = OrganizationalLog::where('org_id', '2')->where('is_archived',0)->get();
+        }
         
         // Process each item
         foreach ($datas as $data) {
@@ -419,28 +472,30 @@ class DashboardController extends Controller
                 'percentage' => $percentage
             ]);
         }
+
+
+        if($isPaginate){
+             // Prepare pagination details
+            $lastPage = $datas->lastPage();
+            $currentPage = $datas->currentPage();
+            $total = $datas->total();
+
+            $response = [
+                'data' => $ReqOffice,
+                'current_page' => $currentPage,
+                'last_page' => $lastPage,
+                'total' => $total
+            ];
+            return $response; // Return the paginated response 
+        }else{
+            return $ReqOffice; // Return all offices with their calculated data
+        }
         
-        // Prepare pagination details
-
-        $lastPage = $datas->lastPage();
-        $currentPage = $datas->currentPage();
-        $total = $datas->total();
-
-        $response = [
-            'data' => $ReqOffice,
-            'current_page' => $currentPage,
-            'last_page' => $lastPage,
-            'total' => $total
-        ];
-
-
-
-        return $response;
     }
 
     private function percentPrograms(){
 
-        // COMPUTATION OF OFFICE PERCENTAGE //
+        // COMPUTATION OF PROGRAM PERCENTAGE //
 
         $ReqProgram = [];
         $datas = OrganizationalLog::where('org_id', '3')->get();
@@ -448,13 +503,17 @@ class DashboardController extends Controller
         foreach ($datas as $data) {
             // Get counts directly
 
+           // Get the total count of requirements related to the current Organizational Log
             $totalReq = Requirement::where('org_log_id', $data->id)->count();
+
+            // Get the count of requirements that have the upload status 'completed'
             $totalUpload = Requirement::where('org_log_id', $data->id)
                                     ->where('upload_status', 'completed')
                                     ->count();
 
-            // Avoid division by zero
-
+      
+            // Avoid division by zero when calculating the percentage
+            // If there are no requirements, set percentage to 0
             $percentage = $totalReq > 0 ? ($totalUpload / $totalReq) * 100 : 0;
 
             $ReqProgram[] = [ 
@@ -475,14 +534,23 @@ class DashboardController extends Controller
 
     }
 
-    private function percentColleges($currentPage){
+    private function percentColleges($currentPage,$isAdmin){
 
         $perPage = 10; // Set items per page
 
-        $this-> percentPrograms();
+        $this-> percentPrograms(); // Call the function to set the percent of programs (presumably doing some setup or calculation)
         $ReqCollege= [];
         
-        $datas = OrganizationalLog::where('org_id', '1')->paginate($perPage, ['*'], 'page', $currentPage);
+        // Check if the user is an admin
+        if($isAdmin){
+              // If the user is an admin, fetch the Organizational Logs with pagination (only unarchived entries)
+             // Pagination is applied with 'page' and 'currentPage' parameters to paginate the results
+              $datas = OrganizationalLog::where('org_id', '1')
+                      ->where('is_archived',0)->paginate($perPage, ['*'], 'page', $currentPage);
+        }else{
+             // If the user is not an admin, fetch all Organizational Logs without pagination
+              $datas = OrganizationalLog::where('org_id', '1')->where('is_archived',0)->get();
+        }
       
         foreach ($datas as $data) {
 
@@ -490,25 +558,34 @@ class DashboardController extends Controller
             $totalUploadreqCollege=0;
             $percentage = 0;
 
+             // Fetch the programs associated with the current Organizational Log (college)
             $programs = Program::where('college_entity_id', $data->id )->get();
 
             foreach ($programs as $program){
 
+                // Count the total number of requirements for the current program
                 $totalReq = Requirement::where('org_log_id', $program->program_entity_id)->count();
+                
+                // Count the number of completed uploads for the current program
                 $totalUpload = Requirement::where('org_log_id',$program->program_entity_id)
                                     ->where('upload_status', 'completed')
                                     ->count();
 
                 $totalreqCollege += $totalReq;
                 $totalUploadreqCollege += $totalUpload;
+
+                // Calculate the percentage of completed uploads
+                // Prevent division by zero by checking if there are any requirements
                 $percentage = $totalreqCollege > 0 ? ($totalUploadreqCollege /$totalreqCollege) * 100 : 0;
 
-            }
+            }   
 
+            // Update the Organizational Log entry with the calculated percentage
             $data->update([
                 'percentage' =>  $percentage
             ]);
-
+        
+        
             $ReqCollege[] = [ 
                 'id' => $data->id,
                 'name' => $data->name,
@@ -520,19 +597,24 @@ class DashboardController extends Controller
 
         }
 
-        $lastPage = $datas->lastPage();
-        $currentPage = $datas->currentPage();
-        $total = $datas->total();
-
-        $response = [
-            'data' => $ReqCollege,
-            'current_page' => $currentPage,
-            'last_page' => $lastPage,
-            'total' => $total
-        ];
-
-        return $response;
-
+        // Check if the user is an admin to return paginated response
+        if($isAdmin){
+            $lastPage = $datas->lastPage();
+            $currentPage = $datas->currentPage();
+            $total = $datas->total();
+    
+            $response = [
+                'data' => $ReqCollege,
+                'current_page' => $currentPage,
+                'last_page' => $lastPage,
+                'total' => $total
+            ];
+            return $response; // Return the paginated response for admins
+        }else{
+           // If the user is not an admin, return the non-paginated college data
+           return $ReqCollege;  // Return all colleges with their calculated data
+        }
+    
     }
 
     public function logAPICalls(string $methodName, string $userId, array $param, array $resp)

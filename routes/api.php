@@ -98,6 +98,26 @@ Route::controller(RequirementController::class)->group(function () {
     Route::post('requirement/delete', 'deleteRequirement');
 });
 
+Route::controller(RequestController::class)->group(function () {
+    Route::post('request', 'getRequest');
+    Route::post('request/create', 'createRequest');
+    Route::post('request/reject', 'rejectRequest');
+    Route::post('request/accept', 'getAcceptRequest');
+    Route::post('requirement-information', 'getRequestInformation');
+});
+
+Route::controller(DashboardController::class)->group(function () {
+    Route::post('dashboard/admin', 'getAdminDashboard');
+    Route::post('dashboard/dean', 'getDeanDashboard');
+    Route::post('dashboard/program-chair', 'getProgramDashboard');
+    Route::post('dashboard/head', 'getHeadDashboard');
+
+    Route::post('document-request-dashboard', 'getDocumentRequestDashboard');
+    Route::post('compliance-dashboard', 'getComplianceDashboard');
+    Route::post('recent-upload-dashboard', 'getRecentUploadDashboard');
+});
+
+
 Route::controller(FileRequirementController::class)->group(function () {
 
     Route::post('all-files', 'getAllfile'); // ADMIN AND STAFF ONLY
@@ -124,24 +144,8 @@ Route::controller(ConversationController::class)->group(function () {
     Route::post('getConvesation', 'getConvesation');
 });
 
-Route::controller(RequestController::class)->group(function () {
-    Route::post('request', 'getRequest');
-    Route::post('request/reject', 'rejectRequest');
-    Route::post('request/create', 'storeRequest');
-    Route::post('request/accept', 'getAcceptRequest');
-    Route::post('requirement-information', 'getRequestInformation');
-});
 
-Route::controller(DashboardController::class)->group(function () {
-    Route::post('admin-dashboard', 'getAdminDashboard');
-    Route::post('dean-dashboard', 'getDeanDashboard');
-    Route::post('program-dashboard', 'getProgramDashboard');
-    Route::post('head-dashboard', 'getHeadDashboard');
 
-    Route::post('document-request-dashboard', 'getDocumentRequestDashboard');
-    Route::post('compliance-dashboard', 'getComplianceDashboard');
-    Route::post('recent-upload-dashboard', 'getRecentUploadDashboard');
-});
 
 Route::controller(ReportController::class)->group(function () {
 
