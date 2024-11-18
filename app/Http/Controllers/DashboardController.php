@@ -12,6 +12,7 @@ use App\Models\RequirementFile;
 use App\Models\Event;
 use App\Models\Apilog;
 use Throwable;
+use Carbon\Carbon;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -161,70 +162,99 @@ class DashboardController extends Controller
             ]);
 
             $account = Account::where('id',$validated['account_id'])->get();
-            $role = $account->first()->role;
-
-            if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
+            $role = $account->first()->role; // Get the role of the account
+            $oneWeekAgo = Carbon::now()->subWeek(); // Get the date and time one week ago from the current date
+           
+            // Check if the user has one of the following roles: Admin, Staff
+            if($role == "Admin" || $role == "Staff" ){
                 $requirement= [];
 
-            $datas = UserRequest::where('is_archived', 0)
+            $datas = UserRequest::where('is_archived', 0)   // Fetch the latest 3 non-archived user requests
                         ->orderBy('created_at', 'desc')
+                        ->take(3)
                         ->get();
+                    
+                    if($datas->isNotEmpty()){
 
                         foreach ($datas as $data) {
+                            $createdDate = Carbon::parse($data->created_at);  // Parse the created_at date
                             $org_log_data = OrganizationalLog::where('id', $data->org_log_id)->first();
-                        
+
                             $requirement[] = [
                                 'id' => $data->id,
                                 'request_no' => $data->request_no,
                                 'org_log_id' => $data->org_log_id,
                                 'org_log_name' => $org_log_data ? $org_log_data->name : null, // Check if org_log_data exists
-                                'requested_date' => $data->requested_date
+                                'requested_date' => $data->requested_date,
+                                'new' => $createdDate->lessThan($oneWeekAgo) ? false : true
                             ];
                         }
+
+                    }else{
+                        $requirement  = [];
+                    }
+                        
                 
 
-            }elseif($role == "Dean" || $role == "3"){
+            }elseif($role == "Dean"){
 
-                        $data = UserRequest::where('college_entity_id',$account->first()->org_log_id)
+                           // Fetch the latest 3 non-archived user requests related to the dean's college or org log
+                            $datas = UserRequest::where('college_entity_id',$account->first()->org_log_id)
                                             ->orWhere('org_log_id',$account->first()->org_log_id)
+                                            ->where('is_archived',0)
                                             ->orderBy('created_at', 'desc')
+                                            ->take(3)
                                             ->get();
 
                         
-                            if($data->isNotEmpty()){
-                                  $org_log_data  = OrganizationalLog::where('id',$data->first()->org_log_id)->first();
-                                  $requirement  = [
-    
-                                    'id' =>   $data->first()->id ,
-                                    'request_no' => $data->first()->request_no,
-                                    'org_log_id' => $data->first()->org_log_id ,
-                                    'org_log_name' =>$org_log_data->name,
-                                    'requested_date' => $data->first()->requested_date
-                                    
-                                ];
+                            if($datas->isNotEmpty()){
+
+                                 foreach($datas as $data){
+                                    $createdDate = Carbon::parse($data->created_at);
+                                    $org_log_data  = OrganizationalLog::where('id',$data->org_log_id)->first();
+                                    $requirement[]  = [
+      
+                                      'id' =>   $data->id ,
+                                      'request_no' => $data->request_no,
+                                      'org_log_id' => $data->org_log_id ,
+                                      'org_log_name' =>$org_log_data->name,
+                                      'new' => $createdDate->lessThan($oneWeekAgo) ? false : true
+                                      
+                                  ];
+
+                                 }
+                                 
                             }else{
+                                // If no data is found, set $requirement to an empty array
                                 $requirement  = [];
                             }
 
                            
         
-            }else{
-
-                $data = UserRequest::where('org_log_id',$account->first()->org_log_id)
-                                            ->where('status','A')
+            }else{  // For other roles (program-chair, head)
+              
+                $datas = UserRequest::where('org_log_id',$account->first()->org_log_id)
+                                            ->where('is_archived',0)
                                             ->orderBy('created_at', 'desc')
+                                            ->take(3)
                                             ->get();
 
-                if($data->isNotEmpty()) {
+                if($datas->isNotEmpty()) {
 
-                    $requirement  = [
+                    foreach($datas as $data){
+                        $createdDate = Carbon::parse($data->created_at);
+                        $requirement[] = [
 
-                        'id' => $data->first()->id,
-                        'request_no' => $data->first()->request_no,
-                        'purpose' => $data->first()->purpose,
-                        'requested_date' =>  $data->first()->requested_date 
-                    ];
+                            'id' => $data->first()->id,
+                            'request_no' => $data->first()->request_no,
+                            'purpose' => $data->first()->purpose,
+                            'new' => $createdDate->lessThan($oneWeekAgo) ? false : true
+
+                        ];
+                    }
+
                 }else{
+                    // If no data is found, set $requirement to an empty array
                     $requirement = [];
                 }
                 
@@ -232,7 +262,7 @@ class DashboardController extends Controller
 
             $response = [
                 'isSuccess' => true,
-                'document_request' => $requirement
+                'document_requests' => $requirement
             ];  
 
             $this->logAPICalls('getDocumentRequestDashboard', "", $request->all(), $response);
@@ -245,7 +275,7 @@ class DashboardController extends Controller
                 'message' => "Please contact support.",
                 'error' => $e->getMessage()
             ];
-         //   $this->logAPICalls('getDocumentRequest', "", $request->all(), $response);
+            $this->logAPICalls('getDocumentRequest', "", $request->all(), $response);
             return response()->json($response, 500);
 
         }
@@ -263,35 +293,43 @@ class DashboardController extends Controller
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     public function getRecentUploadDashboard(Request $request){
 
+      try{
+
         $validated = $request->validate([
             'account_id' => ['required','exists:accounts,id']
         ]);
 
         $file = [];
+
+        // Retrieve the account associated with the validated 'account_id'
         $account = Account::find($validated['account_id']);
         $role = $account->role;
+        $oneWeekAgo = Carbon::now()->subWeek();  // Get the date one week ago from the current date and time
 
-        if($role == "Admin" || $role == "1" || $role == "Staff" || $role == "2"){
+        // Check the role of the user and retrieve the corresponding files based on role
+        if($role == "Admin" || $role == "Staff" ){
 
             $datas = RequirementFile::orderBy('created_at', 'desc')
-                                            ->where('path','!=',null)
-                                            ->where('status',"A")
+                                            ->where('filename', 'like', '%.%') // Filter files with an extension
+                                            ->where('is_archived',0)
                                             ->orderBy('created_at', 'desc')
                                             ->get();
 
-        }elseif($role == "Dean" || $role == "3"){
-
+        }elseif($role == "Dean" ){
+             
             $datas = RequirementFile::where('college_entity_id',$account->org_log_id)
                                         ->orWhere('org_log_id',$account->org_log_id)
-                                        ->where('status',"A")
+                                        ->where('filename', 'like', '%.%') // Filter files with an extension
+                                        ->where('is_archived',0)
                                         ->orderBy('created_at', 'desc')
                                         ->get();
 
 
         }else{
-
+             // For other roles (program chair and head)
             $datas = RequirementFile::where('org_log_id',$account->org_log_id)
-                                        ->where('status',"A")
+                                        ->where('is_archived',0)
+                                        ->where('filename', 'like', '%.%')  // Filter files with an extension
                                         ->orderBy('created_at', 'desc')
                                         ->get();
 
@@ -301,13 +339,24 @@ class DashboardController extends Controller
 
             foreach($datas as $data){
                 $org = OrganizationalLog::find( $data->org_log_id);
+                $createdDate = Carbon::parse($data->created_at);
+
+                    // Check if the file exists in the storage
                 if(is_file(storage_path('app/public/'.$data->path))){
+                    if($role != 'Admin' && $role != 'Staff' && $role != 'Dean' ){
+                        $filename = $data->filename;
+                    }else{
+                        $orgname= $org ?  $org ->name : "Inactive";
+                        $filename =   $orgname.'_'.$data->filename;
+                    }
+                   
                     $file[] = [
                         'id' => $data->id,
-                        'filename' =>  $data->filename,
+                        'filename' => $filename ,
                         'path' => $data->path,
                         'org_log_id' => $data->org_log_id,
-                        'org_log_name' =>  $org ?  $org ->name : "Inactive"
+                        'org_log_name' =>  $org ?  $org ->name : "Inactive",  // If org exists, use its name; otherwise, mark it as "Inactive"
+                        'new' => $createdDate->lessThan($oneWeekAgo) ? false : true
                     ];
                 }
             }
@@ -316,109 +365,66 @@ class DashboardController extends Controller
 
         $response = [
             'isSuccess' => true,
-            'document_request' => $file
+            'recent_uploads' => $file
         ];
 
+        $this->logAPICalls('getRecentUploadDashboard', "", $request->all(), $response);
         return response()->json($response);
+
+      }catch(Throwable $e){
+            $response = [
+                'isSuccess' => false,
+                'message' => "Please contact support.",
+                'error' => $e->getMessage()
+            ];
+
+            $this->logAPICalls('getRecentUploadDashboard', "", $request->all(), $response);
+            return response()->json($response, 500);
+      }
 
     }
 
-
-    // DONE //
-    public function getComplianceDasboard(Request $request){
+    // Hindi pa po tapos itong compliance sir, wait ko lang po si sir paulo. 
+    public function getComplianceDashboard(Request $request){
        try{
 
-            $requirement = [];
+            $events = [];
             $validated = $request->validate([
                 'account_id' => ['required','exists:accounts,id']
             ]);
 
             $account = Account::where('id',$validated['account_id'])->get();
             $role = $account->first()->role;
+            $oneWeekAgo = Carbon::now()->subWeek();  // Get the date one week ago from the current date and time
+           
+           // Check if the user's role is not 'Admin and Staff'. This will apply to non-admin users.
+            if($role != "Admin" && $role != 'Staff'){
 
-            if($role == "Dean" || $role == "3"){
+                // Retrieve the latest 3 events related to the user's organization (non-archived events)
+                // This will only return events where the org_log_id matches the account's organization ID
+                // The events will be ordered by the creation date in descending order, showing the latest events first
+                 $datas = Event::where('org_log_id',$account->first()->org_log_id)
+                                ->where('is_archived',0)
+                                ->take(3)
+                                ->orderBy('created_at', 'desc')
+                                ->get();
 
-            
-                $datas = Event::where('college_entity_id', $account->first()->org_log_id)
-                                    ->where('status', 'A')
-                                    ->orderBy('created_at', 'desc')
-                                    ->get();
-                
-                $datasCollection = collect($datas);
-                
-                $get_programs_id =  Program::where('college_entity_id',$account->first()->org_log_id)
-                                            ->where('status','A')
-                                            ->get();
-
-
-                foreach($get_programs_id as $program_id){
-
-                    $exists = Requirement::where('org_log_id', $program_id->id)
-                                          ->orWhere('org_log_id',$account->first()->org_log_id)->get();
-
-                        if($exists->isNotEmpty()){
-
-                            if (!$datasCollection->contains('id',$exists->first()->event_id)) {
-
-                                $data = Event::find($exists->first()->event_id);
-
-                                // $newEvent = {
-                                //     'id' =>  $data->id,
-                                //     "name": "Event 7",
-                                //     "org_log_id": "65",
-                                //     "college_entity_id": "11",
-                                //     "description": "Description 7",
-                                //     "academic_year": "2024-2025",
-                                //     "submission_date": "November 22 2024",
-                                //     "approval_status": null,
-                                //     "status": "A",
-                                //     "created_at": "2024-10-21T03:06:37.000000Z",
-                                //     "updated_at": "2024-10-21T03:06:37.000000Z"
-                                // };
-
-                                // If the id does not exist, add the new event to the collection
-                              //  $datasCollection->push($newEvent);
-                            }
-                        }
+                foreach($datas as $data){
+                    $createdDate = Carbon::parse($data->created_at);   // Parse the event's 'created_at' timestamp to a Carbon instance
+                    $event_name_concat_submissionDate = $data->name.'-'.$data->submission_date;   // Concatenate event name and submission date (e.g., "Event Name - 2024-11-01")
+                    $events[] = [
+                        'event_name' =>  $event_name_concat_submissionDate,
+                        'new' => $createdDate->lessThan($oneWeekAgo) ? false : true
+                    ];
                 }
-
-                return  $datasCollection->all();
-
-
-
-
-                $requirement = []; // Initialize as an array
-
-                foreach ($datas as $data) {
-                    $program = OrganizationalLog::where('id',$data->org_log_id)->get();
-
-                    if ($program) { // Ensure program exists
-                        $requirement[] = [ // Append to the array
-                            'college_id' => $account->first()->org_log_id,
-                            'program_name' => $program->first()->name,
-                            'submission_date' => $data->first()->submission_date
-                        ];
-                    }
-                    
-                }
-
-                return response()->json($requirement);
-
-            }else{
-
-
-                $requirement = Event::where('org_log_id',$account->first()->org_log_id)
-                                            ->where('status','A')
-                                            ->orderBy('created_at', 'desc')
-                                            ->get();
-
             }
 
             $response = [
                 'isSuccess' => true,
-                'document_request' =>$requirement 
+                'compliances' =>$events 
             ];
 
+            $this->logAPICalls('getComplianceDashboard', "", $request->all(), $response);
             return response()->json($response);
 
        }catch(Throwable $e){
@@ -429,12 +435,12 @@ class DashboardController extends Controller
                 'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
 
+            $this->logAPICalls('getComplianceDashboard', "", $request->all(), $response);
             return response()->json($response);
 
 
        }
     }
-
 
     private function percentOffice($currentPage,$isPaginate){
 
