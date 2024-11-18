@@ -27,8 +27,8 @@ class EmailController extends Controller
 
         $firstDueDate = Carbon::now()->addDays(30)->format('F j, Y');
         $secondDueDate = Carbon::now()->addDays(15)->format('F j, Y');
-        $finalDueDate = Carbon::now()->addDays(7)->format('F j, Y');
-        $superFinalDueDate = Carbon::now()->addDays(1)->format('F j, Y');
+        $thirdDueDate = Carbon::now()->addDays(7)->format('F j, Y');
+        $finalDueDate = Carbon::now()->addDays(1)->format('F j, Y');
 
         // Use cache to track how many times an email has been sent
         $emailKey = 'email_sent_count_' . $email;
@@ -79,7 +79,7 @@ class EmailController extends Controller
                 <body>
                     <p>Good Day!</p>
                     <p>This is the final reminder to submit the required documents for the Data Bank Management System.</p>
-                    <p>Please ensure submission of the files by <strong>{$finalDueDate}</strong>.</p>
+                    <p>Please ensure submission of the files by <strong>{$thirdDueDate}</strong>.</p>
                     <p>We do appreciate your effort in participating in the initiatives of the Research, Extension, and Innovation Office in modernizing and improving the process of data transmitting and managing.</p>
                     <p><a href='https://dmo-server-dev.bulsutech.com/'>Click here</a> to access the Data Bank Management System.</p>
                     <p>Thank you!</p>
@@ -94,14 +94,14 @@ class EmailController extends Controller
                 <body>
                     <p>Good Day!</p>
                     <p>This is the super final reminder to submit the required documents for the Data Bank Management System.</p>
-                    <p>Please ensure submission of the files by <strong>{$superFinalDueDate}</strong>.</p>
+                    <p>Please ensure submission of the files by <strong>{$finalDueDate}</strong>.</p>
                     <p>We do appreciate your effort in participating in the initiatives of the Research, Extension, and Innovation Office in modernizing and improving the process of data transmitting and managing.</p>
                     <p><a href='https://dmo-server-dev.bulsutech.com/'>Click here</a> to access the Data Bank Management System.</p>
                     <p>Thank you!</p>
                 </body>
                 </html>
             ";
-                $subject = 'Super Final Notification for Data Bank Management System';
+                $subject = 'Final Notification for Data Bank Management System';
             }
 
             // Send the email with the generated HTML content
