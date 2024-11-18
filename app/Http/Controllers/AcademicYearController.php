@@ -143,7 +143,7 @@ class AcademicYearController extends Controller
             ]);
 
             // Initialize the base query
-            $query = AcademicYear::select('id', 'Academic_year', 'start_date', 'end_date', 'status')
+            $query = AcademicYear::select('id', 'academic_year', 'start_date', 'end_date', 'status')
                 ->whereIn('status', ['A', 'I'])
                 ->orderBy('start_date', 'desc');
 
@@ -158,7 +158,7 @@ class AcademicYearController extends Controller
                 }
 
                 $query->where(function ($query) use ($searchTerm, $searchDate) {
-                    $query->where('Academic_year', 'like', "%{$searchTerm}%")
+                    $query->where('academic_year', 'like', "%{$searchTerm}%")
                         ->orWhereDate('start_date', $searchDate)
                         ->orWhereDate('end_date', $searchDate);
                 });

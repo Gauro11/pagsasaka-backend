@@ -26,7 +26,7 @@ use App\Http\Controllers\HistoryDocumentController;
 
 
 
-Route::post('role/create', [RoleController::class, 'addRole']);
+
 Route::get('dropdown-roles', [RoleController::class, 'getRoles']);
 
 
