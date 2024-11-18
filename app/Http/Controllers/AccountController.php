@@ -48,7 +48,7 @@ class AccountController extends Controller
             $response = [
                 'isSuccess' => true,
                 'message' => 'UserAccount successfully created.',
-                'Account' => $Account
+                'account' => $Account
             ];
 
             $this->logAPICalls('createAccount', "", $request->all(), [$response]);
