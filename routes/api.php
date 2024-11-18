@@ -30,7 +30,7 @@ Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 Route::post('academic-year/create', [AcademicYearController::class, 'addAcademicYear']);
 Route::post('academic-year/deactivate/{id}', [AcademicYearController::class, 'deactivateAcademicYear']);
-Route::post('/getacademic-years', [AcademicYearController::class, 'getAcademicYear']);
+Route::post('academic-years', [AcademicYearController::class, 'getAcademicYear']);
 
 
 //connection//
@@ -54,7 +54,7 @@ Route::post('password/reset', [AccountController::class, 'resetPasswordToDefault
 
 //create acc///
 Route::controller(AccountController::class)->group(function () {
-    Route::post('accounts/get', 'getAccounts');
+    Route::post('accounts', 'getAccounts');
     Route::post('account/create', 'createAccount');
     Route::post('account/update/{id}', 'updateAccount');
     Route::post('account/deactivate/{id}', 'deactivateAccount');

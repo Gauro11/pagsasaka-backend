@@ -254,7 +254,7 @@ class AccountController extends Controller
             // Prepare the response with only required pagination metadata
             $response = [
                 'isSuccess' => true,
-                'Accounts' => [
+                'accounts' => [
                     'data' => $data->items(),
                     'current_page' => $data->currentPage(),
                     'per_page' => $data->perPage(),
