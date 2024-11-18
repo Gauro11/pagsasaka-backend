@@ -67,7 +67,7 @@ class AcademicYearController extends Controller
             $response = [
                 'isSuccess' => true,
                 'message' => 'Academic Year successfully added.',
-                'academicYear' => $academicYear,
+                'academic_year' => $academicYear,
             ];
     
             $this->logAPICalls('addAcademicYear', "", $request->all(), $response);
@@ -179,7 +179,7 @@ class AcademicYearController extends Controller
             $response = [
                 'isSuccess' => true,
                 'message' => 'Active Academic year retrieved successfully.',
-                'AcademicYear' => [
+                'academic_years' => [
                     'data' => $data->items(),
                     'current_page' => $data->currentPage(),
                     'per_page' => $data->perPage(),
@@ -193,7 +193,7 @@ class AcademicYearController extends Controller
         } catch (\Exception $e) {
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to retrieve AcademicYear records.',
+                'message' => 'Failed to retrieve Academic Year records.',
                 'error' => $e->getMessage(),
             ];
             $this->logAPICalls('getAcademicYear', "", $request->all(), $response);
