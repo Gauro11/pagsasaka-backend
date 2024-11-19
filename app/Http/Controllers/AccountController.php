@@ -19,50 +19,73 @@ class AccountController extends Controller
 
     // Create a new user account.
     public function createAccount(Request $request)
-    {
-        try {
-            $validator = Account::validateAccount($request->all());
+{
+    try {
+        // Validate input
+        $validator = Account::validateAccount($request->all());
 
-            if ($validator->fails()) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors()
-                ];
-                $this->logAPICalls('createAccount', "", $request->all(), $response);
-                return response()->json($response, 500);
-            }
-
-            $Account = Account::create([
-
-                'first_name' => $request->first_name,
-                'last_name' => $request->last_name,
-                'middle_name' => $request->middle_name,
-                'email' => $request->email,
-                'role' => $request->role,
-                'org_log_id' => $request->org_log_id,
-                'password' => Hash::make($request->password ?? '123456789'),
-
-            ]);
-
-            $response = [
-                'isSuccess' => true,
-                'message' => 'UserAccount successfully created.',
-                'account' => $Account
-            ];
-
-            $this->logAPICalls('createAccount', "", $request->all(), [$response]);
-            return response()->json($response, 201);
-        } catch (Throwable $e) {
+        if ($validator->fails()) {
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to create the Account.',
-                'error' => $e->getMessage()
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors()
             ];
             $this->logAPICalls('createAccount', "", $request->all(), $response);
             return response()->json($response, 500);
         }
+
+        // Ensure the role exists based on ID
+        $role = Role::find($request->role);
+        if (!$role) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Invalid role ID provided.',
+            ];
+            $this->logAPICalls('createAccount', "", $request->all(), $response);
+            return response()->json($response, 404);
+        }
+
+        // Create account with the valid role
+        $Account = Account::create([
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
+            'middle_name' => $request->middle_name,
+            'email' => $request->email,
+            'role' => $role->name, // Set the role name from the Role model
+            'org_log_id' => $request->org_log_id,
+            'password' => Hash::make($request->password ?? '123456789'),
+        ]);
+
+        $response = [
+            'isSuccess' => true,
+            'message' => 'UserAccount successfully created.',
+            'account' => [
+                'id' => $Account->id,
+                'first_name' => $Account->first_name,
+                'last_name' => $Account->last_name,
+                'middle_name' => $Account->middle_name,
+                'email' => $Account->email,
+                'role_id' => $request->role, // Role ID from the request
+                'role' => $role->name, // Role name from the Role model
+                'org_log_id' => $Account->org_log_id,
+                'created_at' => $Account->created_at,
+                'updated_at' => $Account->updated_at
+            ]
+        ];
+
+        $this->logAPICalls('createAccount', "", $request->all(), [$response]);
+        return response()->json($response, 201);
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => 'Failed to create the Account.',
+            'error' => $e->getMessage()
+        ];
+        $this->logAPICalls('createAccount', "", $request->all(), $response);
+        return response()->json($response, 500);
     }
+}
+
 
     // Update an existing user account.
     public function updateAccount(Request $request, $id)

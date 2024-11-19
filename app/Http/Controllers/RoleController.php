@@ -12,8 +12,11 @@ class RoleController extends Controller
     public function getRoles()
     {
         try {
-            $role = Role::select('id', 'name')->get();
-
+            // Fetch roles excluding "Admin"
+            $role = Role::select('id', 'name')
+                ->where('name', '!=', 'Admin')
+                ->get();
+    
             $response = [
                 'isSuccess' => true,
                 'data' => $role
@@ -22,10 +25,11 @@ class RoleController extends Controller
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to fetch organization logs.',
+                'message' => 'Failed to fetch roles.',
                 'error' => $e->getMessage()
             ];
             return response()->json($response, 500);
         }
     }
+    
 }

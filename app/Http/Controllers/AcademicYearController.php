@@ -141,12 +141,13 @@ class AcademicYearController extends Controller
             $validated = $request->validate([
                 'paginate' => 'required',
             ]);
-
+    
             // Initialize the base query
             $query = AcademicYear::select('id', 'academic_year', 'start_date', 'end_date', 'status')
-                ->whereIn('status', ['A', 'I'])
+                ->whereIn('status', ['A', 'I']) // Include only active and inactive statuses
+                ->where('is_archived', 0) // Exclude archived records
                 ->orderBy('start_date', 'desc');
-
+    
             // Apply search term if present
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
@@ -156,25 +157,25 @@ class AcademicYearController extends Controller
                 } catch (\Exception $e) {
                     $searchDate = null;
                 }
-
+    
                 $query->where(function ($query) use ($searchTerm, $searchDate) {
                     $query->where('academic_year', 'like', "%{$searchTerm}%")
                         ->orWhereDate('start_date', $searchDate)
                         ->orWhereDate('end_date', $searchDate);
                 });
             }
-
+    
             // Paginated data retrieval
             $perPage = $request->input('per_page', 10);
             $data = $query->paginate($perPage);
-
+    
             // Format the dates for the paginated response
             $data->getCollection()->transform(function ($item) {
                 $item->start_date = Carbon::parse($item->start_date)->format('F j, Y');
                 $item->end_date = Carbon::parse($item->end_date)->format('F j, Y');
                 return $item;
             });
-
+    
             // Prepare the response with only required pagination metadata
             $response = [
                 'isSuccess' => true,
@@ -187,7 +188,7 @@ class AcademicYearController extends Controller
                     'last_page' => $data->lastPage(),
                 ]
             ];
-
+    
             $this->logAPICalls('getAcademicYear', "", $request->all(), $response);
             return response()->json($response, 200);
         } catch (\Exception $e) {
@@ -200,6 +201,7 @@ class AcademicYearController extends Controller
             return response()->json($response, 500);
         }
     }
+    
 
 
     public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)
