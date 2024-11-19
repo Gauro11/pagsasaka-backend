@@ -14,9 +14,10 @@ use App\Models\HistoryDocument;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\File;
 use ZipArchive;
 use Throwable; 
-use File;
+
 use Carbon\Carbon;  
 
 class FileRequirementController extends Controller
@@ -361,7 +362,7 @@ public function getAllfile(Request $request)
             ];
 
             $this->logAPICalls('getEditFile', "", $request->all(), [$response]);
-            return response($respone,200);
+            return response()->json($response,200);
 
         }catch(Throwable $e){
 
@@ -616,15 +617,23 @@ public function getAllfile(Request $request)
                 $data->first()->update([
                     'upload_status' => "completed"
                 ]);
-                return response()->json([
+
+                $response = [
+                    'isSuccess' => true,
                     'message' => 'Files uploaded successfully',
                     'data' => $uploadedFiles
-                ]);
+                ];
+
+                return response()->json($response,200);
 
            }
-            
+            $response= [
+                'isSuccess' =>true,
+                'message' => 'No file uploaded'
+
+            ];
             $this->logAPICalls('createFileRequirement', "", $request->all(), [$response]);
-            return response()->json(['message' => 'No file uploaded'], 400);
+            return response()->json($response, 500);
 
            }catch(Throwable $e){
 
@@ -645,10 +654,11 @@ public function getAllfile(Request $request)
 
         try{
 
-            $validate = $request->validate([
+            $validated = $request->validate([
                 'foldername' =>  'required',
             ]);
-    
+            
+         
             if(!empty($request->folder_id)){
     
                 // CREATE FOLDER UNDER FOLDER" //
@@ -659,14 +669,14 @@ public function getAllfile(Request $request)
     
                 if($data){
     
-                    if( !RequirementFile::where('filename', $validate['foldername'])
+                    if( !RequirementFile::where('filename', $validated['foldername'])
                                 ->where('folder_id',$request->folder_id)
                                 ->exists()){
     
                             $data = RequirementFile::create([
     
                             'requirement_id' => "",
-                            'filename' => $validate['foldername'],
+                            'filename' => $validated['foldername'],
                             'org_log_id' => $data->first()->org_log_id,
                             'college_entity_id' => $college_id,
                             'folder_id' => $request->folder_id
@@ -678,14 +688,15 @@ public function getAllfile(Request $request)
                                 'data' => $data
                             ];
                             $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
-                            return response()->json($response);
+                            return response()->json($response,200);
                     }
-    
-                    $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
+                    
                     $response = [
                         'isSuccess'=> false,
                         'message'=> 'The folder you are trying to register already exists. Please verify your input and try again.'
                     ];
+                    $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
+
         
     
                 }else{
@@ -708,37 +719,39 @@ public function getAllfile(Request $request)
     
                 ]);
     
-                $org_log = Requirement::where('id',$validated['requirement_id'])->get();
-                $program = Program::where('program_entity_id',$data->first()->org_log_id)->get();
-                $college_id = !$program->isEmpty() ?   $program->first()->college_entity_id : "";
+                $requirement = Requirement::find($validated['requirement_id']);
+                $program = Program::where('program_entity_id',$requirement->org_log_id)->first();
+                $college_id = !empty($program) ?   $program->college_entity_id : "";
     
-                if( !RequirementFile::where('filename', $validate['foldername'])
-                                        ->where('requirement_id',$request->requirement_id)
+                if( !RequirementFile::where('filename', $validated['foldername'])
+                                        ->where('requirement_id', $validated['requirement_id'])
                                         ->exists()){
     
                     $data = RequirementFile::create([
     
                             'requirement_id' => $request->requirement_id,
-                            'filename' => $validate['foldername'],
-                            'org_log_id' =>  $org_log->first()->org_log_id,
+                            'filename' => $validated['foldername'],
+                            'org_log_id' =>  $requirement->org_log_id,
                             'college_entity_id' => $college_id
             
                     ]);
-    
-                    return response()->json([
+                    
+                    $response =[
+                        'isSuccess' => true,
                         'message' => 'Successfully created',
                         'data' => $data
-                    ]);
+
+                    ];
+                    return response()->json($response,200);
                 }
-    
-                $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
+                
                 $response = [
-                    'isSuccess'=> false,
+                    'isSuccess' => false,
                     'message'=> 'The folder you are trying to register already exists. Please verify your input and try again.'
+
                 ];
-    
                 $this->logAPICalls('createFolderRequirement', "", $request->all(), [$response]);
-                return response()->json($response, 422);
+                return response()->json($response, 500);
     
             }
     
@@ -855,7 +868,7 @@ public function getAllfile(Request $request)
                     return response()->json(['error' => 'Failed to create the ZIP file.'], 500);
                 }
 
-            } catch (Exception $e) {
+            } catch (Throwable $e) {
                 
                      $response = [
                         'isSuccess' => false,
@@ -1024,7 +1037,7 @@ public function getAllfile(Request $request)
         $this->logAPICalls('createDMOFiles', "", $request->all(), [$response]);
         return response()->json(['message' => 'No file uploaded'], 400);
 
-       }catch(Exception $e){
+       }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
@@ -1043,12 +1056,12 @@ public function getAllfile(Request $request)
 
         try{
 
-            $validate= $request->validate([
+            $validated= $request->validate([
                 'foldername' =>  'required|min:3',
                 'account_id' => 'required|exists:accounts,id'
             ]);
 
-            $account = Account::find( $validate['account_id']);
+            $account = Account::find( $validated['account_id']);
             $organization = Program::where('program_entity_id',$account->org_log_id)->first();
             $college_id = ($organization) ?  $organization->college_entity_id:"";
             
@@ -1060,21 +1073,21 @@ public function getAllfile(Request $request)
     
                 if($data){
     
-                    if( !RequirementFile::where('filename', $validate['foldername'])
+                    if( !RequirementFile::where('filename', $validated['foldername'])
                                 ->where('folder_id',$request->folder_id)
                                 ->exists()){
-                          
-                             if (!Storage::disk('public')->exists($data->first()->filename.'/'.$validate['foldername'])) {
-                                 Storage::disk('public')->makeDirectory($data->first()->filename.'/'.$validate['foldername']);
-                                 $path = Storage::disk('public')->path($data->first()->filename.'/'.$validate['foldername']);
+                                
+                             if (!Storage::disk('public')->exists($data->first()->filename.'/'.$validated['foldername'])) {
+                                 Storage::disk('public')->makeDirectory($data->first()->filename.'/'.$validated['foldername']);
+                                 $path = Storage::disk('public')->path($data->first()->filename.'/'.$validated['foldername']);
                                  $stat = stat($path);
                              }
                              
-                            $path = $path = $data->first()->filename.'/'.$validate['foldername'];
+                            $path = $path = $data->first()->filename.'/'.$validated['foldername'];
                             $data = RequirementFile::create([
     
                             'requirement_id' => "DMO File",
-                            'filename' => $validate['foldername'],
+                            'filename' => $validated['foldername'],
                             'org_log_id' => $account->org_log_id,
                             'college_entity_id' => $college_id,
                             'path' => $path,
@@ -1083,11 +1096,11 @@ public function getAllfile(Request $request)
     
                             ]);
 
-                              // The records of the user who renamed the file will be saved here. //
+                        // The records of the user who created the folder will be saved here. //
                         
                          $file = RequirementFile::where('path',$path)->first();
 
-                            $user = Account::find($validate['account_id']);
+                            $user = Account::find($validated['account_id']);
 
                             if($user){
 
@@ -1133,15 +1146,15 @@ public function getAllfile(Request $request)
     
             }else{
                 $stat = null;
-               // CREATE FOLDER UNDER REQUIREMENT //
-                if( !RequirementFile::where('filename', $validate['foldername'])->exists()){
+         
+                if( !RequirementFile::where('filename', $validated['foldername'])->exists()){
                     
-                    if (!Storage::disk('public')->exists($validate['foldername'])) {
+                    if (!Storage::disk('public')->exists($validated['foldername'])) {
                         // Gumawa ng directory
-                        Storage::disk('public')->makeDirectory($validate['foldername']);
+                        Storage::disk('public')->makeDirectory($validated['foldername']);
                         
                         // get inode of new directory directory
-                        $path = Storage::disk('public')->path($validate['foldername']);
+                        $path = Storage::disk('public')->path($validated['foldername']);
                         $stat = stat($path);
                     
                     }
@@ -1149,19 +1162,19 @@ public function getAllfile(Request $request)
                     $data = RequirementFile::create([
     
                             'requirement_id' => "DMO File",
-                            'filename' => $validate['foldername'],
+                            'filename' => $validated['foldername'],
                             'org_log_id' => $account->org_log_id,
-                            'path' => $validate['foldername'],
+                            'path' => $validated['foldername'],
                             'college_entity_id' =>$college_id,
                             'ino' => $stat['ino']
 
                     ]);
                     
                       // The records of the user who renamed the file will be saved here. //
-                      $path = $validate['foldername'];
+                      $path = $validated['foldername'];
                       $file = RequirementFile::where('path',$path)->first();
 
-                      $user = Account::find($validate['account_id']);
+                      $user = Account::find($validated['account_id']);
   
                       if($user){
   
@@ -1191,7 +1204,7 @@ public function getAllfile(Request $request)
     
             }
     
-        }catch(Exception $e){
+        }catch(Throwable $e){
 
             $response = [
                 'isSuccess' => false,
@@ -1239,7 +1252,7 @@ public function getAllfile(Request $request)
             $this->logAPICalls('deleteFile', "", $request->all(), [$response]);
             return response($response,200);
 
-        }catch(Exception $e){
+        }catch(Throwable $e){
             $response = [
                 'isSuccess' => false,
                 'message' => "Please contact support.",

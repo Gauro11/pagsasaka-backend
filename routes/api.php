@@ -121,9 +121,10 @@ Route::controller(DashboardController::class)->group(function () {
     Route::post('dashboard/program-chair', 'getProgramDashboard');
     Route::post('dashboard/head', 'getHeadDashboard');
 
-    Route::post('document-request-dashboard', 'getDocumentRequestDashboard');
-    Route::post('compliance-dashboard', 'getComplianceDashboard');
-    Route::post('recent-upload-dashboard', 'getRecentUploadDashboard');
+    Route::post('dashboard/document-request', 'getDocumentRequestDashboard');
+    Route::post('dashboard/recent-upload', 'getRecentUploadDashboard');
+    Route::post('dashboard/compliance', 'getComplianceDashboard');
+ 
 });
 
 
