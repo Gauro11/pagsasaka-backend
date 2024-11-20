@@ -39,6 +39,7 @@ Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 Route::post('academic-year/create', [AcademicYearController::class, 'addAcademicYear']);
 Route::post('academic-year/deactivate/{id}', [AcademicYearController::class, 'deactivateAcademicYear']);
+Route::post('academic-years/update-status', [AcademicYearController::class, 'updateAcademicYearStatus']);
 Route::post('academic-years', [AcademicYearController::class, 'getAcademicYear']);
 
 
@@ -52,7 +53,7 @@ Route::options('/{any}', function (Request $request) {
 Route::controller(AuthController::class)->group(function () {
     Route::post('login',  'login');
     Route::post('session',  'insertSession');
-    Route::post('change-password/{id}',  'changePassword');
+    Route::post('update-profile/{id}',  'profileUpdate');
 });
 
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
