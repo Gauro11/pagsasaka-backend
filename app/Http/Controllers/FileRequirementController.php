@@ -37,7 +37,7 @@ public function getAllfile(Request $request)
 
         // Initialize the query
         $query = RequirementFile::where('folder_id', null)
-                                ->where('status','A')->orderBy('created_at', 'desc');
+                                ->where('is_archived',0)->orderBy('created_at', 'desc');
 
         // Apply search filter if provided
         if ($request->filled('search')) {
@@ -81,13 +81,14 @@ public function getAllfile(Request $request)
         // Prepare the response with pagination information
         $response = [
             'isSuccess' => true,
-            'AllFiles' => $allfiles,
-            'pagination' => [
+            'all_files' => [
+                'data' =>  $allfiles,
                 'currentPage' => $datas->currentPage(),
                 'lastPage' => $datas->lastPage(),
                 'perPage' => $datas->perPage(),
-                'total' => $datas->total(),
-            ],
+                'total' => $datas->total()
+
+            ]
         ];
 
         // Log the API call
@@ -120,9 +121,26 @@ public function getAllfile(Request $request)
                 'search' => ['nullable', 'string'], 
             ]);
             
+            $folder =  RequirementFile::find($validated['folder_id']);
+            $requirement_info = [];
+
+            if($folder->requirement_id != 'DMO File'){
+
+              $requirement = Requirement::find($folder->requirement_id);
+              $event = Event::find($requirement->event_id);
+              $requirement_info = [
+                'event_id' => $requirement->event_id,
+                'event_name' =>  $event->name,
+                'requirement_id' =>  $requirement->id,
+                'requirement_name' =>  $requirement->name
+
+              ];
+            
+            }
+
             // Query the 'requirement_files' table base on their folder.
-            $query = RequirementFile::where('folder_id', $validated['folder_id'])
-                                      ->where('status','A');
+           $query = RequirementFile::where('folder_id', $validated['folder_id'])
+                                      ->where('is_archived',0);
             
             // Search in the filename
             if ($request->filled('search')) {
@@ -130,6 +148,8 @@ public function getAllfile(Request $request)
             }
             
             $datas = $query->orderBy('created_at', 'desc')->get();
+
+       
 
             $allfiles = [];
 
@@ -167,10 +187,23 @@ public function getAllfile(Request $request)
                 ];
             }
             
-            $response = [
-                'isSuccess' => true,
-                'folder' =>  $allfiles
-            ];
+            if($folder->requirement_id != 'DMO File'){
+                $response = [
+                    'isSuccess' => true,
+                    'folder' =>  [
+                        'data' => $allfiles,
+                        'requirement_info' =>  $requirement_info
+                    ]
+                ];
+            }else{
+                $response = [
+                    'isSuccess' => true,
+                    'folder' =>  [
+                        'data' => $allfiles,
+                    ]
+                ];
+            }
+           
             
             $this->logAPICalls('getFilesInsideFolder', "", $request->all(), [$response]);
             return response($response, 200);
@@ -386,7 +419,7 @@ public function getAllfile(Request $request)
             
             $validated = $request->validate([
                 'file_id' => 'required|exists:requirement_files,id',
-                'name' => 'required|max:20',
+                'name' => 'required',
                 'folder' => 'required',
                 'account_id' => 'required|exists:accounts,id'
             ]);
@@ -444,8 +477,7 @@ public function getAllfile(Request $request)
 
                     $response = [
                         'isSuccess' => true,
-                        'message' => "Updated successfully!",
-                        'File' => $data
+                        'message' => "Updated successfully!"
                     ];
                     
                     $this->logAPICalls('updateFileOrFolder', "", $request->all(), [$response]);
@@ -897,7 +929,7 @@ public function getAllfile(Request $request)
         }
     }
     
-    public function createDMOFiles(Request $request){
+    public function uploadDMOFiles(Request $request){
       
         try{
 
@@ -1024,17 +1056,17 @@ public function getAllfile(Request $request)
                     $this->logAPICalls('createDMOFiles', "", $request->all(), [$response]);
                     return response($response,500);
             }
-         //  return response(,200)
-            // return response()->json([
-            //     'isSuccess' => false,
-            //     'message' => 'Files already exist. Please check the file you want to upload.',
-            //     'upload_files' => $uploadedFiles,
-            //     'exists_file' =>$exists_file
-            // ],500);
+         // return response(,200)
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Files already exist. Please check the file you want to upload.',
+                'upload_files' => $uploadedFiles,
+                'exists_file' =>$exists_file
+            ],500);
 
         }
         
-        $this->logAPICalls('createDMOFiles', "", $request->all(), [$response]);
+    //    $this->logAPICalls('createDMOFiles', "", $request->all(), [$response]);
         return response()->json(['message' => 'No file uploaded'], 400);
 
        }catch(Throwable $e){
@@ -1114,8 +1146,7 @@ public function getAllfile(Request $request)
 
                             $response = [
                                 'isSuccess' => true,
-                                'message' => 'Successfully created',
-                                'folder' => $data
+                                'message' => 'Successfully created'
                             ];
                             $this->logAPICalls('createDMO_folder', $data, $request->all(), [$response]);
                             return response()->json($response);
@@ -1145,6 +1176,8 @@ public function getAllfile(Request $request)
                 }
     
             }else{
+
+ 
                 $stat = null;
          
                 if( !RequirementFile::where('filename', $validated['foldername'])->exists()){
@@ -1185,14 +1218,16 @@ public function getAllfile(Request $request)
                           ]);
                           
                       }
-  
-                    return response()->json([
-                        'message' => 'Successfully created',
-                        'data' => $data
-                    ]);
+                      
+
+                    $response = [
+                       'isSuccess' =>true,
+                        'message' => 'Successfully created'
+                    ];
+
+                    $this->logAPICalls('storeFolderRequirement', "", $request->all(), [$response]);
+                    return response()->json($response,200);
                 }
-    
-                // $this->logAPICalls('createDMO_folder', "", $request->all(), [$response]);
 
                 $response = [
                     'isSuccess'=> false,
@@ -1218,7 +1253,7 @@ public function getAllfile(Request $request)
     
     }
 
-    public function deleteFile(Request $request){
+    public function deleteFileFolder(Request $request){
         try{
 
             $validated = $request->validate([
@@ -1228,7 +1263,7 @@ public function getAllfile(Request $request)
             $data = RequirementFile::find($validated['file_id']);
             $data->update(
                 [
-                    'status' => 'I'
+                    'is_archived' => 1
                 ]
             );
 
@@ -1237,7 +1272,7 @@ public function getAllfile(Request $request)
             if($datas->isNotEmpty()){
                 foreach($datas as $data){
                     $data->update([
-                        'status' => 'I'
+                        'is_archived' => 1
                     ]);
                 }
             }
@@ -1245,8 +1280,7 @@ public function getAllfile(Request $request)
     
             $response = [
                 'isSuccess' => true,
-                'message' => "Deleted successfully!",
-                'data' => $data
+                'message' => "Deleted successfully!"
             ];
     
             $this->logAPICalls('deleteFile', "", $request->all(), [$response]);

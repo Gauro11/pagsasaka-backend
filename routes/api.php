@@ -130,19 +130,19 @@ Route::controller(DashboardController::class)->group(function () {
 
 Route::controller(FileRequirementController::class)->group(function () {
 
-    Route::post('all-files', 'getAllfile'); // ADMIN AND STAFF ONLY
+  
     Route::post('files-requirement', 'getFileRequirement');
 
     Route::post('file-requirement/create', 'createFileRequirement');
     Route::post('file-requirement/download', 'downloadFileRequirement');
     Route::post('folder-requirement/create', 'createFolderRequirement');
 
-
-    Route::post('dmo-files/create', 'createDMOFiles');
-    Route::post('dmo-folder/create', 'createDMOFolder');
+    Route::post('dmo/files', 'getAllfile'); // ADMIN AND STAFF ONLY
+    Route::post('dmo/files/upload', 'uploadDMOFiles');
+    Route::post('dmo/folder/create', 'createDMOFolder');
 
     Route::post('file-folder/update', 'updateFileOrFolder');
-    Route::post('file-folder/delete', 'deleteFile');
+    Route::post('file-folder/delete', 'deleteFileFolder');
 
     Route::post('confirmation', 'confirmationForEditDelete');
     Route::post('files-inside-folder', 'getFilesInsideFolder');
