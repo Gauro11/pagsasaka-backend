@@ -152,7 +152,7 @@ class AuthController extends Controller
     }
 
     // password change
-    public function changePassword(Request $request)
+    public function profileUpdate(Request $request)
     {
         try {
             // Validate the request

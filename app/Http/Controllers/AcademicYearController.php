@@ -133,6 +133,56 @@ class AcademicYearController extends Controller
             return response()->json($response, 500);
         }
     }
+
+
+    public function updateAcademicYearStatus(Request $request)
+{
+    try {
+        // Validate the request data
+        $request->validate([
+            'id' => 'required|exists:academic_years,id',
+            'status' => 'required'
+        ]);
+
+        // Convert status to uppercase
+        $status = strtoupper($request->status);
+
+        // Find the academic year by ID and update its status
+        $academicYear = AcademicYear::find($request->id);
+        $academicYear->update(['status' => $status]);
+
+        // Set the success message based on the status
+        if ($status === 'A') {
+            $message = "Academic year activated successfully.";
+        } elseif ($status === 'I') {
+            $message = "Academic year inactivated successfully.";
+        } else {
+            $message = "Academic year status updated successfully.";
+        }
+
+        // Prepare and return the success response
+        $response = [
+            'isSuccess' => true,
+            'message' => $message
+        ];
+
+        // Log the API call
+        $this->logAPICalls('updateAcademicYearStatus', "", $request->all(), [$response]);
+        return response()->json($response, 200);
+    } catch (Throwable $e) {
+        // Prepare and return the error response
+        $response = [
+            'isSuccess' => false,
+            'message' => 'Failed to update academic year status.',
+            'error' => $e->getMessage()
+        ];
+
+        // Log the error in API calls
+        $this->logAPICalls('updateAcademicYearStatus', "", $request->all(), [$response]);
+        return response()->json($response, 500);
+    }
+}
+
     
 
     public function getAcademicYear(Request $request)
