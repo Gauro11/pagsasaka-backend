@@ -64,6 +64,18 @@ public function getAllfile(Request $request)
                 ->setTimezone('Asia/Manila')
                 ->format('F j Y g:i A');
 
+            // Assuming you want to check the filename (e.g., stored in $data->filename)
+            $filename = $data->filename; // Example field storing the filename
+            $type = null;
+            // Check if the filename contains an extension (i.e., it has a dot)
+            if (strpos($filename, '.') !== false) {
+                // Filename has an extension (it’s a file)
+                $type = "file";
+            } else {
+                // Filename has no extension (it’s not a typical file)
+                $type = "folder";
+            }
+
             $allfiles[] = [
                 'id' => $data->id,
                 'requirement_id' => $data->requirement_id,
@@ -74,7 +86,8 @@ public function getAllfile(Request $request)
                 'org_log_name' => $org_log ? $org_log->name : null, 
                 'org_log_acronym' => $org_log ? $org_log->acronym : null,
                 'status' => $data->status,
-                'updated_at' => $dateTime
+                'updated_at' => $dateTime,
+                'type' => $type
             ];
         }
 
@@ -83,9 +96,9 @@ public function getAllfile(Request $request)
             'isSuccess' => true,
             'all_files' => [
                 'data' =>  $allfiles,
-                'currentPage' => $datas->currentPage(),
-                'lastPage' => $datas->lastPage(),
-                'perPage' => $datas->perPage(),
+                'current_page' => $datas->currentPage(),
+                'last_page' => $datas->lastPage(),
+                'per_page' => $datas->perPage(),
                 'total' => $datas->total()
 
             ]
@@ -183,7 +196,6 @@ public function getAllfile(Request $request)
                     'org_log_id' => $data->org_log_id, // ID of the person who created the folder or file
                     'org_log_name' => $org_log ? $org_log->name : null, 
                     'org_log_acronym' => $org_log ? $org_log->acronym : null,
-                    'status' => $data->status,
                 ];
             }
             
@@ -192,7 +204,8 @@ public function getAllfile(Request $request)
                     'isSuccess' => true,
                     'folder' =>  [
                         'data' => $allfiles,
-                        'requirement_info' =>  $requirement_info
+                        'requirement_info' =>  $requirement_info,
+                        'type' => 'requirement'
                     ]
                 ];
             }else{
@@ -200,6 +213,7 @@ public function getAllfile(Request $request)
                     'isSuccess' => true,
                     'folder' =>  [
                         'data' => $allfiles,
+                        'type' => 'dmo files'
                     ]
                 ];
             }
