@@ -157,7 +157,6 @@ class AuthController extends Controller
         try {
             // Validate the request
             $validator = Validator::make($request->all(), [
-                'id' => 'required|exists:accounts,id',
                 'first_name' => 'nullable|string|max:255',
                 'last_name' => 'nullable|string|max:255',
                 'middle_name' => 'nullable|string|max:255',
@@ -224,7 +223,6 @@ class AuthController extends Controller
         try {
             // Validate the request
             $validator = Validator::make($request->all(), [
-                'id' => 'required|exists:accounts,id',
                 'current_password' => 'required|string',
                 'new_password' => 'required|string|min:8|confirmed',
             ]);
@@ -282,7 +280,6 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
-
 
     // Separate function for file system detection
     private function detectFileSystem($platformType)

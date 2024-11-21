@@ -53,8 +53,8 @@ Route::options('/{any}', function (Request $request) {
 Route::controller(AuthController::class)->group(function () {
     Route::post('login',  'login');
     Route::post('session',  'insertSession');
-    Route::post('profile/update',  'profileUpdate');
-    Route::post('password/change',  'changePassword');
+    Route::post('profile/update/{id}',  'profileUpdate');
+    Route::post('password/change/{id}',  'changePassword');
 });
 
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
