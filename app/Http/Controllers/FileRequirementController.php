@@ -434,24 +434,33 @@ public function getAllfile(Request $request)
             $validated = $request->validate([
                 'file_id' => 'required|exists:requirement_files,id',
                 'name' => 'required',
-                'folder' => 'required',
                 'account_id' => 'required|exists:accounts,id'
             ]);
         
+          // Retrieve the file record based on the 'file_id' from the 'requirement_files' table
            $data = RequirementFile::where('id',$validated['file_id'])->first();
-           $newFolderName ="";
-           
-          $parts = explode('/', $data->path);
+         
+          $type = null; // To store type of file (file or folder)
+          $parts = explode('/', $data->path); // Split the file path into parts using '/' as separator
           $filename = $validated['name'];
 
-                if ($validated['folder'] == 0) {
-                        $file_extension = pathinfo( $parts[count($parts)-1], PATHINFO_EXTENSION);
+                // Check if the original filename contains an extension (it's a file)
+                if (strpos($data->filename, '.') !== false) {
+                    // Filename has an extension (it’s a file)
+                    $file_extension = pathinfo( $parts[count($parts)-1], PATHINFO_EXTENSION);
                     $filename .= '.' . $file_extension; // Add the extension back
+                    $type = "file";
+                } else{
+                    $type = "folder";
                 }
+
+                // Replace the last part of the path with the new filename
                 $parts[count($parts)-1]=$filename;
+
+                // Construct the new folder path from the parts
                 $newFolderPath = (count($parts) > 1) ? implode('/', $parts) : $filename;
      
-
+                // Check if the new folder/file already exists in the database
             if(!RequirementFile::where('path',$newFolderPath)
                                 ->where('filename',$validated['name'])
                                 ->exists()){
@@ -459,7 +468,7 @@ public function getAllfile(Request $request)
                                 $currentDateTime = Carbon::now();
 
                                 
-                        
+                                     // Check if the file exists in storage and move it to the new path
                                 if (Storage::disk('public')->exists($data->path)) {
                                 
                                   Storage::disk("public")->move($data->path,$newFolderPath);
@@ -467,8 +476,8 @@ public function getAllfile(Request $request)
                                 }
 
                                    
-                
-                    if($validated['folder'] != 0)  {
+                     // If it's a folder, update the paths of any child files/folders
+                    if($type == "folder")  {
                         $this->updateChildPaths($data->path, $newFolderPath, $validated['file_id']);
                        
                     }            
@@ -478,6 +487,7 @@ public function getAllfile(Request $request)
                      'path' => $newFolderPath
                     ]);
                     
+                    // Retrieve the user who initiated the change
                     $user = Account::where('id',$validated['account_id'])->first();
 
                     // The records of the user who renamed the file will be saved here. //
