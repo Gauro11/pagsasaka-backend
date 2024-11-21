@@ -157,24 +157,76 @@ class AuthController extends Controller
         try {
             // Validate the request
             $validator = Validator::make($request->all(), [
+                'id' => 'required|exists:accounts,id',
                 'first_name' => 'nullable|string|max:255',
                 'last_name' => 'nullable|string|max:255',
                 'middle_name' => 'nullable|string|max:255',
                 'email' => 'nullable|email',
-                'current_password' => [
-                    'nullable',
-                    'string',
-                    function ($attribute, $value, $fail) use ($request) {
-                        // Find the user by ID
-                        $user = Account::where('id', $request->id)->first();
+            ]);
 
-                        // If the password is set and the current password doesn't match
-                        if ($user && $user->password && !Hash::check($value, $user->password)) {
-                            return $fail('The current password is incorrect.');
-                        }
-                    },
-                ],
-                'new_password' => 'nullable|string|min:8|confirmed',
+            if ($validator->fails()) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ];
+                $this->logAPICalls('profileUpdate', null, $request->all(), $response);
+                return response()->json($response, 500);
+            }
+
+            // Find the user by ID
+            $user = Account::find($request->id);
+
+            if (!$user) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'User not found.',
+                ];
+                $this->logAPICalls('profileUpdate', null, $request->all(), $response);
+                return response()->json($response, 500);
+            }
+
+            // Update profile fields
+            $user->update($request->only(['first_name', 'last_name', 'middle_name', 'email']));
+
+            // Retrieve organization log details
+            $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'User details updated successfully.',
+                'user' => [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'middle_name' => $user->middle_name,
+                    'email' => $user->email,
+                    'org_log_id' => $user->org_log_id,
+                    'org_log_name' => optional($org_log)->name ?? 'N/A',
+                ]
+            ];
+            $this->logAPICalls('profileUpdate', $user->id, $request->all(), $response);
+            return response()->json($response, 200);
+        } catch (Throwable $e) {
+            // Error handling
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Failed to update user details.',
+                'error' => $e->getMessage(),
+            ];
+            $this->logAPICalls('profileUpdate', null, $request->all(), $response);
+            return response()->json($response, 500);
+        }
+    }
+
+    public function changePassword(Request $request)
+    {
+        try {
+            // Validate the request
+            $validator = Validator::make($request->all(), [
+                'id' => 'required|exists:accounts,id',
+                'current_password' => 'required|string',
+                'new_password' => 'required|string|min:8|confirmed',
             ]);
 
             if ($validator->fails()) {
@@ -188,9 +240,7 @@ class AuthController extends Controller
             }
 
             // Find the user by ID
-            $user = Account::select('id', 'first_name', 'last_name', 'middle_name', 'email', 'org_log_id', 'password')
-                ->where('id', $request->id)
-                ->first();
+            $user = Account::find($request->id);
 
             if (!$user) {
                 $response = [
@@ -201,68 +251,38 @@ class AuthController extends Controller
                 return response()->json($response, 500);
             }
 
-            // Update user's editable fields if provided
-            if ($request->has('first_name')) {
-                $user->first_name = $request->first_name;
-            }
-            if ($request->has('last_name')) {
-                $user->last_name = $request->last_name;
-            }
-            if ($request->has('middle_name')) {
-                $user->middle_name = $request->middle_name;
-            }
-            if ($request->has('email')) {
-                $user->email = $request->email;
+            // Verify current password
+            if (!Hash::check($request->current_password, $user->password)) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'The current password is incorrect.',
+                ];
+                $this->logAPICalls('changePassword', $user->id, $request->all(), $response);
+                return response()->json($response, 500);
             }
 
-            // Retrieve the organization log based on the user's org_log_id
-            $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
-            $org_log_name = $org_log ? $org_log->org_log_name : 'N/A';
-
-            if ($request->filled('new_password')) {
-                // If the password is empty (null), skip current_password check
-                if ($user->password == null || Hash::check($request->current_password, $user->password)) {
-                    // Update password if valid current_password is provided (or if it's blank)
-                    $user->password = Hash::make($request->new_password);
-                } else {
-                    $response = [
-                        'isSuccess' => false,
-                        'message' => 'The current password is incorrect.',
-                    ];
-                    $this->logAPICalls('changePassword', $user->id, $request->all(), $response);
-                    return response()->json($response, 500);
-                }
-            }
-
-            // Save the updated user data
+            // Update the password
+            $user->password = Hash::make($request->new_password);
             $user->save();
 
             $response = [
                 'isSuccess' => true,
-                'message' => 'User details updated successfully.',
-                'user' => [
-                    'id' => $user->id,
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'middle_name' => $user->middle_name,
-                    'email' => $user->email,
-                    'org_log_id' => $user->org_log_id,
-                    'org_log_name' => optional($org_log)->name,
-                ]
+                'message' => 'Password updated successfully.',
             ];
-            $this->logAPICalls('changePassword', $user->id, $request->except('org_log_id'), $response);
+            $this->logAPICalls('changePassword', $user->id, $request->all(), $response);
             return response()->json($response, 200);
         } catch (Throwable $e) {
-            // Error handling
+
             $response = [
                 'isSuccess' => false,
-                'message' => 'Failed to update user details.',
+                'message' => 'Failed to update password.',
                 'error' => $e->getMessage(),
             ];
             $this->logAPICalls('changePassword', null, $request->all(), $response);
             return response()->json($response, 500);
         }
     }
+
 
     // Separate function for file system detection
     private function detectFileSystem($platformType)
