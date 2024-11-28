@@ -24,7 +24,7 @@ class Account extends Authenticatable
             'role',
             'password',
             'is_archived',
-            'org_log_id'
+            
             
         ];
         public static function validateAccount($data)
@@ -40,7 +40,7 @@ class Account extends Authenticatable
             'email' => ['required', 'email', 'unique:accounts,email'],
             'role' => ['required'  ],
             'password',
-            'org_log_id' => ['required',],
+          
            
         ]);
 

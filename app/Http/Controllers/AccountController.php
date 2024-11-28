@@ -52,7 +52,6 @@ class AccountController extends Controller
             'middle_name' => $request->middle_name,
             'email' => $request->email,
             'role' => $role->name, // Set the role name from the Role model
-            'org_log_id' => $request->org_log_id,
             'password' => Hash::make($request->password ?? '123456789'),
         ]);
 
@@ -67,7 +66,6 @@ class AccountController extends Controller
                 'email' => $Account->email,
                 'role_id' => $request->role, // Role ID from the request
                 'role' => $role->name, // Role name from the Role model
-                'org_log_id' => $Account->org_log_id,
                 'created_at' => $Account->created_at,
                 'updated_at' => $Account->updated_at
             ]

@@ -27,64 +27,43 @@ class AuthController extends Controller
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
-
-            // Auto-detect User-Agent
-            $userAgent = $request->header('User-Agent');
-            Log::info('User-Agent:', ['userAgent' => $userAgent]);
-
-            // Detect platform automatically
-            $platformType = $this->detectPlatform($userAgent); // Pass the User-Agent to detectPlatform
-            Log::info('Detected Platform:', ['platform' => $platformType]);
-
-            // Get IP address
-            $ipAddress = $request->ip();
-
-            // Determine file system based on the detected platform
-            $fileSystemType = $this->detectFileSystem($platformType); // Call a separate method for file system detection
-
+    
             $user = Account::where('email', $request->email)->first();
-
+    
             if ($user && Hash::check($request->password, $user->password)) {
                 if ($user->status === 'I') {
                     $response = ['message' => 'Account is inactive.'];
                     $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
                     return response()->json($response, 403);
                 }
-
+    
                 $token = $user->createToken('auth-token')->plainTextToken;
-
+    
                 // Generate session code by calling insertSession
                 $sessionCode = $this->insertSession($user->id);
                 if (!$sessionCode) {
                     return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
                 }
-
-                $org_log = OrganizationalLog::where('id', $user->org_log_id)->first();
-
+    
                 $response = [
                     'isSuccess' => true,
                     'message' => 'Logged in successfully',
                     'token' => $token,
                     'session_code' => $sessionCode,
-
+    
                     'user' => [
                         'id' => $user->id,
                         'first_name' => $user->first_name,
                         'middle_name' => $user->middle_name,
                         'last_name' => $user->last_name,
-                        'org_log_id' => $user->org_log_id,
-                        'org_log_name' => optional($org_log)->name,
                         'email' => $user->email,
                     ],
                     'role' => $user->role,
-                    'ipAddress' => $ipAddress,
-                    'platform' => $platformType,
-                    'fileSystem' => $fileSystemType, // Automatically set file system
                 ];
-
+    
                 // Log successful login attempt
                 $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
-
+    
                 return response()->json($response, 200);
             } else {
                 // Log invalid credentials attempt
@@ -99,12 +78,13 @@ class AuthController extends Controller
                 'message' => 'An error occurred during login.',
                 'error' => $e->getMessage(),
             ];
-
+    
             $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-
+    
             return response()->json($response, 500);
         }
     }
+    
 
     // logout
     public function logout(Request $request)
@@ -278,37 +258,6 @@ class AuthController extends Controller
             ];
             $this->logAPICalls('changePassword', null, $request->all(), $response);
             return response()->json($response, 500);
-        }
-    }
-
-    // Separate function for file system detection
-    private function detectFileSystem($platformType)
-    {
-        switch (strtolower($platformType)) {
-            case 'windows':
-                return 'NTFS';
-            case 'macos':
-                return 'APFS';
-            case 'linux':
-                return 'exFAT'; // Adjust this if you have a different logic for Linux
-            default:
-                return 'Unknown'; // Default for any unrecognized platform
-        }
-    }
-
-    // Modify the detectPlatform method
-    private function detectPlatform($userAgent)
-    {
-        $userAgent = strtolower($userAgent); // Convert to lowercase for easier matching
-
-        if (strpos($userAgent, 'windows') !== false || strpos($userAgent, 'win64') !== false || strpos($userAgent, 'wow64') !== false || strpos($userAgent, 'x64') !== false) {
-            return 'Windows';
-        } elseif (strpos($userAgent, 'macintosh') !== false || strpos($userAgent, 'mac os') !== false) {
-            return 'macOS';
-        } elseif (strpos($userAgent, 'linux') !== false || strpos($userAgent, 'ubuntu') !== false || strpos($userAgent, 'debian') !== false || strpos($userAgent, 'fedora') !== false || strpos($userAgent, 'android') !== false) {
-            return 'Linux';
-        } else {
-            return 'Unknown'; // Return unknown for unrecognized user agents
         }
     }
 

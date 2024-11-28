@@ -28,6 +28,7 @@ use App\Http\Controllers\HistoryDocumentController;
 
 
 Route::get('dropdown-roles', [RoleController::class, 'getRoles']);
+Route::post('roles/add', [RoleController::class, 'addRole']);
 
 
 
@@ -66,7 +67,7 @@ Route::post('password/reset', [AccountController::class, 'resetPasswordToDefault
 //create acc///
 Route::controller(AccountController::class)->group(function () {
     Route::post('accounts', 'getAccounts');
-    Route::post('account/create', 'createAccount');
+    Route::post('account/add', 'createAccount');
     Route::post('account/update/{id}', 'updateAccount');
     Route::post('account/deactivate/{id}', 'deactivateAccount');
 });
