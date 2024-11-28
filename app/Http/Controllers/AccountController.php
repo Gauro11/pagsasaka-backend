@@ -17,7 +17,7 @@ use App\Notifications\email;
 class AccountController extends Controller
 {
 
-    // Create a new user account.
+    // Create a new user account.pagsasaka
     public function createAccount(Request $request)
 {
     try {
