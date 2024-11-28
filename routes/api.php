@@ -24,6 +24,17 @@ use App\Http\Controllers\HistoryDocumentController;
 
 
 
+//connection//
+Route::options('/{any}', function (Request $request) {
+    return response()->json([
+        'status' => 'OK',
+        'message' => 'Preflight request handled.',
+    ], 200)
+    ->header('Access-Control-Allow-Origin', '*')
+    ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+})->where('any', '.*');
+
 
 
 
@@ -44,10 +55,7 @@ Route::post('academic-years/update-status', [AcademicYearController::class, 'upd
 Route::post('academic-years', [AcademicYearController::class, 'getAcademicYear']);
 
 
-//connection//
-Route::options('/{any}', function (Request $request) {
-    return response()->json(['status' => 'OK'], 200);
-})->where('any', '.*');
+
 
 
 ///////////////////////////////////LOGIN//////////////////////////////////////////
