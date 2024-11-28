@@ -31,12 +31,6 @@ class AuthController extends Controller
             $user = Account::where('email', $request->email)->first();
     
             if ($user && Hash::check($request->password, $user->password)) {
-                if ($user->status === 'I') {
-                    $response = ['message' => 'Account is inactive.'];
-                    $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
-                    return response()->json($response, 403);
-                }
-    
                 $token = $user->createToken('auth-token')->plainTextToken;
     
                 // Generate session code by calling insertSession
@@ -84,6 +78,7 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
+    
     
 
     // logout
