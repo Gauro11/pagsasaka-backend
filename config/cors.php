@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://pagsasaka.bpc-bsis4d.com/'],
+    'allowed_origins' => ['*'],
 
     'allowed_origins_patterns' => [],
 
