@@ -26,13 +26,7 @@ use App\Http\Controllers\HistoryDocumentController;
 
 //connection//
 Route::options('/{any}', function (Request $request) {
-    return response()->json([
-        'status' => 'OK',
-        'message' => 'Preflight request handled.',
-    ], 200)
-    ->header('Access-Control-Allow-Origin', '*')
-    ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-    ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return response()->json(['status' => 'OK'], 200);
 })->where('any', '.*');
 
 
@@ -74,7 +68,7 @@ Route::post('password/reset', [AccountController::class, 'resetPasswordToDefault
 
 //create acc///
 Route::controller(AccountController::class)->group(function () {
-    Route::post('accounts', 'getAccounts');
+    Route::get('accounts', 'getAccounts');
     Route::post('account/add', 'createAccount');
     Route::post('account/update/{id}', 'updateAccount');
     Route::post('account/deactivate/{id}', 'deactivateAccount');
