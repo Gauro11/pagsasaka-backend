@@ -20,72 +20,64 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
+    public function login(Request $request)
+    {
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
     
-
-
-public function login(Request $request)
-{
-    return response()->json(['message' => 'Login successful'])
-        ->header('Access-Control-Allow-Origin', 'http://localhost:5173')
-        ->header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE, PUT')
-        ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-}
-        // try {
-        //     $request->validate([
-        //         'email' => 'required|email',
-        //         'password' => 'required',
-        //     ]);
+            $user = Account::where('email', $request->email)->first();
     
-        //     $user = Account::where('email', $request->email)->first();
+            if ($user && Hash::check($request->password, $user->password)) {
+                $token = $user->createToken('auth-token')->plainTextToken;
     
-        //     if ($user && Hash::check($request->password, $user->password)) {
-        //         $token = $user->createToken('auth-token')->plainTextToken;
+                // Generate session code by calling insertSession
+                $sessionCode = $this->insertSession($user->id);
+                if (!$sessionCode) {
+                    return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
+                }
     
-        //         // Generate session code by calling insertSession
-        //         $sessionCode = $this->insertSession($user->id);
-        //         if (!$sessionCode) {
-        //             return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
-        //         }
+                $response = [
+                    'isSuccess' => true,
+                    'message' => 'Logged in successfully',
+                    'token' => $token,
+                    'session_code' => $sessionCode,
     
-        //         $response = [
-        //             'isSuccess' => true,
-        //             'message' => 'Logged in successfully',
-        //             'token' => $token,
-        //             'session_code' => $sessionCode,
+                    'user' => [
+                        'id' => $user->id,
+                        'first_name' => $user->first_name,
+                        'middle_name' => $user->middle_name,
+                        'last_name' => $user->last_name,
+                        'email' => $user->email,
+                    ],
+                    'role' => $user->role,
+                ];
     
-        //             'user' => [
-        //                 'id' => $user->id,
-        //                 'first_name' => $user->first_name,
-        //                 'middle_name' => $user->middle_name,
-        //                 'last_name' => $user->last_name,
-        //                 'email' => $user->email,
-        //             ],
-        //             'role' => $user->role,
-        //         ];
+                // Log successful login attempt
+                $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
     
-        //         // Log successful login attempt
-        //         $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
+                return response()->json($response, 200);
+            } else {
+                // Log invalid credentials attempt
+                $response = ['message' => 'Invalid Credentials.'];
+                $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
+                return response()->json($response, 401);
+            }
+        } catch (Throwable $e) {
+            // Log error during login attempt
+            $response = [
+                'isSuccess' => false,
+                'message' => 'An error occurred during login.',
+                'error' => $e->getMessage(),
+            ];
     
-        //         return response()->json($response, 200);
-        //     } else {
-        //         // Log invalid credentials attempt
-        //         $response = ['message' => 'Invalid Credentials.'];
-        //         $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-        //         return response()->json($response, 401);
-        //     }
-        // } catch (Throwable $e) {
-        //     // Log error during login attempt
-        //     $response = [
-        //         'isSuccess' => false,
-        //         'message' => 'An error occurred during login.',
-        //         'error' => $e->getMessage(),
-        //     ];
+            $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
     
-        //     $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-    
-        //     return response()->json($response, 500);
-        // }
-    
+            return response()->json($response, 500);
+        }
+    }
     
     
 
