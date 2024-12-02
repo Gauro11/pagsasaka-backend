@@ -35,6 +35,9 @@ Route::options('/{any}', function (Request $request) {
 Route::get('dropdown-roles', [RoleController::class, 'getRoles']);
 Route::post('roles/add', [RoleController::class, 'addRole']);
 
+Route::post('verify-otp', [AccountController::class, 'verifyOTP']);
+
+
 
 
 
@@ -69,7 +72,7 @@ Route::post('password/reset', [AccountController::class, 'resetPasswordToDefault
 //create acc///
 Route::controller(AccountController::class)->group(function () {
     Route::get('accounts', 'getAccounts');
-    Route::post('account/add', 'createAccount');
+    Route::post('account/add', 'register');
     Route::post('account/update/{id}', 'updateAccount');
     Route::post('account/deactivate/{id}', 'deactivateAccount');
 });
@@ -80,96 +83,96 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
 });*/
 
-Route::post('/sample', function (Request $request) {
-    return $request->requirements;
-});
+// Route::post('/sample', function (Request $request) {
+//     return $request->requirements;
+// });
 
-Route::controller(OrgLogController::class)->group(function () {
-    Route::post('organizations', 'getOrganization');
-    Route::post('dropdown-organization', 'getDropdownOrganization');
-    Route::post('organization/create', 'createOrganization');
-    Route::post('organization/update', 'updateOrganization');
-    Route::post('organization/delete', 'deleteOrganization');
-    Route::post('organization-status/update', 'updateOrganizationStatus');
-    Route::post('programs/filter', 'getFilteredPrograms');
-    Route::get('dropdown-office-program', 'getConcernedOfficeProgram');
-});
+// Route::controller(OrgLogController::class)->group(function () {
+//     Route::post('organizations', 'getOrganization');
+//     Route::post('dropdown-organization', 'getDropdownOrganization');
+//     Route::post('organization/create', 'createOrganization');
+//     Route::post('organization/update', 'updateOrganization');
+//     Route::post('organization/delete', 'deleteOrganization');
+//     Route::post('organization-status/update', 'updateOrganizationStatus');
+//     Route::post('programs/filter', 'getFilteredPrograms');
+//     Route::get('dropdown-office-program', 'getConcernedOfficeProgram');
+// });
 
 
-Route::controller(EventController::class)->group(function () {
-    Route::get('active-event', 'getActiveEvent'); // ADMIN AND STAFF ONLY
-    Route::post('all-events', 'getEvent');
-    Route::post('event-details', 'eventDetails');
-    Route::post('event/create', 'createEvent');
-    Route::post('event/update', 'updateEvent');
-    Route::post('event/delete', 'deleteEvent');
-    Route::post('event-status', 'eventApprovalStatus');
-});
+// Route::controller(EventController::class)->group(function () {
+//     Route::get('active-event', 'getActiveEvent'); // ADMIN AND STAFF ONLY
+//     Route::post('all-events', 'getEvent');
+//     Route::post('event-details', 'eventDetails');
+//     Route::post('event/create', 'createEvent');
+//     Route::post('event/update', 'updateEvent');
+//     Route::post('event/delete', 'deleteEvent');
+//     Route::post('event-status', 'eventApprovalStatus');
+// });
 
-Route::controller(RequirementController::class)->group(function () {
-    Route::post('requirements', 'getRequirement');
-    Route::post('requirement/update', 'updateRequirement');
-    Route::post('requirement/delete', 'deleteRequirement');
-});
+// Route::controller(RequirementController::class)->group(function () {
+//     Route::post('requirements', 'getRequirement');
+//     Route::post('requirement/update', 'updateRequirement');
+//     Route::post('requirement/delete', 'deleteRequirement');
+// });
 
-Route::controller(RequestController::class)->group(function () {
-    Route::post('request', 'getRequest');
-    Route::post('request/create', 'createRequest');
-    Route::post('request/reject', 'rejectRequest');
-    Route::post('request/accept', 'getAcceptRequest');
-    Route::post('requirement-information', 'getRequestInformation');
-});
+// Route::controller(RequestController::class)->group(function () {
+//     Route::post('request', 'getRequest');
+//     Route::post('request/create', 'createRequest');
+//     Route::post('request/reject', 'rejectRequest');
+//     Route::post('request/accept', 'getAcceptRequest');
+//     Route::post('requirement-information', 'getRequestInformation');
+// });
 
-Route::controller(DashboardController::class)->group(function () {
-    Route::post('dashboard/admin', 'getAdminDashboard');
-    Route::post('dashboard/dean', 'getDeanDashboard');
-    Route::post('dashboard/program-chair', 'getProgramDashboard');
-    Route::post('dashboard/head', 'getHeadDashboard');
+// Route::controller(DashboardController::class)->group(function () {
+//     Route::post('dashboard/admin', 'getAdminDashboard');
+//     Route::post('dashboard/dean', 'getDeanDashboard');
+//     Route::post('dashboard/program-chair', 'getProgramDashboard');
+//     Route::post('dashboard/head', 'getHeadDashboard');
 
-    Route::post('dashboard/document-request', 'getDocumentRequestDashboard');
-    Route::post('dashboard/recent-upload', 'getRecentUploadDashboard');
-    Route::post('dashboard/compliance', 'getComplianceDashboard');
+//     Route::post('dashboard/document-request', 'getDocumentRequestDashboard');
+//     Route::post('dashboard/recent-upload', 'getRecentUploadDashboard');
+//     Route::post('dashboard/compliance', 'getComplianceDashboard');
  
-});
+// });
 
 
-Route::controller(FileRequirementController::class)->group(function () {
+// Route::controller(FileRequirementController::class)->group(function () {
 
   
-    Route::post('files-requirement', 'getFileRequirement');
+//     Route::post('files-requirement', 'getFileRequirement');
 
-    Route::post('file-requirement/create', 'createFileRequirement');
-    Route::post('file-requirement/download', 'downloadFileRequirement');
-    Route::post('folder-requirement/create', 'createFolderRequirement');
+//     Route::post('file-requirement/create', 'createFileRequirement');
+//     Route::post('file-requirement/download', 'downloadFileRequirement');
+//     Route::post('folder-requirement/create', 'createFolderRequirement');
 
-    Route::post('dmo/files', 'getAllfile'); // ADMIN AND STAFF ONLY
-    Route::post('dmo/files/upload', 'uploadDMOFiles');
-    Route::post('dmo/folder/create', 'createDMOFolder');
+//     Route::post('dmo/files', 'getAllfile'); // ADMIN AND STAFF ONLY
+//     Route::post('dmo/files/upload', 'uploadDMOFiles');
+//     Route::post('dmo/folder/create', 'createDMOFolder');
 
-    Route::post('file-folder/update', 'updateFileOrFolder');
-    Route::post('file-folder/delete', 'deleteFileFolder');
+//     Route::post('file-folder/update', 'updateFileOrFolder');
+//     Route::post('file-folder/delete', 'deleteFileFolder');
 
-    Route::post('confirmation', 'confirmationForEditDelete');
-    Route::post('files-inside-folder', 'getFilesInsideFolder');
+//     Route::post('confirmation', 'confirmationForEditDelete');
+//     Route::post('files-inside-folder', 'getFilesInsideFolder');
 
-});
+// });
 
-Route::controller(ConversationController::class)->group(function () {
-    Route::post('storeConverstation', 'createConverstation');
-    Route::post('getConvesation', 'getConvesation');
-});
-
-
+// Route::controller(ConversationController::class)->group(function () {
+//     Route::post('storeConverstation', 'createConverstation');
+//     Route::post('getConvesation', 'getConvesation');
+// });
 
 
-Route::controller(ReportController::class)->group(function () {
 
-    Route::post('report-request', 'getReportRequest');
-    Route::post('compliance-report', 'getComplianceReport');
-});
 
-Route::controller(HistoryDocumentController::class)->group(function () {
+// Route::controller(ReportController::class)->group(function () {
 
-    Route::post('history', 'history');
+//     Route::post('report-request', 'getReportRequest');
+//     Route::post('compliance-report', 'getComplianceReport');
+// });
 
-});
+// Route::controller(HistoryDocumentController::class)->group(function () {
+
+//     Route::post('history', 'history');
+
+// });

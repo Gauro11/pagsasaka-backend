@@ -20,10 +20,6 @@ class CreateSessionsTable extends Migration
             $table->dateTime('login_date');
             $table->dateTime('logout_date')->nullable();
             $table->char('status',1)->default('A');
-            $table->string('payload')->nullable();
-            $table->string('last_activity')->nullable();
-            $table->string('ip_address')->nullable();
-            $table->string('user_agent')->nullable();
             $table->timestamps();
         });
     }
