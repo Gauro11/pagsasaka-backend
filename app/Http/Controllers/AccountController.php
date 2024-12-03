@@ -34,7 +34,7 @@ class AccountController extends Controller
                 'middle_name' => 'nullable|string|max:255',
                 'email' => 'required|email', // Email is required
                 'password' => 'required|string|min:8|confirmed', // Password is required
-                'role' => 'required|exists:roles,id', // Ensure the role exists in the roles table
+                'role' => 'exists:roles,id', // Ensure the role exists in the roles table
             ]);
 
             if ($validator->fails()) {
@@ -205,6 +205,7 @@ class AccountController extends Controller
             return response()->json($response, 500);
         }
     }
+
 
 
 
