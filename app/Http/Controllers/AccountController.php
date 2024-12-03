@@ -144,79 +144,85 @@ class AccountController extends Controller
     
 
 
-
     public function verifyOTP(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
             'otp' => 'required|digits:6',
         ]);
-
+    
         if ($validator->fails()) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
             ];
-            $this->logAPICalls('verifyOTP', $request->email, $request->all(), $response);
+            $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
             return response()->json($response, 422);
         }
-
+    
         try {
-            // Fetch the OTP record from the database
+            // Fetch the latest OTP record from the database
             $otpRecord = DB::table('otps')
-            ->where('email', $request->email)
-                ->where('otp', $request->otp)
+                ->orderBy('created_at', 'desc') // Fetch the most recent OTP
                 ->first();
-
-            // Check if OTP exists
+    
+            // Check if OTP record exists
             if (!$otpRecord) {
                 $response = [
                     'isSuccess' => false,
-                    'message' => 'Invalid OTP or email.',
+                    'message' => 'No OTP found in the database.',
                 ];
-                $this->logAPICalls('verifyOTP', $request->email, $request->all(), $response);
+                $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+                return response()->json($response, 404);
+            }
+    
+            // Validate the provided OTP
+            if ($otpRecord->otp != $request->otp) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Invalid OTP.',
+                ];
+                $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
                 return response()->json($response, 400);
             }
-
-            // Check if OTP has expired
+    
+            // Check if the OTP has expired
             if (now()->greaterThan($otpRecord->expires_at)) {
                 $response = [
                     'isSuccess' => false,
                     'message' => 'OTP has expired.',
                 ];
-                $this->logAPICalls('verifyOTP', $request->email, $request->all(), $response);
+                $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
                 return response()->json($response, 400);
             }
-
+    
             // Mark OTP as used or delete it (optional)
-            // DB::table('otps')->where('id', $otpRecord->id)->delete();
-
+           // DB::table('otps')->where('id', $otpRecord->id)->delete();
+    
             $response = [
                 'isSuccess' => true,
                 'message' => 'OTP verified successfully.',
             ];
-            $this->logAPICalls('verifyOTP', $request->email, $request->all(), $response);
-
+            $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+    
             return response()->json($response, 200);
         } catch (\Throwable $e) {
             Log::error('Error verifying OTP: ' . $e->getMessage(), [
                 'request_data' => $request->all(),
             ]);
-
+    
             $response = [
                 'isSuccess' => false,
                 'message' => 'An error occurred during OTP verification.',
                 'error' => $e->getMessage(),
             ];
-
-            $this->logAPICalls('verifyOTP', $request->email ?? 'unknown', $request->all(), $response);
-
+    
+            $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+    
             return response()->json($response, 500);
         }
     }
-
-
+    
 
 
     // Update an existing user account.

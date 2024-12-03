@@ -28,6 +28,26 @@ class Account extends Authenticatable
             
             
         ];
+        public static function validateAccount($data)
+    {
+        $users = Account::pluck('first_name')->toArray();
+       
+
+        $validator = Validator::make($data, [
+            
+            'first_name' => ['required', 'string','min:3','max:225'],
+            'last_name' => ['required', 'string','min:3','max:225'],
+            'middle_name' => ['required', 'string','min:1','max:225'],
+            'email' => [ 'email', 'unique:accounts,email'],
+            'phone_number' => ['required', 'email', 'unique:accounts,email'],
+            'role' => ['required'  ],
+            'password',
+          
+           
+        ]);
+
+        return $validator;
+    }
 }
 
     
