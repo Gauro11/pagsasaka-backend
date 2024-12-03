@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use App\Models\OrganizationalLog;
 use Laravel\Sanctum\PersonalAccessToken;
+use App\Mail\OTPMail;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+
+
 
 
 
@@ -78,6 +83,8 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
+    
+
     
     
 

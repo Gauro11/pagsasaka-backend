@@ -13,76 +13,199 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use App\Notifications\email;
+use App\Mail\OTPMail;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class AccountController extends Controller
 {
 
     // Create a new user account.pagsasaka
-    public function createAccount(Request $request)
-{
-    try {
-        // Validate input
-        $validator = Account::validateAccount($request->all());
+    public function register(Request $request)
+    {
+        DB::beginTransaction(); // Start a transaction
+
+        try {
+            // Validate input
+            $validator = Validator::make($request->all(), [
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'middle_name' => 'nullable|string|max:255',
+                'email' => 'required|email', // Email is required
+                'password' => 'required|string|min:8|confirmed', // Password is required
+                'role' => 'required|exists:roles,id', // Ensure the role exists in the roles table
+            ]);
+
+            if ($validator->fails()) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ];
+                $this->logAPICalls('register', '', $request->all(), $response);
+                return response()->json($response, 422);
+            }
+
+            // Get the role name from the Role model
+            $role = Role::find($request->role);
+
+            // Generate OTP
+            $otp = rand(100000, 999999);
+
+            // Create account
+            $user = Account::create([
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'middle_name' => $request->middle_name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password), // Save the user-provided password
+                'role' => $role->name,
+                'status' => 'A', // Set default active status
+            ]);
+
+            // Save OTP in the database
+            DB::table('otps')->insert([
+                'email' => $user->email,
+                'otp' => $otp,
+                'created_at' => now(),
+                'expires_at' => now()->addMinutes(10), // Set OTP expiration time
+            ]);
+
+            // Send OTP via email
+            $htmlContent = "<p>Your OTP is: <strong>$otp</strong></p>";
+            $subject = "Your OTP Code";
+            $email = $user->email;
+
+            try {
+                Mail::send([], [], function ($message) use ($email, $htmlContent, $subject) {
+                    $message->to($email)
+                        ->subject($subject)
+                        ->setBody($htmlContent, 'text/html');
+                });
+            } catch (\Throwable $e) {
+                // Log the error for debugging
+                Log::error('Error sending email in register method: ' . $e->getMessage(), [
+                    'email' => $email,
+                    'otp' => $otp,
+                ]);
+
+                throw $e; // Re-throw the exception to trigger the outer catch
+            }
+
+            DB::commit(); // Commit the transaction if everything succeeds
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Account registered successfully. An OTP has been sent to your email.',
+                'user' => [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'middle_name' => $user->middle_name,
+                    'email' => $user->email,
+                    'role' => $role->name,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ],
+            ];
+
+            $this->logAPICalls('register', $user->email, $request->except(['password', 'password_confirmation']), $response);
+
+            return response()->json($response, 201);
+        } catch (\Throwable $e) {
+            DB::rollBack(); // Rollback the transaction on error
+
+            // Log the error for debugging
+            Log::error('Error in register method: ' . $e->getMessage(), [
+                'request_data' => $request->all(),
+            ]);
+
+            $response = [
+                'isSuccess' => false,
+                'message' => 'An error occurred during registration.',
+                'error' => $e->getMessage(),
+            ];
+
+            $this->logAPICalls('register', $request->email ?? 'unknown', $request->all(), $response);
+
+            return response()->json($response, 500);
+        }
+    }
+
+
+
+    public function verifyOTP(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'otp' => 'required|digits:6',
+        ]);
 
         if ($validator->fails()) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Validation failed.',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ];
-            $this->logAPICalls('createAccount', "", $request->all(), $response);
-            return response()->json($response, 500);
+            $this->logAPICalls('verifyOTP', $request->email, $request->all(), $response);
+            return response()->json($response, 422);
         }
 
-        // Ensure the role exists based on ID
-        $role = Role::find($request->role);
-        if (!$role) {
+        try {
+            // Fetch the OTP record from the database
+            $otpRecord = DB::table('otps')
+            ->where('email', $request->email)
+                ->where('otp', $request->otp)
+                ->first();
+
+            // Check if OTP exists
+            if (!$otpRecord) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Invalid OTP or email.',
+                ];
+                $this->logAPICalls('verifyOTP', $request->email, $request->all(), $response);
+                return response()->json($response, 400);
+            }
+
+            // Check if OTP has expired
+            if (now()->greaterThan($otpRecord->expires_at)) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'OTP has expired.',
+                ];
+                $this->logAPICalls('verifyOTP', $request->email, $request->all(), $response);
+                return response()->json($response, 400);
+            }
+
+            // Mark OTP as used or delete it (optional)
+            // DB::table('otps')->where('id', $otpRecord->id)->delete();
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'OTP verified successfully.',
+            ];
+            $this->logAPICalls('verifyOTP', $request->email, $request->all(), $response);
+
+            return response()->json($response, 200);
+        } catch (\Throwable $e) {
+            Log::error('Error verifying OTP: ' . $e->getMessage(), [
+                'request_data' => $request->all(),
+            ]);
+
             $response = [
                 'isSuccess' => false,
-                'message' => 'Invalid role ID provided.',
+                'message' => 'An error occurred during OTP verification.',
+                'error' => $e->getMessage(),
             ];
-            $this->logAPICalls('createAccount', "", $request->all(), $response);
-            return response()->json($response, 404);
+
+            $this->logAPICalls('verifyOTP', $request->email ?? 'unknown', $request->all(), $response);
+
+            return response()->json($response, 500);
         }
-
-        // Create account with the valid role
-        $Account = Account::create([
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'middle_name' => $request->middle_name,
-            'email' => $request->email,
-            'role' => $role->name, // Set the role name from the Role model
-            'password' => Hash::make($request->password ?? '123456789'),
-        ]);
-
-        $response = [
-            'isSuccess' => true,
-            'message' => 'UserAccount successfully created.',
-            'account' => [
-                'id' => $Account->id,
-                'first_name' => $Account->first_name,
-                'last_name' => $Account->last_name,
-                'middle_name' => $Account->middle_name,
-                'email' => $Account->email,
-                'role_id' => $request->role, // Role ID from the request
-                'role' => $role->name, // Role name from the Role model
-                'created_at' => $Account->created_at,
-                'updated_at' => $Account->updated_at
-            ]
-        ];
-
-        $this->logAPICalls('createAccount', "", $request->all(), [$response]);
-        return response()->json($response, 201);
-    } catch (Throwable $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => 'Failed to create the Account.',
-            'error' => $e->getMessage()
-        ];
-        $this->logAPICalls('createAccount', "", $request->all(), $response);
-        return response()->json($response, 500);
     }
-}
+
 
 
     // Update an existing user account.
@@ -347,33 +470,4 @@ class AccountController extends Controller
         return true; // Indicate success
     }
 
-
-
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /* public function __construct(Request $request)
-    {
-        // Retrieve the authenticated user
-        $user = $request->user();
-
-        // Apply middleware based on the user type
-        if ($user && $user->user_type === 'Admin') {
-            $this->middleware('UserTypeAuth:Admin')->only(['createAccount', 'createAccount']);
-        }
-
-        if ($user && $user->user_type === 'Programchair') {
-            $this->middleware('UserTypeAuth:Progamchair')->only(['updateAccount','getAccounts']);
-        }
-
-        if ($user && $user->user_type === 'Head') {
-            $this->middleware('UserTypeAuth:Head')->only(['updateReview','getReviews']);
-        }
-
-        if ($user && $user->user_type === 'Dean') {
-            $this->middleware('UserTypeAuth:Dean')->only(['updateReview','getReviews']);
-        }
-
-        if ($user && $user->user_type === 'Staff') {
-            $this->middleware('UserTypeAuth:Staff')->only(['getReviews']);
-        }
-    }*/
 }

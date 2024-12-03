@@ -23,6 +23,7 @@ class Account extends Authenticatable
             'email',
             'role',
             'password',
+            'phone_number',
             'is_archived',
             
             
@@ -37,7 +38,8 @@ class Account extends Authenticatable
             'first_name' => ['required', 'string','min:3','max:225'],
             'last_name' => ['required', 'string','min:3','max:225'],
             'middle_name' => ['required', 'string','min:1','max:225'],
-            'email' => ['required', 'email', 'unique:accounts,email'],
+            'email' => [ 'email', 'unique:accounts,email'],
+            'phone_number' => ['required', 'email', 'unique:accounts,email'],
             'role' => ['required'  ],
             'password',
           

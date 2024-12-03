@@ -8,7 +8,21 @@ use Illuminate\Database\Eloquent\Model;
 class Session extends Model
 {
     use HasFactory;
-    protected $guarded = [];
 
-    
+    // Specify the columns that are fillable
+    protected $fillable = [
+        'session_code',
+        'user_id',
+        'login_date',
+        'logout_date',
+        'status',
+    ];
+
+    // Optional: Explicitly specify the table name
+    protected $table = 'sessions';
+
+    // Optionally handle timestamps
+    public $timestamps = true;
 }
+
+
