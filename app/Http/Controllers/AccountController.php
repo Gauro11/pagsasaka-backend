@@ -25,7 +25,7 @@ class AccountController extends Controller
     public function register(Request $request)
     {
         DB::beginTransaction(); // Start a transaction
-
+    
         try {
             // Validate input
             $validator = Validator::make($request->all(), [
@@ -34,9 +34,9 @@ class AccountController extends Controller
                 'middle_name' => 'nullable|string|max:255',
                 'email' => 'required|email', // Email is required
                 'password' => 'required|string|min:8|confirmed', // Password is required
-                'role' => 'exists:roles,id', // Ensure the role exists in the roles table
+               
             ]);
-
+    
             if ($validator->fails()) {
                 $response = [
                     'isSuccess' => false,
@@ -46,13 +46,21 @@ class AccountController extends Controller
                 $this->logAPICalls('register', '', $request->all(), $response);
                 return response()->json($response, 422);
             }
-
-            // Get the role name from the Role model
+    
+            // Ensure the role exists based on ID
             $role = Role::find($request->role);
-
+            if (!$role) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Invalid role ID provided.',
+                ];
+                $this->logAPICalls('register', "", $request->all(), $response);
+                return response()->json($response, 404);
+            }
+    
             // Generate OTP
             $otp = rand(100000, 999999);
-
+    
             // Create account
             $user = Account::create([
                 'first_name' => $request->first_name,
@@ -60,10 +68,10 @@ class AccountController extends Controller
                 'middle_name' => $request->middle_name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password), // Save the user-provided password
-                'role' => $role->name,
+                'role' => $role->name, // Use the role name from the Role model
                 'status' => 'A', // Set default active status
             ]);
-
+    
             // Save OTP in the database
             DB::table('otps')->insert([
                 'email' => $user->email,
@@ -71,12 +79,12 @@ class AccountController extends Controller
                 'created_at' => now(),
                 'expires_at' => now()->addMinutes(10), // Set OTP expiration time
             ]);
-
+    
             // Send OTP via email
             $htmlContent = "<p>Your OTP is: <strong>$otp</strong></p>";
             $subject = "Your OTP Code";
             $email = $user->email;
-
+    
             try {
                 Mail::send([], [], function ($message) use ($email, $htmlContent, $subject) {
                     $message->to($email)
@@ -89,12 +97,12 @@ class AccountController extends Controller
                     'email' => $email,
                     'otp' => $otp,
                 ]);
-
+    
                 throw $e; // Re-throw the exception to trigger the outer catch
             }
-
+    
             DB::commit(); // Commit the transaction if everything succeeds
-
+    
             $response = [
                 'isSuccess' => true,
                 'message' => 'Account registered successfully. An OTP has been sent to your email.',
@@ -104,34 +112,36 @@ class AccountController extends Controller
                     'last_name' => $user->last_name,
                     'middle_name' => $user->middle_name,
                     'email' => $user->email,
-                    'role' => $role->name,
+                    'role_id' => $request->role, // Role ID from the request
+                    'role' => $role->name, // Role name from the Role model
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at,
                 ],
             ];
-
+    
             $this->logAPICalls('register', $user->email, $request->except(['password', 'password_confirmation']), $response);
-
+    
             return response()->json($response, 201);
         } catch (\Throwable $e) {
             DB::rollBack(); // Rollback the transaction on error
-
+    
             // Log the error for debugging
             Log::error('Error in register method: ' . $e->getMessage(), [
                 'request_data' => $request->all(),
             ]);
-
+    
             $response = [
                 'isSuccess' => false,
                 'message' => 'An error occurred during registration.',
                 'error' => $e->getMessage(),
             ];
-
+    
             $this->logAPICalls('register', $request->email ?? 'unknown', $request->all(), $response);
-
+    
             return response()->json($response, 500);
         }
     }
+    
 
 
 
