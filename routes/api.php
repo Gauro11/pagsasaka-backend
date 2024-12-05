@@ -19,6 +19,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\AcademicYearController;
 use App\Http\Controllers\HistoryDocumentController;
+use App\Http\Controllers\QuestionController;
 
 
 
@@ -32,14 +33,13 @@ Route::options('/{any}', function (Request $request) {
 
 
 
+Route::post('create', [QuestionController::class, 'createQuestion']);
+Route::get('questions', [QuestionController::class, 'getAllQuestions']);
+
+
 Route::get('dropdown-roles', [RoleController::class, 'getRoles']);
 Route::post('roles/add', [RoleController::class, 'addRole']);
-
 Route::post('verify-otp', [AccountController::class, 'verifyOTP']);
-
-
-
-
 
 
 
