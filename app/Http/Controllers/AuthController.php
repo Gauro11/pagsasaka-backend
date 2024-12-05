@@ -62,6 +62,8 @@ class AuthController extends Controller
                         'email' => $user->email,
                     ],
                     'role_id' => $user->role_id, // Return the role ID in the response
+                    
+
                 ];
 
                 // Log successful login attempt
