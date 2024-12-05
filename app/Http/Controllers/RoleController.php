@@ -70,8 +70,8 @@ class RoleController extends Controller
     {
         try {
             // Fetch roles excluding "Admin"
-            $role = Role::select('id', 'name')
-                ->where('name', '!=', 'Admin')
+            $role = Role::select('id', 'role')
+                ->where('role', '!=', 'Admin')
                 ->get();
     
             $response = [
