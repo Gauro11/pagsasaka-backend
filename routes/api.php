@@ -20,6 +20,8 @@ use App\Http\Controllers\EmailController;
 use App\Http\Controllers\AcademicYearController;
 use App\Http\Controllers\HistoryDocumentController;
 use App\Http\Controllers\QuestionController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ProductController;
 
 
 
@@ -77,6 +79,33 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('account/deactivate/{id}', 'deactivateAccount');
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
+
+
+
+Route::prefix('category')->group(function () {
+
+    Route::post('create', [CategoryController::class, 'createCategory']);
+    Route::post('edit/{id}', [CategoryController::class, 'editCategory']);
+    Route::get('list', [CategoryController::class, 'getCategory']);
+    Route::post('delete/{id}', [CategoryController::class, 'deleteCategory']);
+    
+});
+
+Route::prefix('product')->group(function () {
+
+    Route::post('add', [ProductController::class, 'addProduct']);
+    Route::post('edit/{id}', [ProductController::class, 'editProduct']);
+    Route::post('list', [ProductController::class, 'getAllProducts']);
+    Route::post('list/{id}', [ProductController::class, 'getProductbyId']);
+    Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
+
+ 
+});
+
+Route::prefix('dropdown')->group(function () {
+    Route::get('category', [CategoryController::class, 'dropdownCategory']);
+});
+
 
 /*
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
