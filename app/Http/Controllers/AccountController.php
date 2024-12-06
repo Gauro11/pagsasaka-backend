@@ -150,7 +150,7 @@ class AccountController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
             ];
-            $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+            $this->logAPICalls('verifyOTP', "", $request->all(), $response);
             return response()->json($response, 422);
         }
     
@@ -166,7 +166,7 @@ class AccountController extends Controller
                     'isSuccess' => false,
                     'message' => 'No OTP found in the database.',
                 ];
-                $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+                $this->logAPICalls('verifyOTP', "", $request->all(), $response);
                 return response()->json($response, 404);
             }
     
@@ -176,7 +176,7 @@ class AccountController extends Controller
                     'isSuccess' => false,
                     'message' => 'Invalid OTP.',
                 ];
-                $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+                $this->logAPICalls('verifyOTP', "", $request->all(), $response);
                 return response()->json($response, 400);
             }
     
@@ -186,7 +186,7 @@ class AccountController extends Controller
                     'isSuccess' => false,
                     'message' => 'OTP has expired.',
                 ];
-                $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+                $this->logAPICalls('verifyOTP', "", $request->all(), $response);
                 return response()->json($response, 400);
             }
     
@@ -197,7 +197,7 @@ class AccountController extends Controller
                 'isSuccess' => true,
                 'message' => 'OTP verified successfully.',
             ];
-            $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+            $this->logAPICalls('verifyOTP', "", $request->all(), $response);
     
             return response()->json($response, 200);
         } catch (\Throwable $e) {
@@ -211,7 +211,7 @@ class AccountController extends Controller
                 'error' => $e->getMessage(),
             ];
     
-            $this->logAPICalls('verifyOTP', 'unknown', $request->all(), $response);
+            $this->logAPICalls('verifyOTP', "", $request->all(), $response);
     
             return response()->json($response, 500);
         }
