@@ -32,23 +32,21 @@ class AuthController extends Controller
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
-
+    
             // Retrieve the user and eager load the 'role' relationship
-            $user = Account::where('email', $request->email)->with('role')->first();
-
+            $user = Account::where('email', $request->email)
+                ->with('role') // Eager load the role relationship
+                ->first();
+    
             if ($user && Hash::check($request->password, $user->password)) {
                 $token = $user->createToken('auth-token')->plainTextToken;
-
+    
                 // Generate session code by calling insertSession
                 $sessionCode = $this->insertSession($user->id);
                 if (!$sessionCode) {
                     return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
                 }
-
-                // Debugging: Check the role object to see if it's being loaded
-                // dd($user->role); // Remove this once you're done debugging
-
-                // If role exists, include the role name in the response
+    
                 $response = [
                     'isSuccess' => true,
                     'message' => 'Logged in successfully',
@@ -61,14 +59,15 @@ class AuthController extends Controller
                         'last_name' => $user->last_name,
                         'email' => $user->email,
                     ],
-                    'role_id' => $user->role_id, // Return the role ID in the response
-                    
-
+                    'role' => [
+                        'id' => $user->role_id,
+                        'role' => $user->role->role ?? 'No Role Assigned', // Include the role column
+                    ],
                 ];
-
+    
                 // Log successful login attempt
                 $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
-
+    
                 return response()->json($response, 200);
             } else {
                 // Log invalid credentials attempt
@@ -83,12 +82,13 @@ class AuthController extends Controller
                 'message' => 'An error occurred during login.',
                 'error' => $e->getMessage(),
             ];
-
+    
             $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-
+    
             return response()->json($response, 500);
         }
     }
+    
 
 
     
