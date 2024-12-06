@@ -32,7 +32,7 @@ class AccountController extends Controller
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
-            'email' => 'required|email', // Email is required
+            'email' => 'required|email|unique:accounts,email',
             'password' => 'required|string|min:8|confirmed', // Password is required
             'role' => 'required|exists:roles,id', // Ensure the role ID exists in the roles table
             'security_question_id' => 'required|exists:questions,id', // Ensure the selected security question exists
@@ -137,8 +137,7 @@ class AccountController extends Controller
 }
 
 
-    
-    
+
     public function verifyOTP(Request $request)
     {
         $validator = Validator::make($request->all(), [
