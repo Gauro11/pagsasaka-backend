@@ -85,7 +85,7 @@ class AccountController extends Controller
                     ->subject($subject)
                     ->setBody($htmlContent, 'text/html');
             });
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Log the error for debugging
             Log::error('Error sending email in register method: ' . $e->getMessage(), [
                 'email' => $email,
@@ -116,7 +116,7 @@ class AccountController extends Controller
         $this->logAPICalls('register', $user->email, $request->except(['password', 'password_confirmation']), $response);
 
         return response()->json($response, 201);
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         DB::rollBack(); // Rollback the transaction on error
 
         // Log the error for debugging

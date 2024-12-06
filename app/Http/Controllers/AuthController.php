@@ -59,10 +59,9 @@ class AuthController extends Controller
                         'last_name' => $user->last_name,
                         'email' => $user->email,
                     ],
-                    'role' => [
-                        'id' => $user->role_id,
-                        'role' => $user->role->role ?? 'No Role Assigned', // Include the role column
-                    ],
+                    'role_name' =>$user->role->role ?? 'No Role Assigned',
+                    'role_id' => $user->role_id
+                    
                 ];
     
                 // Log successful login attempt
@@ -75,7 +74,7 @@ class AuthController extends Controller
                 $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
                 return response()->json($response, 401);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Log error during login attempt
             $response = [
                 'isSuccess' => false,
