@@ -85,7 +85,7 @@ class AccountController extends Controller
                     ->subject($subject)
                     ->setBody($htmlContent, 'text/html');
             });
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Log the error for debugging
             Log::error('Error sending email in register method: ' . $e->getMessage(), [
                 'email' => $email,
@@ -116,7 +116,7 @@ class AccountController extends Controller
         $this->logAPICalls('register', $user->email, $request->except(['password', 'password_confirmation']), $response);
 
         return response()->json($response, 201);
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         DB::rollBack(); // Rollback the transaction on error
 
         // Log the error for debugging
@@ -200,7 +200,7 @@ class AccountController extends Controller
             $this->logAPICalls('verifyOTP', "", $request->all(), $response);
     
             return response()->json($response, 200);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Error verifying OTP: ' . $e->getMessage(), [
                 'request_data' => $request->all(),
             ]);
@@ -217,7 +217,6 @@ class AccountController extends Controller
         }
     }
     
-
 
     // Update an existing user account.
     public function updateAccount(Request $request, $id)

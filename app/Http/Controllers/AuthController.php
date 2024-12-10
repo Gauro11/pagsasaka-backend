@@ -20,9 +20,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 
-
-
-
 class AuthController extends Controller
 {
     public function login(Request $request)
@@ -45,9 +42,6 @@ class AuthController extends Controller
                     return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
                 }
 
-                // Debugging: Check the role object to see if it's being loaded
-                // dd($user->role); // Remove this once you're done debugging
-
                 // If role exists, include the role name in the response
                 $response = [
                     'isSuccess' => true,
@@ -62,7 +56,6 @@ class AuthController extends Controller
                         'email' => $user->email,
                     ],
                     'role_id' => $user->role_id, // Return the role ID in the response
-                    
 
                 ];
 
@@ -76,7 +69,7 @@ class AuthController extends Controller
                 $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
                 return response()->json($response, 401);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Log error during login attempt
             $response = [
                 'isSuccess' => false,
@@ -89,9 +82,6 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
-
-
-    
 
     // logout
     public function logout(Request $request)
@@ -292,7 +282,7 @@ class AuthController extends Controller
 
 
     // Method to log API calls
-    public function logAPICalls(string $methodName, ?string $userId,  array $param, array $resp)
+    public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {
         try {
             ApiLog::create([

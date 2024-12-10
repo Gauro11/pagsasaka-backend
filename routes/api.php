@@ -59,10 +59,10 @@ Route::post('academic-years', [AcademicYearController::class, 'getAcademicYear']
 
 ///////////////////////////////////LOGIN//////////////////////////////////////////
 Route::controller(AuthController::class)->group(function () {
-    Route::post('login',  'login');
-    Route::post('session',  'insertSession');
-    Route::post('profile/update/{id}',  'profileUpdate');
-    Route::post('password/change/{id}',  'changePassword');
+    Route::post('login', 'login');
+    Route::post('session', 'insertSession');
+    Route::post('profile/update/{id}', 'profileUpdate');
+    Route::post('password/change/{id}', 'changePassword');
 });
 
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
@@ -88,19 +88,22 @@ Route::prefix('category')->group(function () {
     Route::post('edit/{id}', [CategoryController::class, 'editCategory']);
     Route::get('list', [CategoryController::class, 'getCategory']);
     Route::post('delete/{id}', [CategoryController::class, 'deleteCategory']);
-    
+
 });
 
-Route::prefix('product')->group(function () {
-
+Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('add', [ProductController::class, 'addProduct']);
     Route::post('edit/{id}', [ProductController::class, 'editProduct']);
     Route::post('list', [ProductController::class, 'getAllProducts']);
     Route::post('list/{id}', [ProductController::class, 'getProductbyId']);
+    Route::get('id/{id}', [ProductController::class, 'getProductById']);
+    Route::post('account-id/{id}', [ProductController::class, 'getProductsByAccountId']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
+    Route::post('buy', [ProductController::class, 'buyProduct']);
+    Route::post('cart', [ProductController::class, 'addToCart']);
 
- 
 });
+
 
 Route::prefix('dropdown')->group(function () {
     Route::get('category', [CategoryController::class, 'dropdownCategory']);
@@ -161,13 +164,13 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
 //     Route::post('dashboard/document-request', 'getDocumentRequestDashboard');
 //     Route::post('dashboard/recent-upload', 'getRecentUploadDashboard');
 //     Route::post('dashboard/compliance', 'getComplianceDashboard');
- 
+
 // });
 
 
 // Route::controller(FileRequirementController::class)->group(function () {
 
-  
+
 //     Route::post('files-requirement', 'getFileRequirement');
 
 //     Route::post('file-requirement/create', 'createFileRequirement');
