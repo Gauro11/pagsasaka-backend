@@ -240,7 +240,7 @@ class ProductController extends Controller
                     'price' => $product->price,
                     'stocks' => $product->stocks,
                     'category_id' => $product->category_id,
-                    'is_active' => $product->is_archived,
+                    'is_archived' => $product->is_archived,
                 ];
             });
 
@@ -348,7 +348,7 @@ class ProductController extends Controller
                     'stocks' => $product->stocks,
                     'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
-                    'is_active' => $product->is_archived == 0,
+                    'is_archived' => $product->is_archived == 0,
                 ];
             });
 
