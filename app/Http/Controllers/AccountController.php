@@ -191,7 +191,7 @@ class AccountController extends Controller
             }
     
             // Mark OTP as used or delete it (optional)
-           // DB::table('otps')->where('id', $otpRecord->id)->delete();
+            DB::table('otps')->where('id', $otpRecord->id)->delete();
     
             $response = [
                 'isSuccess' => true,
@@ -200,7 +200,7 @@ class AccountController extends Controller
             $this->logAPICalls('verifyOTP', "", $request->all(), $response);
     
             return response()->json($response, 200);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Error verifying OTP: ' . $e->getMessage(), [
                 'request_data' => $request->all(),
             ]);
