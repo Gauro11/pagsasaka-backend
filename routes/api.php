@@ -22,6 +22,7 @@ use App\Http\Controllers\HistoryDocumentController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ShipmentController;
 
 
 
@@ -33,7 +34,7 @@ Route::options('/{any}', function (Request $request) {
 })->where('any', '.*');
 
 
-
+Route::post('shipments', [ShipmentController::class, 'addShipment']);
 
 Route::post('create', [QuestionController::class, 'createQuestion']);
 Route::get('questions', [QuestionController::class, 'getAllQuestions']);
