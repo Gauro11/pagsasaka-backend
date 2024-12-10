@@ -42,16 +42,28 @@ class ProductController extends Controller
             $accountId = auth()->id();
 
             // Handle image uploads
-            $imagePaths = [];
+            $imageUrls = [];
             if ($request->hasFile('product_img')) {
-                foreach ($request->file('product_img') as $image) {
-                    $path = $image->store('products', 'public');
-                    $imagePaths[] = Storage::url($path); // Generate and store public URL
+                foreach ($request->file('product_img') as $index => $file) {
+                    // Define the target directory and file name
+                    $directory = public_path('img/products');
+                    $fileName = 'Product-' . $accountId . '-' . now()->format('YmdHis') . '-' . $index . '.' . $file->getClientOriginalExtension();
+
+                    // Ensure the directory exists
+                    if (!file_exists($directory)) {
+                        mkdir($directory, 0755, true);
+                    }
+
+                    // Move the file to the target directory
+                    $file->move($directory, $fileName);
+
+                    // Generate the file URL
+                    $imageUrls[] = asset('img/products/' . $fileName);
                 }
             }
 
-            // Assign the image paths directly (not as a JSON string)
-            $validated['product_img'] = $imagePaths;
+            // Assign the image URLs directly (not as a JSON string)
+            $validated['product_img'] = $imageUrls;
 
             // Add the authenticated user's ID to the validated data
             $validated['account_id'] = $accountId;
@@ -94,7 +106,6 @@ class ProductController extends Controller
         }
     }
 
-
     public function editProduct(Request $request, $id)
     {
         try {
@@ -115,28 +126,42 @@ class ProductController extends Controller
 
             // Handle image uploads if provided
             if ($request->hasFile('product_img')) {
+                // Define the target directory
+                $directory = public_path('img/products');
+
                 // Delete old images
-                $oldImages = $product->product_img;  // No need to json_decode anymore since it's an array
-                if (!empty($oldImages)) {
-                    foreach ($oldImages as $oldImage) {
-                        $path = str_replace('/storage', 'public', $oldImage); // Convert URL to storage path
-                        if (Storage::exists($path)) {
-                            Storage::delete($path);
+                if (!empty($product->product_img)) {
+                    foreach ($product->product_img as $oldImage) {
+                        // Convert URL to path
+                        $path = str_replace(asset(''), '', $oldImage);
+                        $fullPath = public_path($path);
+
+                        if (file_exists($fullPath)) {
+                            unlink($fullPath); // Delete the old file
                         }
                     }
                 }
 
                 // Upload new images
-                $imagePaths = [];
-                foreach ($request->file('product_img') as $image) {
-                    // Store the new image
-                    $path = $image->store('products', 'public');
-                    // Store the URL
-                    $imagePaths[] = Storage::url($path);
+                $imageUrls = [];
+                foreach ($request->file('product_img') as $index => $file) {
+                    // Generate unique file name
+                    $fileName = 'Product-' . $product->id . '-' . now()->format('YmdHis') . '-' . $index . '.' . $file->getClientOriginalExtension();
+
+                    // Ensure the directory exists
+                    if (!file_exists($directory)) {
+                        mkdir($directory, 0755, true);
+                    }
+
+                    // Move the file to the target directory
+                    $file->move($directory, $fileName);
+
+                    // Generate the public URL for the file
+                    $imageUrls[] = asset('img/products/' . $fileName);
                 }
 
-                // Update the validated data with the new image paths
-                $validated['product_img'] = $imagePaths;
+                // Update the validated data with the new image URLs
+                $validated['product_img'] = $imageUrls;
             }
 
             // Update the product with the validated data
@@ -179,6 +204,7 @@ class ProductController extends Controller
             return response()->json($response, 500);
         }
     }
+
 
     public function getAllProducts(Request $request)
     {
