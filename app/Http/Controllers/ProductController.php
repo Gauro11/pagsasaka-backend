@@ -26,7 +26,7 @@ class ProductController extends Controller
                 'price' => 'required|numeric|min:0',
                 'stocks' => 'required|integer|min:0',
                 'product_img' => 'required|array|min:3',
-                'product_img.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+                'product_img.*' => 'max:2048',
                 'visibility' => 'required|in:Published,Scheduled',
             ]);
 
