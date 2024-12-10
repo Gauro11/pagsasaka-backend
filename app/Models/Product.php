@@ -17,9 +17,10 @@ class Product extends Model
         'stocks',
         'product_img',
         'visibility',
-        'is_archived'
+        'is_archived',
+        'account_id',
     ];
-
+    
     protected $casts = [
         'product_img' => 'array',
     ];

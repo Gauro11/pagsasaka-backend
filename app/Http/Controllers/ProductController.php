@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Models\ApiLog;
 use App\Models\Product;
+use App\Models\Order;
+use App\Models\Cart;
+use Auth;
 use Throwable;
 
 class ProductController extends Controller
@@ -27,6 +30,17 @@ class ProductController extends Controller
                 'visibility' => 'required|in:Published,Scheduled',
             ]);
 
+            // Ensure the user is authenticated
+            if (!auth()->check()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Unauthorized. Please log in to add a product.',
+                ], 500);
+            }
+
+            // Get the authenticated user's account ID
+            $accountId = auth()->id();
+
             // Handle image uploads
             $imagePaths = [];
             if ($request->hasFile('product_img')) {
@@ -38,6 +52,9 @@ class ProductController extends Controller
 
             // Assign the image paths directly (not as a JSON string)
             $validated['product_img'] = $imagePaths;
+
+            // Add the authenticated user's ID to the validated data
+            $validated['account_id'] = $accountId;
 
             // Create the product
             $product = Product::create($validated);
@@ -76,6 +93,7 @@ class ProductController extends Controller
             return response()->json($response, 500);
         }
     }
+
 
     public function editProduct(Request $request, $id)
     {
@@ -228,46 +246,264 @@ class ProductController extends Controller
         }
     }
 
-    // public function getProductbyId(Request $request)
-    // {
+    public function getProductById($id)
+    {
+        try {
+            $product = Product::find($id);
 
-    // }
+            if (!$product) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Product not found.',
+                ], 404);
+            }
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Product retrieved successfully.',
+                'product' => $product,
+            ], 200);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve the product.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getProductsByAccountId(Request $request, $accountId)
+    {
+        try {
+            $searchTerm = $request->input('search', null); // Optional search term
+            $perPage = $request->input('per_page', 10); // Items per page (default: 10)
+
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'is_archived')
+                ->where('account_id', $accountId)
+                ->where('is_archived', '0') // Assuming we only want active products
+                ->when($searchTerm, function ($query, $searchTerm) {
+                    return $query->where(function ($activeQuery) use ($searchTerm) {
+                        $activeQuery->where('product_name', 'like', '%' . $searchTerm . '%')
+                            ->orWhere('description', 'like', '%' . $searchTerm . '%');
+                    });
+                });
+
+            $result = $query->paginate($perPage);
+
+            if ($result->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No products found for the given account ID matching the criteria.',
+                ], 404);
+            }
+
+            $formattedProducts = $result->getCollection()->transform(function ($product) {
+                return [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'stocks' => $product->stocks,
+                    'product_img' => $product->product_img,
+                    'category_id' => $product->category_id,
+                    'is_active' => $product->is_archived == 0,
+                ];
+            });
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Products retrieved successfully.',
+                'products' => $formattedProducts,
+                'pagination' => [
+                    'total' => $result->total(),
+                    'per_page' => $result->perPage(),
+                    'current_page' => $result->currentPage(),
+                    'last_page' => $result->lastPage(),
+                ],
+            ], 200);
+
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve products.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
     public function deleteProduct($id)
-{
-    try {
-        $product = Product::findOrFail($id); // Find or throw 404
+    {
+        try {
+            $product = Product::findOrFail($id); // Find or throw 404
 
-        // Check if the product is already archived
-        if ($product->is_archived == "1") {
+            // Check if the product is already archived
+            if ($product->is_archived == "1") {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => "Product has already been archived.",
+                ];
+                $this->logAPICalls('deleteProduct', $id, [], [$response]);
+                return response()->json($response, 400); // Return a 400 Bad Request response
+            }
+
+            // Archive the product
+            $product->update(['is_archived' => "1"]);
+
             $response = [
-                'isSuccess' => false,
-                'message' => "Product has already been archived.",
+                'isSuccess' => true,
+                'message' => "Product successfully deleted."
             ];
             $this->logAPICalls('deleteProduct', $id, [], [$response]);
-            return response()->json($response, 400); // Return a 400 Bad Request response
+            return response()->json($response, 200);
+
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => "Failed to delete the product.",
+                'error' => $e->getMessage()
+            ];
+            $this->logAPICalls('deleteProduct', "", [], [$response]);
+            return response()->json($response, 500);
+        }
+    }
+    public function buyProduct(Request $request)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ];
+            $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the failed API call
+            return response()->json($response, 500);
         }
 
-        // Archive the product
-        $product->update(['is_archived' => "1"]);
+        try {
+            $validated = $request->validate([
+                'product_id' => 'required|integer',
+                'quantity' => 'required|integer|min:1',
+            ]);
 
-        $response = [
-            'isSuccess' => true,
-            'message' => "Product successfully deleted."
-        ];
-        $this->logAPICalls('deleteProduct', $id, [], [$response]);
-        return response()->json($response, 200);
+            $product = Product::find($validated['product_id']);
 
-    } catch (Throwable $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => "Failed to delete the product.",
-            'error' => $e->getMessage()
-        ];
-        $this->logAPICalls('deleteProduct', "", [], [$response]);
-        return response()->json($response, 500);
+            if (!$product) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Product not found',
+                ];
+                $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the failed API call
+                return response()->json($response, 500);
+            }
+
+            if ($product->stocks < $validated['quantity']) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Insufficient stock',
+                ];
+                $this->logAPICalls('buyProduct', $product->id, $request->all(), [$response]); // Log the failed API call
+                return response()->json($response, 500);
+            }
+
+            // Deduct stock
+            $product->stocks -= $validated['quantity'];
+            $product->save();
+
+            // Calculate total price
+            $totalAmount = $product->price * $validated['quantity'];
+
+            // Create order
+            $order = Order::create([
+                'account_id' => $user->id,
+                'product_id' => $product->id,
+                'quantity' => $validated['quantity'],
+                'total_amount' => $totalAmount,
+            ]);
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Order placed successfully',
+                'order' => $order,
+            ];
+            $this->logAPICalls('buyProduct', $product->id, $request->all(), [$response]); // Log the successful API call
+            return response()->json($response, 200);
+
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'An error occurred while placing the order.',
+                'error' => $e->getMessage(),
+            ];
+            $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the exception
+            return response()->json($response, 500);
+        }
     }
-}
+
+    public function addToCart(Request $request)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ];
+            $this->logAPICalls('addToCart', "", $request->all(), [$response]); // Log the failed API call
+            return response()->json($response, 500);
+        }
+
+        try {
+            $validated = $request->validate([
+                'product_id' => 'required|integer',
+                'quantity' => 'required|integer|min:1',
+            ]);
+
+            $product = Product::find($validated['product_id']);
+
+            if (!$product) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Product not found',
+                ];
+                $this->logAPICalls('addToCart', "", $request->all(), [$response]); // Log the failed API call
+                return response()->json($response, 500);
+            }
+
+            // Optionally check for maximum stock constraints
+            if ($validated['quantity'] > $product->stocks) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Requested quantity exceeds available stock.',
+                ];
+                $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]); // Log the failed API call
+                return response()->json($response, 500);
+            }
+
+            // Create cart entry
+            $cart = Cart::create([
+                'account_id' => $user->id,
+                'product_id' => $product->id,
+                'quantity' => $validated['quantity'],
+            ]);
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Product added to cart successfully',
+                'cart' => $cart,
+            ];
+            $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]); // Log the successful API call
+            return response()->json($response, 200);
+
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'An error occurred while adding the product to the cart.',
+                'error' => $e->getMessage(),
+            ];
+            $this->logAPICalls('addToCart', "", $request->all(), [$response]); // Log the exception
+            return response()->json($response, 500);
+        }
+    }
 
 
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)

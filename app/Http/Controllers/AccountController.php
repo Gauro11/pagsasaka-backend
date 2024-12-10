@@ -218,7 +218,6 @@ class AccountController extends Controller
     }
     
 
-
     // Update an existing user account.
     public function updateAccount(Request $request, $id)
     {
