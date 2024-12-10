@@ -26,7 +26,7 @@ class ProductController extends Controller
                 'price' => 'required|numeric|min:0',
                 'stocks' => 'required|integer|min:0',
                 'product_img' => 'required|array|min:3',
-                'product_img.*' => 'max:2048',
+                'product_img.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
                 'visibility' => 'required|in:Published,Scheduled',
             ]);
 
@@ -35,76 +35,48 @@ class ProductController extends Controller
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'Unauthorized. Please log in to add a product.',
-                ], 500);
+                ], 401);
             }
 
             // Get the authenticated user's account ID
             $accountId = auth()->id();
 
             // Handle image uploads
-            $imageUrls = [];
+            $imagePaths = [];
             if ($request->hasFile('product_img')) {
-                foreach ($request->file('product_img') as $index => $file) {
-                    // Define the target directory and file name
+                foreach ($request->file('product_img') as $image) {
                     $directory = public_path('img/products');
-                    $fileName = 'Product-' . $accountId . '-' . now()->format('YmdHis') . '-' . $index . '.' . $file->getClientOriginalExtension();
+                    $fileName = 'Product-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
 
-                    // Ensure the directory exists
                     if (!file_exists($directory)) {
                         mkdir($directory, 0755, true);
                     }
 
-                    // Move the file to the target directory
-                    $file->move($directory, $fileName);
-
-                    // Generate the file URL
-                    $imageUrls[] = asset('img/products/' . $fileName);
+                    $image->move($directory, $fileName);
+                    $imagePaths[] = asset('img/products/' . $fileName);
                 }
             }
 
-            // Assign the image URLs directly (not as a JSON string)
-            $validated['product_img'] = $imageUrls;
-
-            // Add the authenticated user's ID to the validated data
+            // Save product
+            $validated['product_img'] = $imagePaths; // Save as array
             $validated['account_id'] = $accountId;
 
-            // Create the product
             $product = Product::create($validated);
 
-            // Prepare success response
-            $response = [
+            return response()->json([
                 'isSuccess' => true,
                 'message' => 'Product successfully created.',
                 'product' => $product,
-            ];
-
-            // Log API call
-            $this->logAPICalls('addProduct', $product->id, $request->all(), $response);
-
-            return response()->json($response, 200);
-
-        } catch (ValidationException $v) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Validation failed.',
-                'errors' => $v->errors(),
-            ];
-
-            $this->logAPICalls('addProduct', null, $request->all(), $response);
-
-            return response()->json($response, 500);
+            ], 200);
         } catch (Throwable $e) {
-            $response = [
+            return response()->json([
                 'isSuccess' => false,
                 'message' => 'Failed to create the product.',
                 'error' => $e->getMessage(),
-            ];
-
-            $this->logAPICalls('addProduct', null, $request->all(), $response);
-
-            return response()->json($response, 500);
+            ], 500);
         }
     }
+
 
     public function editProduct(Request $request, $id)
     {
