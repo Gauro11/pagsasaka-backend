@@ -200,7 +200,7 @@ class AccountController extends Controller
             $this->logAPICalls('verifyOTP', "", $request->all(), $response);
     
             return response()->json($response, 200);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Error verifying OTP: ' . $e->getMessage(), [
                 'request_data' => $request->all(),
             ]);
@@ -217,7 +217,6 @@ class AccountController extends Controller
         }
     }
     
-
 
     // Update an existing user account.
     public function updateAccount(Request $request, $id)
