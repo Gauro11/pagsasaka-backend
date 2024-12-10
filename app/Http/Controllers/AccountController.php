@@ -191,7 +191,7 @@ class AccountController extends Controller
             }
     
             // Mark OTP as used or delete it (optional)
-           // DB::table('otps')->where('id', $otpRecord->id)->delete();
+            DB::table('otps')->where('id', $otpRecord->id)->delete();
     
             $response = [
                 'isSuccess' => true,
