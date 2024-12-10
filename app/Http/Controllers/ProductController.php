@@ -298,12 +298,25 @@ class ProductController extends Controller
         }
     }
 
-    public function getProductsByAccountId(Request $request, $accountId)
+    public function getProductsByAccountId(Request $request)
     {
         try {
+            // Ensure the user is authenticated
+            if (!auth()->check()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Unauthorized. Please log in to view products.',
+                ], 401);
+            }
+
+            // Get the authenticated user's account ID
+            $accountId = auth()->id();
+
+            // Get optional query parameters
             $searchTerm = $request->input('search', null); // Optional search term
             $perPage = $request->input('per_page', 10); // Items per page (default: 10)
 
+            // Build the query
             $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'is_archived')
                 ->where('account_id', $accountId)
                 ->where('is_archived', '0') // Assuming we only want active products
@@ -314,15 +327,18 @@ class ProductController extends Controller
                     });
                 });
 
+            // Paginate results
             $result = $query->paginate($perPage);
 
+            // Check if results are empty
             if ($result->isEmpty()) {
                 return response()->json([
                     'isSuccess' => false,
-                    'message' => 'No products found for the given account ID matching the criteria.',
+                    'message' => 'No products found for your account matching the criteria.',
                 ], 404);
             }
 
+            // Format the products
             $formattedProducts = $result->getCollection()->transform(function ($product) {
                 return [
                     'id' => $product->id,
@@ -336,6 +352,7 @@ class ProductController extends Controller
                 ];
             });
 
+            // Return the response
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Products retrieved successfully.',

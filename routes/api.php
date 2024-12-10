@@ -95,9 +95,8 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('add', [ProductController::class, 'addProduct']);
     Route::post('edit/{id}', [ProductController::class, 'editProduct']);
     Route::post('list', [ProductController::class, 'getAllProducts']);
-    Route::post('list/{id}', [ProductController::class, 'getProductbyId']);
-    Route::get('id/{id}', [ProductController::class, 'getProductById']);
-    Route::post('account-id/{id}', [ProductController::class, 'getProductsByAccountId']);
+    Route::get('by-id/{id}', [ProductController::class, 'getProductById']);
+    Route::post('account', [ProductController::class, 'getProductsByAccountId']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
     Route::post('buy', [ProductController::class, 'buyProduct']);
     Route::post('cart', [ProductController::class, 'addToCart']);
