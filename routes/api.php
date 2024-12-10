@@ -115,9 +115,9 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
 });*/
 
-// Route::post('/sample', function (Request $request) {
-//     return $request->requirements;
-// });
+Route::post('/sample', function (Request $request) {
+    return $request->requirements;
+});
 
 // Route::controller(OrgLogController::class)->group(function () {
 //     Route::post('organizations', 'getOrganization');
