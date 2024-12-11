@@ -106,7 +106,7 @@ class ProductController extends Controller
                 'price' => 'sometimes|numeric|min:0',
                 'stocks' => 'sometimes|integer|min:0',
                 'product_img' => 'sometimes|array',
-                'product_img.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+                'product_img.*' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048', // Ensure proper validation
                 'visibility' => 'sometimes|in:Published,Scheduled',
             ]);
 
@@ -157,7 +157,6 @@ class ProductController extends Controller
             $this->logAPICalls('editProduct', $product->id, $request->all(), $response);
 
             return response()->json($response, 200);
-
         } catch (ModelNotFoundException $e) {
             $response = [
                 'isSuccess' => false,
@@ -388,6 +387,7 @@ class ProductController extends Controller
             $this->logAPICalls('deleteProduct', "", [], [$response]);
             return response()->json($response, 500);
         }
+
     }
     public function buyProduct(Request $request)
     {
