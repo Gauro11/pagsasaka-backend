@@ -32,10 +32,15 @@ class ProductController extends Controller
 
             // Ensure the user is authenticated
             if (!auth()->check()) {
-                return response()->json([
+                $response = [
                     'isSuccess' => false,
                     'message' => 'Unauthorized. Please log in to add a product.',
-                ], 401);
+                ];
+
+                // Log the API call
+                $this->logAPICalls('addProduct', null, $request->all(), $response);
+
+                return response()->json($response, 401);
             }
 
             // Get the authenticated user's account ID
@@ -63,20 +68,29 @@ class ProductController extends Controller
 
             $product = Product::create($validated);
 
-            return response()->json([
+            $response = [
                 'isSuccess' => true,
                 'message' => 'Product successfully created.',
                 'product' => $product,
-            ], 200);
+            ];
+
+            // Log the API call
+            $this->logAPICalls('addProduct', $product->id, $request->all(), $response);
+
+            return response()->json($response, 200);
         } catch (Throwable $e) {
-            return response()->json([
+            $response = [
                 'isSuccess' => false,
                 'message' => 'Failed to create the product.',
                 'error' => $e->getMessage(),
-            ], 500);
+            ];
+
+            // Log the API call
+            $this->logAPICalls('addProduct', null, $request->all(), $response);
+
+            return response()->json($response, 500);
         }
     }
-
 
     public function editProduct(Request $request, $id)
     {
@@ -98,42 +112,35 @@ class ProductController extends Controller
 
             // Handle image uploads if provided
             if ($request->hasFile('product_img')) {
-                // Define the target directory
                 $directory = public_path('img/products');
+                $imagePaths = [];
+
+                // Ensure the directory exists
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
 
                 // Delete old images
                 if (!empty($product->product_img)) {
                     foreach ($product->product_img as $oldImage) {
-                        // Convert URL to path
                         $path = str_replace(asset(''), '', $oldImage);
                         $fullPath = public_path($path);
 
                         if (file_exists($fullPath)) {
-                            unlink($fullPath); // Delete the old file
+                            unlink($fullPath);
                         }
                     }
                 }
 
                 // Upload new images
-                $imageUrls = [];
-                foreach ($request->file('product_img') as $index => $file) {
-                    // Generate unique file name
-                    $fileName = 'Product-' . $product->id . '-' . now()->format('YmdHis') . '-' . $index . '.' . $file->getClientOriginalExtension();
-
-                    // Ensure the directory exists
-                    if (!file_exists($directory)) {
-                        mkdir($directory, 0755, true);
-                    }
-
-                    // Move the file to the target directory
+                foreach ($request->file('product_img') as $file) {
+                    $fileName = 'Product-' . $product->id . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $file->getClientOriginalExtension();
                     $file->move($directory, $fileName);
-
-                    // Generate the public URL for the file
-                    $imageUrls[] = asset('img/products/' . $fileName);
+                    $imagePaths[] = asset('img/products/' . $fileName);
                 }
 
-                // Update the validated data with the new image URLs
-                $validated['product_img'] = $imageUrls;
+                // Update the validated data with the new image paths
+                $validated['product_img'] = $imagePaths;
             }
 
             // Update the product with the validated data
@@ -157,7 +164,7 @@ class ProductController extends Controller
                 'message' => 'Product not found.',
             ];
 
-            return response()->json($response, 500);
+            return response()->json($response, 404);
         } catch (ValidationException $v) {
             $response = [
                 'isSuccess' => false,
@@ -165,7 +172,7 @@ class ProductController extends Controller
                 'errors' => $v->errors(),
             ];
 
-            return response()->json($response, 500);
+            return response()->json($response, 422);
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
@@ -177,14 +184,13 @@ class ProductController extends Controller
         }
     }
 
-
     public function getAllProducts(Request $request)
     {
         try {
             $searchTerm = $request->input('search', null);
             $perPage = $request->input('per_page', 10);
 
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'category_id', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'category_id', 'visibility', 'is_archived')
                 ->where('is_archived', '0') // Assuming we only want active products
                 ->when($searchTerm, function ($query, $searchTerm) {
                     return $query->where(function ($activeQuery) use ($searchTerm) {
@@ -212,6 +218,7 @@ class ProductController extends Controller
                     'price' => $product->price,
                     'stocks' => $product->stocks,
                     'category_id' => $product->category_id,
+                    'visibility' => $product->visibility,
                     'is_archived' => $product->is_archived,
                 ];
             });
@@ -261,7 +268,7 @@ class ProductController extends Controller
                 'message' => 'Product retrieved successfully.',
                 'product' => $product,
             ], 200);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Failed to retrieve the product.',
@@ -289,7 +296,7 @@ class ProductController extends Controller
             $perPage = $request->input('per_page', 10); // Items per page (default: 10)
 
             // Build the query
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
                 ->where('account_id', $accountId)
                 ->where('is_archived', '0') // Assuming we only want active products
                 ->when($searchTerm, function ($query, $searchTerm) {
@@ -320,6 +327,7 @@ class ProductController extends Controller
                     'stocks' => $product->stocks,
                     'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
+                    'visibility' => $product->visibility,
                     'is_archived' => $product->is_archived == 0,
                 ];
             });
@@ -519,7 +527,6 @@ class ProductController extends Controller
             return response()->json($response, 500);
         }
     }
-
 
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {
