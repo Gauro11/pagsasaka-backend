@@ -266,7 +266,7 @@ class ProductController extends Controller
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Product retrieved successfully.',
-                'product' => $product,
+                'product' => [$product],
             ], 200);
         } catch (Throwable $e) {
             return response()->json([
