@@ -19,6 +19,7 @@ class Product extends Model
         'visibility',
         'is_archived',
         'account_id',
+        
     ];
     
     protected $casts = [

@@ -35,6 +35,8 @@ Route::options('/{any}', function (Request $request) {
 
 
 Route::post('shipments', [ShipmentController::class, 'addShipment']);
+Route::middleware('auth:sanctum')->get('getOrders', [ShipmentController::class, 'getOrders']);
+
 
 Route::post('create', [QuestionController::class, 'createQuestion']);
 Route::get('questions', [QuestionController::class, 'getAllQuestions']);
@@ -49,10 +51,10 @@ Route::post('verify-otp', [AccountController::class, 'verifyOTP']);
 Route::post('send-email', [EmailController::class, 'sendEmail']);
 
 
-Route::post('academic-year/create', [AcademicYearController::class, 'addAcademicYear']);
-Route::post('academic-year/deactivate/{id}', [AcademicYearController::class, 'deactivateAcademicYear']);
-Route::post('academic-years/update-status', [AcademicYearController::class, 'updateAcademicYearStatus']);
-Route::post('academic-years', [AcademicYearController::class, 'getAcademicYear']);
+// Route::post('academic-year/create', [AcademicYearController::class, 'addAcademicYear']);
+// Route::post('academic-year/deactivate/{id}', [AcademicYearController::class, 'deactivateAcademicYear']);
+// Route::post('academic-years/update-status', [AcademicYearController::class, 'updateAcademicYearStatus']);
+// Route::post('academic-years', [AcademicYearController::class, 'getAcademicYear']);
 
 
 
@@ -100,7 +102,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::get('id/{id}', [ProductController::class, 'getProductById']);
     Route::post('account-id/{id}', [ProductController::class, 'getProductsByAccountId']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
-    Route::post('buy', [ProductController::class, 'buyProduct']);
+    Route::post('buy-product/{product_id}', [ProductController::class, 'buyProduct']);
     Route::post('cart', [ProductController::class, 'addToCart']);
 
 });

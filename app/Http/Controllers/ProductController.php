@@ -10,8 +10,9 @@ use App\Models\ApiLog;
 use App\Models\Product;
 use App\Models\Order;
 use App\Models\Cart;
-use Auth;
+use Illuminate\Support\Facades\Auth;
 use Throwable;
+use Carbon\Carbon;
 
 class ProductController extends Controller
 {
@@ -366,10 +367,11 @@ class ProductController extends Controller
             return response()->json($response, 500);
         }
     }
-    public function buyProduct(Request $request)
+
+    public function buyProduct(Request $request, $product_id)
     {
         $user = Auth::user();
-
+    
         if (!$user) {
             $response = [
                 'isSuccess' => false,
@@ -378,15 +380,14 @@ class ProductController extends Controller
             $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the failed API call
             return response()->json($response, 500);
         }
-
+    
         try {
             $validated = $request->validate([
-                'product_id' => 'required|integer',
                 'quantity' => 'required|integer|min:1',
             ]);
-
-            $product = Product::find($validated['product_id']);
-
+    
+            $product = Product::find($product_id);
+    
             if (!$product) {
                 $response = [
                     'isSuccess' => false,
@@ -395,7 +396,7 @@ class ProductController extends Controller
                 $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the failed API call
                 return response()->json($response, 500);
             }
-
+    
             if ($product->stocks < $validated['quantity']) {
                 $response = [
                     'isSuccess' => false,
@@ -404,30 +405,43 @@ class ProductController extends Controller
                 $this->logAPICalls('buyProduct', $product->id, $request->all(), [$response]); // Log the failed API call
                 return response()->json($response, 500);
             }
-
+    
             // Deduct stock
             $product->stocks -= $validated['quantity'];
             $product->save();
-
+    
             // Calculate total price
             $totalAmount = $product->price * $validated['quantity'];
-
-            // Create order
+    
+            // Create order with 'processing' as the initial status
             $order = Order::create([
                 'account_id' => $user->id,
                 'product_id' => $product->id,
                 'quantity' => $validated['quantity'],
                 'total_amount' => $totalAmount,
+                'status' => 'processing', // Default status set to 'processing'
+                'ship_to' => $request->input('ship_to', 'Default Shipping Address'), // Provide a default if not sent
+                'created_at' => now()->format('Y-m-d H:i:s'), // Explicitly set created_at
+                'updated_at' => now()->format('Y-m-d H:i:s'), // Explicitly set updated_at
             ]);
-
+    
             $response = [
                 'isSuccess' => true,
                 'message' => 'Order placed successfully',
-                'order' => $order,
+                'order' => [
+                    'id' => $order->id,
+                    'account_id' => $order->account_id,
+                    'product_id' => $order->product_id,
+                    'quantity' => $order->quantity,
+                    'total_amount' => $order->total_amount,
+                    'status' => $order->status, // Include the status in the response
+                    'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
+                    'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
+                ],
             ];
             $this->logAPICalls('buyProduct', $product->id, $request->all(), [$response]); // Log the successful API call
             return response()->json($response, 200);
-
+    
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
@@ -438,6 +452,9 @@ class ProductController extends Controller
             return response()->json($response, 500);
         }
     }
+    
+    
+    
 
     public function addToCart(Request $request)
     {
