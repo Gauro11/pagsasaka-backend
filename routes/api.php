@@ -99,7 +99,6 @@ Route::prefix('category')->group(function () {
 Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('add', [ProductController::class, 'addProduct']);
     Route::post('edit/{id}', [ProductController::class, 'editProduct']);
-    Route::post('list', [ProductController::class, 'getAllProductsList']);
     Route::get('by-id/{id}', [ProductController::class, 'getProductById']);
     Route::post('account', [ProductController::class, 'getProductsByAccountId']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
@@ -107,6 +106,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('cart', [ProductController::class, 'addToCart']);
 });
 
+Route::post('list', [ProductController::class, 'getAllProductsList']);
 
 Route::prefix('dropdown')->group(function () {
     Route::get('category', [CategoryController::class, 'dropdownCategory']);
