@@ -19,5 +19,14 @@ class Order extends Model
         'ship_to',
         'status',
     ];
+
+// In Order model
+public function product()
+{
+    return $this->belongsTo(Product::class, 'product_id', 'id');
+}
+
+
+    
 }
 
