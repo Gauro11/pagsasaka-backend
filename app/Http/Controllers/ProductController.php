@@ -185,82 +185,89 @@ class ProductController extends Controller
     }
 
     public function getAllProductsList(Request $request)
-{
-    try {
-        // Get optional query parameters
-        $searchTerm = $request->input('search', null); // Optional search term
-        $perPage = $request->input('per_page', 10); // Items per page (default: 10)
-
-        // Build the query
-        $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
-            ->where('is_archived', '0') // Assuming we only want active products
-            ->when($searchTerm, function ($query, $searchTerm) {
-                return $query->where(function ($activeQuery) use ($searchTerm) {
-                    $activeQuery->where('product_name', 'like', '%' . $searchTerm . '%')
-                        ->orWhere('description', 'like', '%' . $searchTerm . '%');
+    {
+        try {
+            // Get optional query parameters
+            $searchTerm = $request->input('search', null); // Optional search term
+            $perPage = $request->input('per_page', 10); // Items per page (default: 10)
+    
+            // Build the query
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
+                ->where('is_archived', '0') // Assuming we only want active products
+                ->when($searchTerm, function ($query, $searchTerm) {
+                    return $query->where(function ($activeQuery) use ($searchTerm) {
+                        $activeQuery->where('product_name', 'like', '%' . $searchTerm . '%')
+                            ->orWhere('description', 'like', '%' . $searchTerm . '%');
+                    });
                 });
+    
+            // Paginate results
+            $result = $query->paginate($perPage);
+    
+            // Check if results are empty
+            if ($result->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No products found matching the criteria.',
+                ], 404);
+            }
+    
+            // Format the products
+            $formattedProducts = $result->getCollection()->transform(function ($product) {
+                // Base URL for product images
+                $baseUrl = url('/img/products'); // The local URL to prepend to each image
+    
+                // Ensure product_img is correctly processed
+                $productImages = is_string($product->product_img)
+                    ? explode(',', $product->product_img) // Split string into array if it's a string
+                    : (is_array($product->product_img) ? $product->product_img : []); // Use as is if already an array, or default to empty
+    
+                // Extract the file name and prepend with the local base URL
+                $imagePaths = array_map(function ($img) use ($baseUrl) {
+                    // Extract the file name from the full URL
+                    $pathParts = parse_url($img);
+                    $fileName = basename($pathParts['path']); // Get the file name (e.g., Product-76-20241211025207-6758fe57aa4e1.png)
+    
+                    // Return the full local URL with the file name
+                    return $baseUrl . '/' . $fileName;
+                }, $productImages);
+    
+                return [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'stocks' => $product->stocks,
+                    'product_img' => $imagePaths,
+                    'category_id' => $product->category_id,
+                    'visibility' => $product->visibility,
+                    'is_archived' => $product->is_archived == 0,
+                ];
             });
-
-        // Paginate results
-        $result = $query->paginate($perPage);
-
-        // Check if results are empty
-        if ($result->isEmpty()) {
+    
+            // Return the response
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Products retrieved successfully.',
+                'products' => $formattedProducts,
+                'pagination' => [
+                    'total' => $result->total(),
+                    'per_page' => $result->perPage(),
+                    'current_page' => $result->currentPage(),
+                    'last_page' => $result->lastPage(),
+                ],
+            ], 200);
+    
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'No products found matching the criteria.',
-            ], 404);
+                'message' => 'Failed to retrieve products.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        // Format the products
-        $formattedProducts = $result->getCollection()->transform(function ($product) {
-            // Base URL for product images
-            $baseUrl = url('/img/products');
-
-            // Ensure `product_img` is correctly processed
-            $productImages = is_string($product->product_img)
-                ? explode(',', $product->product_img) // Split string into array if it's a string
-                : (is_array($product->product_img) ? $product->product_img : []); // Use as is if already an array, or default to empty
-
-            // Transform image paths into full URLs
-            $imagePaths = array_map(function ($img) use ($baseUrl) {
-                return $baseUrl . '/' . $img;
-            }, $productImages);
-
-            return [
-                'id' => $product->id,
-                'product_name' => $product->product_name,
-                'description' => $product->description,
-                'price' => $product->price,
-                'stocks' => $product->stocks,
-                'product_img' => $imagePaths,
-                'category_id' => $product->category_id,
-                'visibility' => $product->visibility,
-                'is_archived' => $product->is_archived == 0,
-            ];
-        });
-
-        // Return the response
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Products retrieved successfully.',
-            'products' => $formattedProducts,
-            'pagination' => [
-                'total' => $result->total(),
-                'per_page' => $result->perPage(),
-                'current_page' => $result->currentPage(),
-                'last_page' => $result->lastPage(),
-            ],
-        ], 200);
-
-    } catch (Throwable $e) {
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'Failed to retrieve products.',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
+    
+    
 
 
 
