@@ -26,6 +26,13 @@ class Product extends Model
         'product_img' => 'array',
     ];
 
+    // In Product.php
+public function orders()
+{
+    return $this->hasMany(Order::class, 'product_id', 'id'); // Adjust foreign key if needed
+}
+
+
     
 }
 
