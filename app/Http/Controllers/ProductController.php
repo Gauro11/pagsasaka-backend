@@ -27,16 +27,21 @@ class ProductController extends Controller
                 'price' => 'required|numeric|min:0',
                 'stocks' => 'required|integer|min:0',
                 'product_img' => 'required|array|min:3',
-                'product_img.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+                'product_img.*' => 'max:2048',
                 'visibility' => 'required|in:Published,Scheduled',
             ]);
 
             // Ensure the user is authenticated
             if (!auth()->check()) {
-                return response()->json([
+                $response = [
                     'isSuccess' => false,
                     'message' => 'Unauthorized. Please log in to add a product.',
-                ], 500);
+                ];
+
+                // Log the API call
+                $this->logAPICalls('addProduct', null, $request->all(), $response);
+
+                return response()->json($response, 401);
             }
 
             // Get the authenticated user's account ID
@@ -46,42 +51,34 @@ class ProductController extends Controller
             $imagePaths = [];
             if ($request->hasFile('product_img')) {
                 foreach ($request->file('product_img') as $image) {
-                    $path = $image->store('products', 'public');
-                    $imagePaths[] = Storage::url($path); // Generate and store public URL
+                    $directory = public_path('img/products');
+                    $fileName = 'Product-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
+
+                    if (!file_exists($directory)) {
+                        mkdir($directory, 0755, true);
+                    }
+
+                    $image->move($directory, $fileName);
+                    $imagePaths[] = asset('img/products/' . $fileName);
                 }
             }
 
-            // Assign the image paths directly (not as a JSON string)
-            $validated['product_img'] = $imagePaths;
-
-            // Add the authenticated user's ID to the validated data
+            // Save product
+            $validated['product_img'] = $imagePaths; // Save as array
             $validated['account_id'] = $accountId;
 
-            // Create the product
             $product = Product::create($validated);
 
-            // Prepare success response
             $response = [
                 'isSuccess' => true,
                 'message' => 'Product successfully created.',
                 'product' => $product,
             ];
 
-            // Log API call
+            // Log the API call
             $this->logAPICalls('addProduct', $product->id, $request->all(), $response);
 
             return response()->json($response, 200);
-
-        } catch (ValidationException $v) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Validation failed.',
-                'errors' => $v->errors(),
-            ];
-
-            $this->logAPICalls('addProduct', null, $request->all(), $response);
-
-            return response()->json($response, 500);
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
@@ -89,12 +86,12 @@ class ProductController extends Controller
                 'error' => $e->getMessage(),
             ];
 
+            // Log the API call
             $this->logAPICalls('addProduct', null, $request->all(), $response);
 
             return response()->json($response, 500);
         }
     }
-
 
     public function editProduct(Request $request, $id)
     {
@@ -110,30 +107,37 @@ class ProductController extends Controller
                 'price' => 'sometimes|numeric|min:0',
                 'stocks' => 'sometimes|integer|min:0',
                 'product_img' => 'sometimes|array',
-                'product_img.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+                'product_img.*' => 'sometimes|max:2048',
                 'visibility' => 'sometimes|in:Published,Scheduled',
             ]);
 
             // Handle image uploads if provided
             if ($request->hasFile('product_img')) {
+                $directory = public_path('img/products');
+                $imagePaths = [];
+
+                // Ensure the directory exists
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
+                }
+
                 // Delete old images
-                $oldImages = $product->product_img;  // No need to json_decode anymore since it's an array
-                if (!empty($oldImages)) {
-                    foreach ($oldImages as $oldImage) {
-                        $path = str_replace('/storage', 'public', $oldImage); // Convert URL to storage path
-                        if (Storage::exists($path)) {
-                            Storage::delete($path);
+                if (!empty($product->product_img)) {
+                    foreach ($product->product_img as $oldImage) {
+                        $path = str_replace(asset(''), '', $oldImage);
+                        $fullPath = public_path($path);
+
+                        if (file_exists($fullPath)) {
+                            unlink($fullPath);
                         }
                     }
                 }
 
                 // Upload new images
-                $imagePaths = [];
-                foreach ($request->file('product_img') as $image) {
-                    // Store the new image
-                    $path = $image->store('products', 'public');
-                    // Store the URL
-                    $imagePaths[] = Storage::url($path);
+                foreach ($request->file('product_img') as $file) {
+                    $fileName = 'Product-' . $product->id . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $file->getClientOriginalExtension();
+                    $file->move($directory, $fileName);
+                    $imagePaths[] = asset('img/products/' . $fileName);
                 }
 
                 // Update the validated data with the new image paths
@@ -154,14 +158,13 @@ class ProductController extends Controller
             $this->logAPICalls('editProduct', $product->id, $request->all(), $response);
 
             return response()->json($response, 200);
-
         } catch (ModelNotFoundException $e) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Product not found.',
             ];
 
-            return response()->json($response, 500);
+            return response()->json($response, 404);
         } catch (ValidationException $v) {
             $response = [
                 'isSuccess' => false,
@@ -169,7 +172,7 @@ class ProductController extends Controller
                 'errors' => $v->errors(),
             ];
 
-            return response()->json($response, 500);
+            return response()->json($response, 422);
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
@@ -187,7 +190,7 @@ class ProductController extends Controller
             $searchTerm = $request->input('search', null);
             $perPage = $request->input('per_page', 10);
 
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'category_id', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'category_id', 'visibility', 'is_archived')
                 ->where('is_archived', '0') // Assuming we only want active products
                 ->when($searchTerm, function ($query, $searchTerm) {
                     return $query->where(function ($activeQuery) use ($searchTerm) {
@@ -215,7 +218,8 @@ class ProductController extends Controller
                     'price' => $product->price,
                     'stocks' => $product->stocks,
                     'category_id' => $product->category_id,
-                    'is_active' => $product->is_archived,
+                    'visibility' => $product->visibility,
+                    'is_archived' => $product->is_archived,
                 ];
             });
 
@@ -264,7 +268,7 @@ class ProductController extends Controller
                 'message' => 'Product retrieved successfully.',
                 'product' => $product,
             ], 200);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Failed to retrieve the product.',
@@ -273,13 +277,26 @@ class ProductController extends Controller
         }
     }
 
-    public function getProductsByAccountId(Request $request, $accountId)
+    public function getProductsByAccountId(Request $request)
     {
         try {
+            // Ensure the user is authenticated
+            if (!auth()->check()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Unauthorized. Please log in to view products.',
+                ], 401);
+            }
+
+            // Get the authenticated user's account ID
+            $accountId = auth()->id();
+
+            // Get optional query parameters
             $searchTerm = $request->input('search', null); // Optional search term
             $perPage = $request->input('per_page', 10); // Items per page (default: 10)
 
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'is_archived')
+            // Build the query
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
                 ->where('account_id', $accountId)
                 ->where('is_archived', '0') // Assuming we only want active products
                 ->when($searchTerm, function ($query, $searchTerm) {
@@ -289,15 +306,18 @@ class ProductController extends Controller
                     });
                 });
 
+            // Paginate results
             $result = $query->paginate($perPage);
 
+            // Check if results are empty
             if ($result->isEmpty()) {
                 return response()->json([
                     'isSuccess' => false,
-                    'message' => 'No products found for the given account ID matching the criteria.',
+                    'message' => 'No products found for your account matching the criteria.',
                 ], 404);
             }
 
+            // Format the products
             $formattedProducts = $result->getCollection()->transform(function ($product) {
                 return [
                     'id' => $product->id,
@@ -307,10 +327,12 @@ class ProductController extends Controller
                     'stocks' => $product->stocks,
                     'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
-                    'is_active' => $product->is_archived == 0,
+                    'visibility' => $product->visibility,
+                    'is_archived' => $product->is_archived == 0,
                 ];
             });
 
+            // Return the response
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Products retrieved successfully.',
@@ -366,6 +388,7 @@ class ProductController extends Controller
             $this->logAPICalls('deleteProduct', "", [], [$response]);
             return response()->json($response, 500);
         }
+
     }
 
     public function buyProduct(Request $request, $product_id)
@@ -521,7 +544,6 @@ class ProductController extends Controller
             return response()->json($response, 500);
         }
     }
-
 
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {
