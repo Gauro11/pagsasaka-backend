@@ -96,7 +96,7 @@ class ShipmentController extends Controller
                     'id' => $order->id,
                     'account_id' => $order->account_id,
                     'product_id' => $order->product_id,
-                    'ship_to' => $order->ship_to,
+                    'ship_to' => $order->ship_to, //shiip to the location 
                     'quantity' => $order->quantity,
                     'total_amount' => $order->total_amount,
                     'status' => $order->status,
