@@ -36,6 +36,8 @@ Route::options('/{any}', function (Request $request) {
 
 Route::post('shipments', [ShipmentController::class, 'addShipment']);
 Route::middleware('auth:sanctum')->get('getOrders', [ShipmentController::class, 'getOrders']);
+Route::middleware('auth:sanctum')->get('cancelled', [ShipmentController::class, 'getCancelledOrders']);
+Route::middleware('auth:sanctum')->get('refund', [ShipmentController::class, 'getRefundOrders']);
 
 
 Route::post('create', [QuestionController::class, 'createQuestion']);

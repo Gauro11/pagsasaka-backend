@@ -38,15 +38,13 @@ class ShipmentController extends Controller
                 return response()->json($response, 403);
             }
     
-            // Retrieve orders with eager loading for 'product'
+            // Retrieve orders with 'processing' status
             $orders = Order::with('product') // Eager load the product relationship
                 ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
                 ->where('account_id', $user->id)
+                ->where('status', 'processing') // Only get orders with 'processing' status
                 ->when($request->has('product_id'), function ($query) use ($request) {
                     $query->where('product_id', $request->product_id); 
-                })
-                ->when($request->has('status'), function ($query) use ($request) {
-                    $query->where('status', $request->status); 
                 })
                 ->orderBy('created_at', 'desc')
                 ->paginate($request->get('paginate', 10));
@@ -90,8 +88,8 @@ class ShipmentController extends Controller
                     'quantity' => $order->quantity,
                     'total_amount' => $order->total_amount,
                     'status' => $order->status,
-                    'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
-                    'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
+                   'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
+                   'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
                 ];
             });
     
@@ -108,6 +106,156 @@ class ShipmentController extends Controller
             ], 500);
         }
     }
+    
+
+    public function getCancelledOrders(Request $request)
+{
+    try {
+        // Authenticate the user
+        $user = Auth::user();
+        if (!$user) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ];
+            $this->logAPICalls('getCancelledOrders', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+        }
+
+        // Check if the user's role_id is Farmer (role_id = 2)
+        if ($user->role_id !== 2) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Access denied. Only Farmers can retrieve cancelled orders.',
+            ];
+            $this->logAPICalls('getCancelledOrders', $user->id, $request->all(), [$response]);
+            return response()->json($response, 403);
+        }
+
+        // Retrieve orders with 'Cancelled' status
+        $orders = Order::with('product') // Eager load the product relationship
+            ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
+            ->where('account_id', $user->id)
+            ->where('status', 'Cancelled') // Only get orders with 'Cancelled' status
+            ->when($request->has('product_id'), function ($query) use ($request) {
+                $query->where('product_id', $request->product_id); 
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->get('paginate', 10));
+
+        // Transform the collection to format the response and include product_name
+        $orders->getCollection()->transform(function ($order) {
+            // Retrieve product_name from the related product model, or return 'N/A' if not found
+            $productName = $order->product ? $order->product->product_name : 'N/A';
+
+            // Format the created_at and updated_at fields to "December 11 2024"
+            $order->created_at = Carbon::parse($order->created_at)->format('F d Y');
+            $order->updated_at = Carbon::parse($order->updated_at)->format('F d Y');
+
+            // Return the transformed order
+            return [
+                'id' => $order->id,
+                'account_id' => $order->account_id,
+                'product_id' => $order->product_id,
+                'product_name' => $productName, // Assign the product name
+                'ship_to' => $order->ship_to,
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'status' => $order->status,
+                'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
+                'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Cancelled orders retrieved successfully.',
+            'orders' => $orders,
+        ], 200);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred while retrieving cancelled orders.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
+public function getRefundOrders(Request $request)
+{
+    try {
+        // Authenticate the user
+        $user = Auth::user();
+        if (!$user) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ];
+            $this->logAPICalls('getRefundOrders', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+        }
+
+        // Check if the user's role_id is Farmer (role_id = 2)
+        if ($user->role_id !== 2) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Access denied. Only Farmers can retrieve refund orders.',
+            ];
+            $this->logAPICalls('getRefundOrders', $user->id, $request->all(), [$response]);
+            return response()->json($response, 403);
+        }
+
+        // Retrieve orders with 'Refund' status
+        $orders = Order::with('product') // Eager load the product relationship
+            ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
+            ->where('account_id', $user->id)
+            ->where('status', 'Refund') // Only get orders with 'Refund' status
+            ->when($request->has('product_id'), function ($query) use ($request) {
+                $query->where('product_id', $request->product_id); 
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->get('paginate', 10));
+
+        // Transform the collection to format the response and include product_name
+        $orders->getCollection()->transform(function ($order) {
+            // Retrieve product_name from the related product model, or return 'N/A' if not found
+            $productName = $order->product ? $order->product->product_name : 'N/A';
+
+            // Format the created_at and updated_at fields to "December 11 2024"
+            $order->created_at = Carbon::parse($order->created_at)->format('F d Y');
+            $order->updated_at = Carbon::parse($order->updated_at)->format('F d Y');
+
+            // Return the transformed order
+            return [
+                'id' => $order->id,
+                'account_id' => $order->account_id,
+                'product_id' => $order->product_id,
+                'product_name' => $productName, // Assign the product name
+                'ship_to' => $order->ship_to,
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'status' => $order->status,
+                'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
+                'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Refund orders retrieved successfully.',
+            'orders' => $orders,
+        ], 200);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred while retrieving refund orders.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
     
     
 
