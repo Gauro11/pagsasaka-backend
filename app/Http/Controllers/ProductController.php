@@ -267,11 +267,6 @@ class ProductController extends Controller
         }
     }
     
-    
-
-
-
-    
 
     public function getProductById($id)
     {
