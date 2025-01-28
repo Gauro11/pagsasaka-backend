@@ -14,6 +14,7 @@ use Throwable;
 class ShipmentController extends Controller
 {
     // Function to get a list of orders
+    //shipment
     public function getOrders(Request $request)
     {
         try {
