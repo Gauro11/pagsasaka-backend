@@ -38,6 +38,12 @@ Route::post('shipments', [ShipmentController::class, 'addShipment']);
 Route::middleware('auth:sanctum')->get('getOrders', [ShipmentController::class, 'getOrders']);
 Route::middleware('auth:sanctum')->get('cancelled', [ShipmentController::class, 'getCancelledOrders']);
 Route::middleware('auth:sanctum')->get('refund', [ShipmentController::class, 'getRefundOrders']);
+Route::middleware('auth:sanctum')->post('updateOrderStatus/{id}', [ShipmentController::class, 'updateOrderStatus']);
+
+
+
+
+
 
 
 Route::post('create', [QuestionController::class, 'createQuestion']);
@@ -101,7 +107,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('edit/{id}', [ProductController::class, 'editProduct']);
     Route::post('account', [ProductController::class, 'getProductsByAccountId']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
-    Route::post('buy-product/{product_id}', [ProductController::class, 'buyProduct']);
+    Route::post('checkout', [ProductController::class, 'checkout']);
     Route::post('cart', [ProductController::class, 'addToCart']);
 });
 
