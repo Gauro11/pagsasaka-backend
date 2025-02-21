@@ -183,6 +183,9 @@ class ShipmentController extends Controller
                     'account_id' => $order->account_id,
                     'product_id' => $order->product_id,
                     'status' => $order->status,
+                    'ship_to' => $order->ship_to,
+                    'product_name' => $order->product ? $order->product->product_name : 'N/A', // Fetch product name
+                    'created_at' => Carbon::now()->format('F d Y'),
                     'updated_at' => Carbon::now()->format('F d Y'),
                 ],
             ], 200);
