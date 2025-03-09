@@ -39,6 +39,8 @@ Route::middleware('auth:sanctum')->get('getOrders', [ShipmentController::class, 
 Route::middleware('auth:sanctum')->get('cancelled', [ShipmentController::class, 'getCancelledOrders']);
 Route::middleware('auth:sanctum')->get('refund', [ShipmentController::class, 'getRefundOrders']);
 Route::middleware('auth:sanctum')->post('updateOrderStatus/{id}', [ShipmentController::class, 'updateOrderStatus']);
+Route::middleware('auth:sanctum')->post('confirmOrderReceived/{id}', [ShipmentController::class, 'confirmOrderReceived']);
+
 
 
 

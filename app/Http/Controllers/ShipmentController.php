@@ -199,6 +199,76 @@ class ShipmentController extends Controller
         }
     }
 
+     //order received//
+    public function confirmOrderReceived(Request $request, $id)
+{
+    try {
+        // Authenticate user
+        $user = Auth::user();
+        Log::info('Customer confirming order received:', ['user' => $user]);
+
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+         // Check if user is a Farmer (2) or Consumer (3)
+         if (!in_array($user->role_id, [2, 3])) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Only Farmers and Consumers can confirm order receipt.',
+            ], 403);
+        }
+
+        // Find the order and check if it belongs to the consumer
+        $order = Order::with('product')->where('account_id', $user->id)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Order not found or does not belong to you.',
+            ], 404);
+        }
+
+        // Ensure order is already "Order delivered" before marking it as "Order received"
+        if ($order->status !== 'Order delivered') {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'You can only confirm receipt when the order is delivered.',
+            ], 400);
+        }
+
+        // Update the order status to "Order received"
+        $order->status = 'Order received';
+        $order->save();
+
+        Log::info('Order marked as received:', ['order_id' => $order->id, 'new_status' => $order->status]);
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Order marked as received successfully.',
+            'order' => [
+                'id' => $order->id,
+                'account_id' => $order->account_id,
+                'product_id' => $order->product_id,
+                'product_name' => $order->product ? $order->product->product_name : 'N/A',
+                'status' => $order->status,
+                'ship_to' => $order->ship_to,
+                'updated_at' => Carbon::now()->format('F d Y'),
+            ],
+        ], 200);
+    } catch (Throwable $e) {
+        Log::error('Error confirming order received:', ['error' => $e->getMessage()]);
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred while updating the order status.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
 
 
 
