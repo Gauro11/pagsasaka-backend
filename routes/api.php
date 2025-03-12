@@ -23,7 +23,8 @@ use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShipmentController;
-
+use App\Http\Controllers\ChatController;
+use App\Http\Controllers\MessageController;
 
 
 
@@ -120,6 +121,21 @@ Route::prefix('dropdown')->group(function () {
     Route::get('category', [CategoryController::class, 'dropdownCategory']);
 });
 
+
+// Conversations
+Route::middleware('auth:sanctum')->group(function () {
+    // Conversation endpoints
+    Route::get('/conversations', [ChatController::class, 'index']);
+    Route::post('/conversations', [ChatController::class, 'store']);
+    Route::get('/conversations/{id}', [ChatController::class, 'show']);
+    Route::delete('/conversations/{id}', [ChatController::class, 'destroy']);
+    
+    // Message endpoints
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::post('/messages/read', [MessageController::class, 'markAsRead']);
+    Route::get('/messages/unread', [MessageController::class, 'unreadCount']);
+    Route::delete('/messages/{id}', [MessageController::class, 'destroy']);
+});
 
 /*
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
