@@ -156,7 +156,7 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
 //     Route::post('programs/filter', 'getFilteredPrograms');
 //     Route::get('dropdown-office-program', 'getConcernedOfficeProgram');
 // });
-
+//
 
 // Route::controller(EventController::class)->group(function () {
 //     Route::get('active-event', 'getActiveEvent'); // ADMIN AND STAFF ONLY
