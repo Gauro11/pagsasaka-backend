@@ -189,7 +189,7 @@ class ProductController extends Controller
         try {
             // Get optional query parameters
             $searchTerm = $request->input('search', null); // Optional search term
-            $perPage = $request->input('per_page', 10); // Items per page (default: 10)
+            $perPage = $request->input('per_page', 5); // Items per page (default: 10)
     
             // Build the query
             $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')

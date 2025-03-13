@@ -25,7 +25,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShipmentController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
-use App\Http\Controller\PaymentController;
+use App\Http\Controllers\PaymentController;
 
 
 
