@@ -25,7 +25,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShipmentController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
-
+use App\Http\Controller\PaymentController;
 
 
 
@@ -137,6 +137,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/messages/{id}', [MessageController::class, 'destroy']);
 });
 
+
+// In routes/api.php
+Route::post('pay', [PaymentController::class, 'pay']);
+Route::get('success', [PaymentController::class, 'success']);
+// other routes...
 /*
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
