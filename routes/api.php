@@ -23,8 +23,9 @@ use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShipmentController;
-
-
+use App\Http\Controllers\ChatController;
+use App\Http\Controllers\MessageController;
+use App\Http\Controller\PaymentController;
 
 
 
@@ -126,6 +127,26 @@ Route::prefix('dropdown')->group(function () {
 });
 
 
+// Conversations
+Route::middleware('auth:sanctum')->group(function () {
+    // Conversation endpoints
+    Route::get('/conversations', [ChatController::class, 'index']);
+    Route::post('/conversations', [ChatController::class, 'store']);
+    Route::get('/conversations/{id}', [ChatController::class, 'show']);
+    Route::delete('/conversations/{id}', [ChatController::class, 'destroy']);
+    
+    // Message endpoints
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::post('/messages/read', [MessageController::class, 'markAsRead']);
+    Route::get('/messages/unread', [MessageController::class, 'unreadCount']);
+    Route::delete('/messages/{id}', [MessageController::class, 'destroy']);
+});
+
+
+// In routes/api.php
+Route::post('pay', [PaymentController::class, 'pay']);
+Route::get('success', [PaymentController::class, 'success']);
+// other routes...
 /*
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
@@ -145,7 +166,7 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
 //     Route::post('programs/filter', 'getFilteredPrograms');
 //     Route::get('dropdown-office-program', 'getConcernedOfficeProgram');
 // });
-
+//
 
 // Route::controller(EventController::class)->group(function () {
 //     Route::get('active-event', 'getActiveEvent'); // ADMIN AND STAFF ONLY

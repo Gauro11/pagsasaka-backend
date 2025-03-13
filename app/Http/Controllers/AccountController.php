@@ -395,7 +395,7 @@ class AccountController extends Controller
             }
 
             // Paginated data retrieval
-            $perPage = $request->input('per_page', 10);
+            $perPage = $request->input('per_page', 5);
             $data = $query->paginate($perPage);
 
             // Transform to add `org_log_name` based on `org_log_id`
