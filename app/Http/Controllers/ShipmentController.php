@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\ApiLog;
 use Throwable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ShipmentController extends Controller
 {
@@ -102,119 +103,104 @@ class ShipmentController extends Controller
     }
 
     public function updateOrderStatus(Request $request, $id)
-{
-    try {
-        $user = Auth::user();
-        Log::info('User updating order status:', ['user' => $user]);
-
-        if (!$user) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'User not authenticated',
-            ], 401);
-        }
-
-        // ✅ Only Farmers (role_id = 2) can update order statuses
-        if ($user->role_id !== 2) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Access denied. Only Farmers can update order statuses.',
-            ], 403);
-        }
-
-        // Find the order
-        $order = Order::find($id);
-
-        if (!$order) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Order not found.',
-            ], 404);
-        }
-
-        Log::info('Order status before update:', [
-            'order_id' => $order->id,
-            'current_status' => $order->status
-        ]);
-
-        // Define valid status transitions
-        $statusFlow = [
-            'Order placed' => 'Waiting for courier',
-            'Waiting for courier' => 'In transit',
-            'In transit' => 'Order delivered',
-        ];
-
-        // Check if the order can transition
-        if (!isset($statusFlow[$order->status])) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Order status cannot be changed further.',
-            ], 400);
-        }
-
-        // **CHECK FOR DELIVERY PROOF WHEN MARKING AS "ORDER DELIVERED"**
-        if ($statusFlow[$order->status] === 'Order delivered') {
-            if (!$request->hasFile('delivery_proof')) {
+    {
+        try {
+            $user = Auth::user();
+            Log::info('User updating order status:', ['user' => $user]);
+    
+            if (!$user) {
                 return response()->json([
                     'isSuccess' => false,
-                    'message' => 'Delivery proof image is required to mark the order as delivered.',
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+    
+            // ✅ Only Farmers (role_id = 2) can update order statuses
+            if ($user->role_id !== 2) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Access denied. Only Farmers can update order statuses.',
+                ], 403);
+            }
+    
+            // Find the order
+            $order = Order::find($id);
+    
+            if (!$order) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Order not found.',
+                ], 404);
+            }
+    
+            Log::info('Order status before update:', [
+                'order_id' => $order->id,
+                'current_status' => $order->status
+            ]);
+    
+            // Define valid status transitions
+            $statusFlow = [
+                'Order placed' => 'Waiting for courier',
+                'Waiting for courier' => 'In transit',
+                'In transit' => 'Order delivered',
+            ];
+    
+            // Check if the order can transition
+            if (!isset($statusFlow[$order->status])) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Order status cannot be changed further.',
                 ], 400);
             }
-
-            // Validate the image file
-            $request->validate([
-                'delivery_proof' => 'required|image|mimes:jpeg,png,jpg|max:2048', // Max 2MB
-            ]);
-
-            // Store the image
-            $image = $request->file('delivery_proof');
-            $directory = public_path('img/delivery_proofs');
-            $fileName = 'DeliveryProof-' . $order->id . '-' . now()->format('YmdHis') . '.' . $image->getClientOriginalExtension();
-
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
+    
+            // **CHECK FOR DELIVERY PROOF WHEN MARKING AS "ORDER DELIVERED"**
+            if ($statusFlow[$order->status] === 'Order delivered') {
+                if (!$order->delivery_proof) { // ✅ Only allows update if proof exists
+                    return response()->json([
+                        'isSuccess' => false,
+                        'message' => 'Delivery proof is required to mark the order as delivered.',
+                    ], 400);
+                }
             }
-
-            $image->move($directory, $fileName);
-            $imagePath = asset('img/delivery_proofs/' . $fileName);
-
-            // Save proof to the order
-            $order->delivery_proof = $imagePath;
+    
+            // Update the order status
+            $order->status = $statusFlow[$order->status];
+            $order->save();
+    
+            Log::info('Order status updated successfully:', [
+                'order_id' => $order->id,
+                'new_status' => $order->status
+            ]);
+    
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Order status updated successfully.',
+                'order' => [
+                    'id' => $order->id,
+                    'account_id' => $order->account_id,
+                    'product_id' => $order->product_id,
+                    'status' => $order->status,
+                    'ship_to' => $order->ship_to,
+                    'product_name' => $order->product ? $order->product->product_name : 'N/A',
+                    'delivery_proof' => $order->delivery_proof ?? null, // Include proof in response
+                    'created_at' => $order->created_at->format('F d Y'),
+                    'updated_at' => now()->format('F d Y'),
+                ],
+            ], 200);
+        } catch (Throwable $e) {
+            Log::error('Error updating order status:', ['error' => $e->getMessage()]);
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'An error occurred while updating the order status.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        // Update the order status
-        $order->status = $statusFlow[$order->status];
-        $order->save();
-
-        Log::info('Order status updated successfully:', [
-            'order_id' => $order->id,
-            'new_status' => $order->status
-        ]);
-
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Order status updated successfully.',
-            'order' => [
-                'id' => $order->id,
-                'account_id' => $order->account_id,
-                'product_id' => $order->product_id,
-                'status' => $order->status,
-                'ship_to' => $order->ship_to,
-                'product_name' => $order->product ? $order->product->product_name : 'N/A',
-                'delivery_proof' => $order->delivery_proof ?? null, // Include proof in response
-                'created_at' => Carbon::now()->format('F d Y'),
-                'updated_at' => Carbon::now()->format('F d Y'),
-            ],
-        ], 200);
-    } catch (Throwable $e) {
-        Log::error('Error updating order status:', ['error' => $e->getMessage()]);
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'An error occurred while updating the order status.',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
+    
+    
+
+
+    
 
 
      //order received//
@@ -422,7 +408,7 @@ public function uploadDeliveryProof(Request $request, $id)
         $accountId = auth()->id();
 
         // Handle the image upload
-        $directory = public_path('delivery_proofs');
+        $directory = public_path('delivery_proof');
         $fileName = 'DeliveryProof-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
 
         if (!file_exists($directory)) {
@@ -430,17 +416,19 @@ public function uploadDeliveryProof(Request $request, $id)
         }
 
         $request->file('image')->move($directory, $fileName);
-        $filePath = asset('delivery_proofs/' . $fileName);
+        $filePath = asset('delivery_proof/' . $fileName);
 
         // Update the order record
-        $order->delivery_proofs = $filePath;
-        $order->status = 'Order delivered';
+        $order->delivery_proof = $filePath;
         $order->save();
 
         $response = [
             'isSuccess' => true,
             'message' => 'Delivery proof uploaded successfully.',
+            'quantity' => $order->quantity,
+            'total_amount' => $order->total_amount,
             'delivery_proof' => $filePath,
+            
         ];
 
         // Log the API call
