@@ -150,6 +150,9 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('pay', [PaymentController::class, 'pay']);
 Route::get('success', [PaymentController::class, 'success']);
 
+Route::get('/payment/success/{productId}', [PaymentController::class, 'paymentSuccess']);
+Route::get('/payment/cancel', [PaymentController::class, 'paymentCancel']);
+Route::post('/products/{productId}/pay', [PaymentController::class, 'payForProduct']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales', [SalesController::class, 'index']);
