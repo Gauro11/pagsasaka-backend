@@ -26,6 +26,9 @@ use App\Http\Controllers\ShipmentController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\SalesController;
+
+
 
 
 
@@ -143,9 +146,25 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 
-// In routes/api.php
+// In routes/api.php payment
 Route::post('pay', [PaymentController::class, 'pay']);
 Route::get('success', [PaymentController::class, 'success']);
+
+Route::get('/payment/success/{productId}', [PaymentController::class, 'paymentSuccess']);
+Route::get('/payment/cancel', [PaymentController::class, 'paymentCancel']);
+Route::post('/products/{productId}/pay', [PaymentController::class, 'payForProduct']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/sales', [SalesController::class, 'index']);
+});
+
+
+
+
+
+
+
+
 // other routes...
 /*
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
