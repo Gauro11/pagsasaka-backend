@@ -204,74 +204,92 @@ class ShipmentController extends Controller
 
 
      //order received//
-    public function confirmOrderReceived(Request $request, $id)
-{
-    try {
-        // Authenticate user
-        $user = Auth::user();
-        Log::info('Customer confirming order received:', ['user' => $user]);
-
-        if (!$user) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'User not authenticated',
-            ], 401);
-        }
-
-         // Check if user is a Farmer (2) or Consumer (3)
-         if (!in_array($user->role_id, [2, 3])) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Only Farmers and Consumers can confirm order receipt.',
-            ], 403);
-        }
-
-        // Find the order and check if it belongs to the consumer
-        $order = Order::with('product')->where('account_id', $user->id)->find($id);
-
-        if (!$order) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Order not found or does not belong to you.',
-            ], 404);
-        }
-
-        // Ensure order is already "Order delivered" before marking it as "Order received"
-        if ($order->status !== 'Order delivered') {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'You can only confirm receipt when the order is delivered.',
-            ], 400);
-        }
-
-        // Update the order status to "Order received"
-        $order->status = 'Order received';
-        $order->save();
-
-        Log::info('Order marked as received:', ['order_id' => $order->id, 'new_status' => $order->status]);
-
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Order marked as received successfully.',
-            'order' => [
-                'id' => $order->id,
-                'account_id' => $order->account_id,
-                'product_id' => $order->product_id,
-                'product_name' => $order->product ? $order->product->product_name : 'N/A',
-                'status' => $order->status,
-                'ship_to' => $order->ship_to,
-                'updated_at' => Carbon::now()->format('F d Y'),
-            ],
-        ], 200);
-    } catch (Throwable $e) {
-        Log::error('Error confirming order received:', ['error' => $e->getMessage()]);
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'An error occurred while updating the order status.',
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-}
+     public function confirmOrderReceived(Request $request, $id)
+     {
+         try {
+             $user = Auth::user();
+             Log::info('User updating order to delivered:', ['user' => $user]);
+     
+             if (!$user) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'User not authenticated',
+                 ], 401);
+             }
+     
+             // ✅ Only Consumers (role_id = 3) and Farmers (role_id = 2) can update this status
+             if (!in_array($user->role_id, [2, 3])) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Access denied. Only Farmers and Consumers can update this status.',
+                 ], 403);
+             }
+     
+             // Find the order
+             $order = Order::find($id);
+     
+             if (!$order) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Order not found.',
+                 ], 404);
+             }
+     
+             Log::info('Order status before update:', [
+                 'order_id' => $order->id,
+                 'current_status' => $order->status
+             ]);
+     
+             // ✅ Ensure the order is currently "In transit"
+             if ($order->status !== 'In transit') {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'You can only update the order when it is in transit.',
+                 ], 400);
+             }
+     
+             // ✅ Ensure the delivery proof has been uploaded
+             if (!$order->delivery_proof) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Delivery proof is required to mark the order as delivered.',
+                 ], 400);
+             }
+     
+             // ✅ Update the order status to "Order Delivered"
+             $order->status = 'Order Delivered';
+             $order->save();
+     
+             Log::info('Order status updated to delivered:', [
+                 'order_id' => $order->id,
+                 'new_status' => $order->status
+             ]);
+     
+             return response()->json([
+                 'isSuccess' => true,
+                 'message' => 'Order successfully updated to Delivered.',
+                 'order' => [
+                     'id' => $order->id,
+                     'account_id' => $order->account_id,
+                     'product_id' => $order->product_id,
+                     'status' => $order->status,
+                     'ship_to' => $order->ship_to,
+                     'product_name' => $order->product ? $order->product->product_name : 'N/A',
+                     'delivery_proof' => $order->delivery_proof ? asset('storage/' . $order->delivery_proof) : null,
+                     'created_at' => $order->created_at->format('F d Y'),
+                     'updated_at' => now()->format('F d Y'),
+                 ],
+             ], 200);
+         } catch (Throwable $e) {
+             Log::error('Error updating order to delivered:', ['error' => $e->getMessage()]);
+             return response()->json([
+                 'isSuccess' => false,
+                 'message' => 'An error occurred while updating the order status.',
+                 'error' => $e->getMessage(),
+             ], 500);
+         }
+     }
+     
 
 
 public function getOrdersForPickup(Request $request)
