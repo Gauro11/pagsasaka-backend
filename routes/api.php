@@ -154,6 +154,9 @@ Route::get('/payment/success/{productId}', [PaymentController::class, 'paymentSu
 Route::get('/payment/cancel', [PaymentController::class, 'paymentCancel']);
 Route::post('/products/{productId}/pay', [PaymentController::class, 'payForProduct']);
 
+Route::post('/payment/pay-link', [PaymentController::class, 'createMultipleItemsPayLink']);
+Route::get('/payment/pay-link/{linkId}', [PaymentController::class, 'checkMultiPayLinkStatus']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales', [SalesController::class, 'index']);
 });
