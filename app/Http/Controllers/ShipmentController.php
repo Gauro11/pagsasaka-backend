@@ -292,43 +292,61 @@ class ShipmentController extends Controller
      
 
 
-public function getOrdersForPickup(Request $request)
-{
-    try {
-        // ✅ Authenticate user
-        $user = Auth::user();
-        if (!$user) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'User not authenticated.',
-            ], 401);
-        }
-
-        // ✅ Ensure only Riders (role_id = 4) can access this function
-        if ($user->role_id !== 4) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Access denied. Only Riders can retrieve pickup orders.',
-            ], 403);
-        }
-
-        // ✅ Retrieve orders that are "Waiting for courier"
-        $orders = Order::where('status', 'Waiting for courier')->get();
-
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Orders for pickup retrieved successfully.',
-            'orders' => $orders,
-        ], 200);
-    } catch (\Throwable $e) {
-        Log::error('Error retrieving orders for pickup:', ['error' => $e->getMessage()]);
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'An error occurred while retrieving orders.',
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-}
+     public function getOrdersForPickup(Request $request)
+     {
+         try {
+             // ✅ Authenticate user
+             $user = Auth::user();
+             if (!$user) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'User not authenticated.',
+                 ], 401);
+             }
+     
+             // ✅ Ensure only Riders (role_id = 4) can access this function
+             if ($user->role_id !== 4) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Access denied. Only Riders can retrieve pickup orders.',
+                 ], 403);
+             }
+     
+             // ✅ Retrieve orders that are "Waiting for courier" and include product details
+             $orders = Order::with('product:id,product_name') // Fetch product_name based on product_id
+                 ->where('status', 'Waiting for courier')
+                 ->get()
+                 ->map(function ($order) {
+                     return [
+                         'id' => $order->id,
+                         'account_id' => $order->account_id,
+                         'product_id' => $order->product_id,
+                         'product_name' => $order->product ? $order->product->product_name : 'N/A', // Include product_name
+                         'ship_to' => $order->ship_to,
+                         'quantity' => $order->quantity,
+                         'total_amount' => $order->total_amount,
+                         'created_at' => $order->created_at->format('F d Y'),
+                         'updated_at' => now()->format('F d Y'),
+                         'status' => $order->status,
+                         'delivery_proof' => $order->delivery_proof ?? null,
+                     ];
+                 });
+     
+             return response()->json([
+                 'isSuccess' => true,
+                 'message' => 'Orders for pickup retrieved successfully.',
+                 'orders' => $orders,
+             ], 200);
+         } catch (\Throwable $e) {
+             Log::error('Error retrieving orders for pickup:', ['error' => $e->getMessage()]);
+             return response()->json([
+                 'isSuccess' => false,
+                 'message' => 'An error occurred while retrieving orders.',
+                 'error' => $e->getMessage(),
+             ], 500);
+         }
+     }
+     
 
 
 public function pickupOrder(Request $request, $id)
