@@ -12,6 +12,7 @@ use App\Models\ApiLog;
 use Throwable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Account;
 
 class ShipmentController extends Controller
 {
@@ -349,61 +350,86 @@ class ShipmentController extends Controller
      
 
 
-public function pickupOrder(Request $request, $id)
-{
-    try {
-        // ✅ Authenticate user
-        $user = Auth::user();
-        if (!$user) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'User not authenticated.',
-            ], 401);
-        }
+     public function pickupOrder(Request $request, $id)
+     {
+         try {
+             // ✅ Authenticate user
+             $user = Auth::user();
+             if (!$user) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'User not authenticated.',
+                 ], 401);
+             }
+     
+             // ✅ Ensure only Riders (role_id = 4) can pick up orders
+             if ($user->role_id !== 4) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Access denied. Only Riders can pick up orders.',
+                 ], 403);
+             }
+     
+             // ✅ Find the order
+             $order = Order::find($id);
+             if (!$order) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Order not found.',
+                 ], 404);
+             }
+     
+             // ✅ Ensure order status is "Waiting for courier"
+             if ($order->status !== 'Waiting for courier') {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Order cannot be picked up. It is not in "Waiting for courier" status.',
+                 ], 400);
+             }
+     
+             // ✅ Update order status to "In transit"
+             $order->status = 'In transit';
+             $order->save();
+     
+             // ✅ Fetch Rider's Firstname and Lastname from `accounts` table
+             $rider = Account::where('id', $user->id)->first(['id', 'first_name', 'last_name', 'role_id']);
+     
+             // ✅ Format Rider's Name Properly
+             $riderName = $rider ? trim("{$rider->first_name} {$rider->last_name}") : 'Unknown Rider';
+     
+             // ✅ Include Rider Details in Response
+             return response()->json([
+                 'isSuccess' => true,
+                 'message' => 'Order picked up successfully. Status updated to "In transit".',
+                 'order' => [
+                     'id' => $order->id,
+                     'account_id' => $order->account_id,
+                     'status' => $order->status,
+                     'ship_to' => $order->ship_to,
+                     'quantity' => $order->quantity,
+                     'total_amount' => $order->total_amount,
+                     'created_at' => $order->created_at->format('F d Y'),
+                     'updated_at' => now()->format('F d Y'),
+                 ],
+                 'rider' => [
+                     'id' => $rider->id ?? $user->id, // Rider ID
+                     'name' => $riderName, // Rider Full Name (first_name + last_name)
+                     'role_id' => $rider->role_id ?? $user->role_id, // Should be 4
+                 ],
+             ], 200);
+         } catch (\Throwable $e) {
+             Log::error('Error picking up order:', ['error' => $e->getMessage()]);
+             return response()->json([
+                 'isSuccess' => false,
+                 'message' => 'An error occurred while picking up the order.',
+                 'error' => $e->getMessage(),
+             ], 500);
+         }
+     }
+     
+     
 
-        // ✅ Ensure only Riders (role_id = 4) can pick up orders
-        if ($user->role_id !== 4) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Access denied. Only Riders can pick up orders.',
-            ], 403);
-        }
-
-        // ✅ Find the order
-        $order = Order::find($id);
-        if (!$order) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Order not found.',
-            ], 404);
-        }
-
-        // ✅ Ensure order status is "Waiting for courier"
-        if ($order->status !== 'Waiting for courier') {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Order cannot be picked up. It is not in "Waiting for courier" status.',
-            ], 400);
-        }
-
-        // ✅ Update status to "In transit"
-        $order->status = 'In transit';
-        $order->save();
-
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Order picked up successfully. Status updated to "In transit".',
-            'order' => $order,
-        ], 200);
-    } catch (\Throwable $e) {
-        Log::error('Error picking up order:', ['error' => $e->getMessage()]);
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'An error occurred while picking up the order.',
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-}
+     
 
 public function uploadDeliveryProof(Request $request, $id)
 {
