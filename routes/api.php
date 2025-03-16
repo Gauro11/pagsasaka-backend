@@ -118,7 +118,6 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('edit/{id}', [ProductController::class, 'editProduct']);
     Route::post('account', [ProductController::class, 'getProductsByAccountId']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
-    Route::post('checkout', [ProductController::class, 'checkout']);
     Route::post('cart', [ProductController::class, 'addToCart']);
 });
 
@@ -153,6 +152,9 @@ Route::get('success', [PaymentController::class, 'success']);
 Route::get('/payment/success/{productId}', [PaymentController::class, 'paymentSuccess']);
 Route::get('/payment/cancel', [PaymentController::class, 'paymentCancel']);
 Route::post('/products/{productId}/pay', [PaymentController::class, 'payForProduct']);
+
+Route::post('/payment/pay-link', [PaymentController::class, 'createMultipleItemsPayLink']);
+Route::get('/payment/pay-link/{linkId}', [PaymentController::class, 'checkMultiPayLinkStatus']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales', [SalesController::class, 'index']);
