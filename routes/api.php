@@ -119,6 +119,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('account', [ProductController::class, 'getProductsByAccountId']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
     Route::post('cart', [ProductController::class, 'addToCart']);
+    Route::post('cart-list', [ProductController::class, 'getCartList']);
 });
 
 Route::post('list', [ProductController::class, 'getAllProductsList']);
