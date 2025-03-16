@@ -161,6 +161,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales', [SalesController::class, 'index']);
 });
 
+Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebhook']);
 
 
 
