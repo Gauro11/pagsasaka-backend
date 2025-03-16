@@ -27,3 +27,4 @@ Route::post('/refund', [PaymentController::class, 'refund']);
 Route::get('/refund-status/{id}', [PaymentController::class, 'refundStatus']);
 Route::post('/payment/pay-link', [PaymentController::class, 'createMultipleItemsPayLink']);
 Route::get('/payment/pay-link/{linkId}', [PaymentController::class, 'checkMultiPayLinkStatus']);
+Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebhook']);
