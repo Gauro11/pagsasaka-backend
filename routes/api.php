@@ -23,6 +23,10 @@ use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShipmentController;
+use App\Http\Controllers\ChatController;
+use App\Http\Controllers\MessageController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\SalesController;
 
 
 
@@ -39,6 +43,13 @@ Route::middleware('auth:sanctum')->get('getOrders', [ShipmentController::class, 
 Route::middleware('auth:sanctum')->get('cancelled', [ShipmentController::class, 'getCancelledOrders']);
 Route::middleware('auth:sanctum')->get('refund', [ShipmentController::class, 'getRefundOrders']);
 Route::middleware('auth:sanctum')->post('updateOrderStatus/{id}', [ShipmentController::class, 'updateOrderStatus']);
+Route::middleware('auth:sanctum')->post('confirmOrderReceived/{id}', [ShipmentController::class, 'confirmOrderReceived']);
+Route::middleware('auth:sanctum')->get('orders-for-pickup', [ShipmentController::class, 'getOrdersForPickup']);
+Route::middleware('auth:sanctum')->post('pickupOrder/{id}', [ShipmentController::class, 'pickupOrder']);
+Route::middleware('auth:sanctum')->post('uploadDeliveryProof/{id}', [ShipmentController::class, 'uploadDeliveryProof']);
+
+
+
 
 
 
@@ -118,6 +129,45 @@ Route::prefix('dropdown')->group(function () {
 });
 
 
+// Conversations
+Route::middleware('auth:sanctum')->group(function () {
+    // Conversation endpoints
+    Route::get('/conversations', [ChatController::class, 'index']);
+    Route::post('/conversations', [ChatController::class, 'store']);
+    Route::get('/conversations/{id}', [ChatController::class, 'show']);
+    Route::delete('/conversations/{id}', [ChatController::class, 'destroy']);
+    
+    // Message endpoints
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::post('/messages/read', [MessageController::class, 'markAsRead']);
+    Route::get('/messages/unread', [MessageController::class, 'unreadCount']);
+    Route::delete('/messages/{id}', [MessageController::class, 'destroy']);
+});
+
+
+// In routes/api.php payment
+Route::post('pay', [PaymentController::class, 'pay']);
+Route::get('success', [PaymentController::class, 'success']);
+
+Route::get('/payment/success/{productId}', [PaymentController::class, 'paymentSuccess']);
+Route::get('/payment/cancel', [PaymentController::class, 'paymentCancel']);
+Route::post('/products/{productId}/pay', [PaymentController::class, 'payForProduct']);
+
+Route::post('/payment/pay-link', [PaymentController::class, 'createMultipleItemsPayLink']);
+Route::get('/payment/pay-link/{linkId}', [PaymentController::class, 'checkMultiPayLinkStatus']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/sales', [SalesController::class, 'index']);
+});
+
+
+
+
+
+
+
+
+// other routes...
 /*
 Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
     Route::get('/some-protected-route', [AuthController::class, 'someMethod']);
@@ -137,7 +187,7 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
 //     Route::post('programs/filter', 'getFilteredPrograms');
 //     Route::get('dropdown-office-program', 'getConcernedOfficeProgram');
 // });
-
+//
 
 // Route::controller(EventController::class)->group(function () {
 //     Route::get('active-event', 'getActiveEvent'); // ADMIN AND STAFF ONLY
