@@ -480,6 +480,42 @@ class ProductController extends Controller
         }
     }
 
+    public function getCartList()
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ];
+            $this->logAPICalls('getCartList', "", [], [$response]);
+            return response()->json($response, 401);
+        }
+
+        try {
+            $cartItems = Cart::where('account_id', $user->id)
+                ->with('product') // Assuming there's a relationship defined in the Cart model
+                ->get();
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Cart items retrieved successfully.',
+                'cart' => $cartItems,
+            ];
+            $this->logAPICalls('getCartList', $user->id, [], [$response]);
+            return response()->json($response, 200);
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'An error occurred while retrieving the cart items.',
+                'error' => $e->getMessage(),
+            ];
+            $this->logAPICalls('getCartList', "", [], [$response]);
+            return response()->json($response, 500);
+        }
+    }
+
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {
         try {
