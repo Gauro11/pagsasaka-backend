@@ -503,7 +503,7 @@ class ProductController extends Controller
     public function addToCart(Request $request)
     {
         $user = Auth::user();
-
+    
         if (!$user) {
             $response = [
                 'isSuccess' => false,
@@ -512,49 +512,49 @@ class ProductController extends Controller
             $this->logAPICalls('addToCart', "", $request->all(), [$response]); // Log the failed API call
             return response()->json($response, 500);
         }
-
+    
         try {
-            $validated = $request->validate([
-                'product_id' => 'required|integer',
-                'quantity' => 'required|integer|min:1',
-            ]);
-
-            $product = Product::find($validated['product_id']);
-
-            if (!$product) {
+            
+            $lastViewedProduct = Product::latest()->first();
+    
+            if (!$lastViewedProduct) {
                 $response = [
                     'isSuccess' => false,
-                    'message' => 'Product not found',
+                    'message' => 'No product available to add to cart',
                 ];
                 $this->logAPICalls('addToCart', "", $request->all(), [$response]); // Log the failed API call
                 return response()->json($response, 500);
             }
-
+    
+            $validated = $request->validate([
+                'quantity' => 'required|integer|min:1',
+            ]);
+    
             // Optionally check for maximum stock constraints
-            if ($validated['quantity'] > $product->stocks) {
+            if ($validated['quantity'] > $lastViewedProduct->stocks) {
                 $response = [
                     'isSuccess' => false,
                     'message' => 'Requested quantity exceeds available stock.',
                 ];
-                $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]); // Log the failed API call
+                $this->logAPICalls('addToCart', $lastViewedProduct->id, $request->all(), [$response]); // Log the failed API call
                 return response()->json($response, 500);
             }
-
+    
             // Create cart entry
             $cart = Cart::create([
                 'account_id' => $user->id,
-                'product_id' => $product->id,
+                'product_id' => $lastViewedProduct->id,
                 'quantity' => $validated['quantity'],
             ]);
-
+    
             $response = [
                 'isSuccess' => true,
                 'message' => 'Product added to cart successfully',
                 'cart' => $cart,
             ];
-            $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]); // Log the successful API call
+            $this->logAPICalls('addToCart', $lastViewedProduct->id, $request->all(), [$response]); // Log the successful API call
             return response()->json($response, 200);
-
+    
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
@@ -565,6 +565,7 @@ class ProductController extends Controller
             return response()->json($response, 500);
         }
     }
+    
 
     public function getCartList()
     {
