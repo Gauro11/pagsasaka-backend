@@ -188,12 +188,12 @@ class ProductController extends Controller
     {
         try {
             // Get optional query parameters
-            $searchTerm = $request->input('search', null); // Optional search term
-            $perPage = $request->input('per_page', 5); // Items per page (default: 10)
+            $searchTerm = $request->input('search', null);
+            $perPage = $request->input('per_page', 5);
     
             // Build the query
             $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
-                ->where('is_archived', '0') // Assuming we only want active products
+                ->where('is_archived', '0') // Only active products
                 ->when($searchTerm, function ($query, $searchTerm) {
                     return $query->where(function ($activeQuery) use ($searchTerm) {
                         $activeQuery->where('product_name', 'like', '%' . $searchTerm . '%')
@@ -214,23 +214,28 @@ class ProductController extends Controller
     
             // Format the products
             $formattedProducts = $result->getCollection()->transform(function ($product) {
-                // Base URL for product images
-                $baseUrl = url('/img/products'); // The local URL to prepend to each image
+                $baseUrl = url('/img/products');
     
-                // Ensure product_img is correctly processed
+                // ✅ Ensure product_img is always an array of strings
                 $productImages = is_string($product->product_img)
-                    ? explode(',', $product->product_img) // Split string into array if it's a string
-                    : (is_array($product->product_img) ? $product->product_img : []); // Use as is if already an array, or default to empty
+                    ? explode(',', $product->product_img) // Convert CSV string to an array
+                    : (is_array($product->product_img) ? $product->product_img : []);
     
-                // Extract the file name and prepend with the local base URL
+                // ✅ Make sure each element is a valid string before calling parse_url()
                 $imagePaths = array_map(function ($img) use ($baseUrl) {
-                    // Extract the file name from the full URL
+                    if (!is_string($img) || empty($img)) {
+                        return null; // Skip invalid or empty entries
+                    }
                     $pathParts = parse_url($img);
-                    $fileName = basename($pathParts['path']); // Get the file name (e.g., Product-76-20241211025207-6758fe57aa4e1.png)
-    
-                    // Return the full local URL with the file name
+                    if (!isset($pathParts['path'])) {
+                        return null; // Skip invalid URLs
+                    }
+                    $fileName = basename($pathParts['path']);
                     return $baseUrl . '/' . $fileName;
                 }, $productImages);
+    
+                // ✅ Remove null values from the array
+                $imagePaths = array_filter($imagePaths);
     
                 return [
                     'id' => $product->id,
@@ -238,7 +243,7 @@ class ProductController extends Controller
                     'description' => $product->description,
                     'price' => $product->price,
                     'stocks' => $product->stocks,
-                    'product_img' => $imagePaths,
+                    'product_img' => array_values($imagePaths), // Ensure proper JSON structure
                     'category_id' => $product->category_id,
                     'visibility' => $product->visibility,
                     'is_archived' => $product->is_archived == 0,
@@ -258,7 +263,7 @@ class ProductController extends Controller
                 ],
             ], 200);
     
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {  // 🔹 Fixed namespace issue
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Failed to retrieve products.',
@@ -266,6 +271,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
+    
     
 
     public function getProductById($id)
