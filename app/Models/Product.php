@@ -15,6 +15,7 @@ class Product extends Model
         'description',
         'price',
         'stocks',
+        'unit',
         'product_img',
         'visibility',
         'is_archived',
