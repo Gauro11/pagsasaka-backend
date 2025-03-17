@@ -10,126 +10,123 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log; // Import Log facade
 use Illuminate\Support\Facades\DB;
 
-
-
 class PaymentController extends Controller
 {
     /**
      * Create a PayMongo payment link for multiple products
      */
     public function createMultipleItemsPayLink(Request $request)
-{
-    // Validate the request
-    $validator = Validator::make($request->all(), [
-        'items' => 'required|array',
-        'items.*.product_id' => 'required|exists:products,id',
-        'items.*.quantity' => 'required|integer|min:1',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json(['errors' => $validator->errors()], 422);
-    }
-
-    $totalAmount = 0;
-    $productIds = [];
-    $quantities = [];
-    $itemDescriptions = [];
-    $purchasedProducts = [];
-
-    DB::beginTransaction(); // Start database transaction
-
-    try {
-        // Process each item in the request
-        foreach ($request->items as $item) {
-            $productId = $item['product_id'];
-            $quantity = (int) $item['quantity'];
-
-            // Find the product
-            $product = Product::findOrFail($productId);
-
-            // Validate product availability
-            if ($product->stocks <= 0 || $product->visibility !== 'Published' || $product->is_archived == 1) {
-                DB::rollBack();
-                return response()->json(['error' => "Product {$product->product_name} is not available for purchase"], 400);
-            }
-
-            // Validate quantity against available stock
-            if ($quantity > $product->stocks) {
-                DB::rollBack();
-                return response()->json(['error' => "Requested quantity exceeds available stock for {$product->product_name}"], 400);
-            }
-
-            // Deduct stock
-            $product->decrement('stocks', $quantity);
-
-            // Store transaction details
-            $purchasedProducts[] = [
-                'product' => $product->product_name,
-                'quantity' => $quantity,
-                'price' => $product->price
-            ];
-
-            Log::info("Stock deducted successfully.", [
-                'product_id' => $product->id,
-                'product_name' => $product->product_name,
-                'quantity_deducted' => $quantity,
-                'remaining_stock' => $product->stocks
-            ]);
-
-            // Calculate amount in cents
-            $amountInCents = $product->price * 100 * $quantity;
-            $totalAmount += $amountInCents;
-
-            // Store product ID and quantity for later use
-            $productIds[] = $productId;
-            $quantities[] = $quantity;
-            $itemDescriptions[] = "{$quantity}x {$product->product_name}";
-        }
-
-        DB::commit(); // Commit transaction if everything is successful
-
-        // Create the payment link data
-        $data = [
-            'data' => [
-                'attributes' => [
-                    'amount' => $totalAmount,
-                    'description' => 'Purchase of: ' . implode(', ', $itemDescriptions),
-                    'remarks' => json_encode([
-                        'product_ids' => $productIds,
-                        'quantities' => $quantities
-                    ])
-                ]
-            ]
-        ];
-
-        // Send the request to PayMongo
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-            'Authorization' => 'Basic ' . base64_encode(env('PAYMONGO_SECRET_KEY') . ':')
-        ])->post('https://api.paymongo.com/v1/links', $data);
-
-        $responseData = $response->json();
-
-        if ($response->failed() || !isset($responseData['data']['attributes']['checkout_url'])) {
-            DB::rollBack();
-            return response()->json(['error' => $responseData], 400);
-        }
-
-        // Return the payment link data
-        return response()->json([
-            'id' => $responseData['data']['id'],
-            'checkout_url' => $responseData['data']['attributes']['checkout_url'],
-            'status' => $responseData['data']['attributes']['status']
+    {
+        // Validate the request
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error("Error processing payment: " . $e->getMessage());
-        return response()->json(['error' => 'An error occurred while processing the payment.'], 500);
-    }
-}
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
+        $totalAmount = 0;
+        $productIds = [];
+        $quantities = [];
+        $itemDescriptions = [];
+        $purchasedProducts = [];
+
+        DB::beginTransaction(); // Start database transaction
+
+        try {
+            // Process each item in the request
+            foreach ($request->items as $item) {
+                $productId = $item['product_id'];
+                $quantity = (int) $item['quantity'];
+
+                // Find the product
+                $product = Product::findOrFail($productId);
+
+                // Validate product availability
+                if ($product->stocks <= 0 || $product->visibility !== 'Published' || $product->is_archived == 1) {
+                    DB::rollBack();
+                    return response()->json(['error' => "Product {$product->product_name} is not available for purchase"], 400);
+                }
+
+                // Validate quantity against available stock
+                if ($quantity > $product->stocks) {
+                    DB::rollBack();
+                    return response()->json(['error' => "Requested quantity exceeds available stock for {$product->product_name}"], 400);
+                }
+
+                // Deduct stock
+                $product->decrement('stocks', $quantity);
+
+                // Store transaction details
+                $purchasedProducts[] = [
+                    'product' => $product->product_name,
+                    'quantity' => $quantity,
+                    'price' => $product->price
+                ];
+
+                Log::info("Stock deducted successfully.", [
+                    'product_id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'quantity_deducted' => $quantity,
+                    'remaining_stock' => $product->stocks
+                ]);
+
+                // Calculate amount in cents
+                $amountInCents = $product->price * 100 * $quantity;
+                $totalAmount += $amountInCents;
+
+                // Store product ID and quantity for later use
+                $productIds[] = $productId;
+                $quantities[] = $quantity;
+                $itemDescriptions[] = "{$quantity}x {$product->product_name}";
+            }
+
+            DB::commit(); // Commit transaction if everything is successful
+
+            // Create the payment link data
+            $data = [
+                'data' => [
+                    'attributes' => [
+                        'amount' => $totalAmount,
+                        'description' => 'Purchase of: ' . implode(', ', $itemDescriptions),
+                        'remarks' => json_encode([
+                            'product_ids' => $productIds,
+                            'quantities' => $quantities
+                        ])
+                    ]
+                ]
+            ];
+
+            // Send the request to PayMongo
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+                'Authorization' => 'Basic ' . base64_encode(env('PAYMONGO_SECRET_KEY') . ':')
+            ])->post('https://api.paymongo.com/v1/links', $data);
+
+            $responseData = $response->json();
+
+            if ($response->failed() || !isset($responseData['data']['attributes']['checkout_url'])) {
+                DB::rollBack();
+                return response()->json(['error' => $responseData], 400);
+            }
+
+            // Return the payment link data
+            return response()->json([
+                'id' => $responseData['data']['id'],
+                'checkout_url' => $responseData['data']['attributes']['checkout_url'],
+                'status' => $responseData['data']['attributes']['status']
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error processing payment: " . $e->getMessage());
+            return response()->json(['error' => 'An error occurred while processing the payment.'], 500);
+        }
+    }
 
     /**
      * Check the status of a multiple items payment link and process if paid
@@ -225,46 +222,96 @@ class PaymentController extends Controller
     /**
      * The original pay method - keep for backward compatibility
      */
-    public function pay()
+    public function pay(Request $request)
     {
-        $data = [
-            'data' => [
-                'attributes' => [
-                    'line_items' => [
-                        [
-                            'currency' => 'PHP',
-                            'amount' => 10000, // Amount in cents (100 PHP)
-                            'description' => 'Test Product', // Description for the line item
-                            'name' => 'Test Product',
-                            'quantity' => 1,
-                        ]
+        DB::beginTransaction(); // Start transaction
+    
+        try {
+            // Validate the request
+            $validator = Validator::make($request->all(), [
+                'items' => 'required|array',
+                'items.*.product_id' => 'required|exists:products,id',
+                'items.*.quantity' => 'required|integer|min:1',
+            ]);
+    
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+    
+            $lineItems = [];
+            $totalAmount = 0;
+    
+            foreach ($request->items as $item) {
+                $product = Product::findOrFail($item['product_id']);
+    
+                // Validate product availability
+                if ($product->stocks <= 0 || $product->visibility !== 'Published' || $product->is_archived == 1) {
+                    return response()->json(['error' => "Product {$product->product_name} is not available for purchase"], 400);
+                }
+    
+                // Validate quantity against available stock
+                if ($item['quantity'] > $product->stocks) {
+                    return response()->json(['error' => "Requested quantity exceeds available stock for {$product->product_name}"], 400);
+                }
+    
+                // Deduct stock (Consider reserving instead of deducting here)
+                $product->stocks -= $item['quantity'];
+                $product->save();
+    
+                // Prepare line items for PayMongo
+                $lineItems[] = [
+                    'currency' => 'PHP',
+                    'amount' => $product->price * 100, // Convert PHP to cents
+                    'description' => "{$item['quantity']}x {$product->product_name}",
+                    'name' => $product->product_name,
+                    'quantity' => $item['quantity'],
+                ];
+    
+                // Calculate total amount
+                $totalAmount += $product->price * 100 * $item['quantity'];
+            }
+    
+            // Create checkout session data
+            $data = [
+                'data' => [
+                    'attributes' => [
+                        'line_items' => $lineItems,
+                        'payment_method_types' => ['gcash', 'paymaya'], // Add other payment methods if needed
+                        'success_url' => url('/success'),
+                        'cancel_url' => url('/cancel'),
+                        'description' => 'Payment for multiple items',
                     ],
-                    'payment_method_types' => ['gcash'],
-                    'success_url' => url('/success'),
-                    'cancel_url' => url('/cancel'),
-                    'description' => 'Payment for Test Product', // Overall description
                 ],
-            ]
-        ];
-
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-            'Authorization' => 'Basic ' . base64_encode(env('PAYMONGO_SECRET_KEY') . ':')
-        ])->post('https://api.paymongo.com/v1/checkout_sessions', $data);
-
-        $responseData = $response->json();
-
-        if ($response->failed() || !isset($responseData['data']['attributes']['checkout_url'])) {
-            Log::error("PayMongo API Error:", ['error' => $responseData, 'request_data' => $data]);
-            return response()->json(['error' => $responseData], 400);
+            ];
+    
+            // Send request to PayMongo API
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+                'Authorization' => 'Basic ' . base64_encode(env('PAYMONGO_SECRET_KEY') . ':'),
+            ])->post('https://api.paymongo.com/v1/checkout_sessions', $data);
+    
+            $responseData = $response->json();
+    
+            if ($response->failed() || !isset($responseData['data']['attributes']['checkout_url'])) {
+                Log::error("PayMongo API Error:", ['error' => $responseData, 'request_data' => $data]);
+                DB::rollBack(); // Rollback transaction if API call fails
+                return response()->json(['error' => $responseData], 400);
+            }
+    
+            DB::commit(); // Commit transaction if everything is successful
+    
+            return response()->json([
+                'checkout_url' => $responseData['data']['attributes']['checkout_url'],
+            ]);
+        } catch (Exception $e) {
+            DB::rollBack(); // Rollback transaction in case of an exception
+            Log::error("Payment processing error: " . $e->getMessage());
+            return response()->json(['error' => 'Something went wrong. Please try again.'], 500);
         }
-
-        Session::put('session_id', $responseData['data']['id']);
-        return response()->json([
-            'checkout_url' => $responseData['data']['attributes']['checkout_url']
-        ]);
     }
+    
+
 
     // Keep your existing methods below
     public function linkPay()
@@ -335,9 +382,6 @@ class PaymentController extends Controller
     /**
      * Handle PayMongo webhook
      */
-       /**
-     * Handle PayMongo webhook
-     */
     public function handlePaymongoWebhook(Request $request)
     {
         Log::info('PayMongo Webhook Received:', $request->all()); // Log the entire payload
@@ -360,35 +404,53 @@ class PaymentController extends Controller
                 // Extract line items and deduct stock
                 $lineItems = $responseData['data']['attributes']['line_items'];
 
-                foreach ($lineItems as $lineItem) {
-                    $productName = $lineItem['name'];
-                    $quantity = $lineItem['quantity'];
+                DB::beginTransaction(); // Start transaction
 
-                    // Find the product by name (This is not ideal, use product_id if you can pass it to paymongo)
-                     $product = Product::where('product_name', $productName)->first();
+                try {
+                    foreach ($lineItems as $lineItem) {
+                        $productName = $lineItem['name'];
+                        $quantity = $lineItem['quantity'];
 
-                    if ($product) {
-                        if ($product->stocks >= $quantity) {
-                            $product->decrement('stocks', $quantity);
-                            Log::info("Stock deducted successfully via webhook.", [
-                                'product_id' => $product->id,
-                                'product_name' => $product->product_name,
-                                'quantity_deducted' => $quantity,
-                                'remaining_stock' => $product->stocks
-                            ]);
+                        // Find the product by name
+                        $product = Product::where('product_name', $productName)->first();
+
+                        if ($product) {
+                            // Check if enough stock is available
+                            if ($product->stocks >= $quantity) {
+                                // Deduct stock
+                                $product->decrement('stocks', $quantity);
+
+                                Log::info("Stock deducted successfully via webhook.", [
+                                    'product_id' => $product->id,
+                                    'product_name' => $product->product_name,
+                                    'quantity_deducted' => $quantity,
+                                    'remaining_stock' => $product->stocks
+                                ]);
+                            } else {
+                                Log::error("Insufficient stock for product {$product->product_name} (via webhook). Requested: {$quantity}, Available: {$product->stocks}");
+                                DB::rollBack(); // Rollback if insufficient stock
+                                return response('Insufficient stock', 400); // Or handle as appropriate
+                            }
                         } else {
-                            Log::error("Insufficient stock for product {$product->product_name} (ID: {$product->id}) via webhook.  Requested: {$quantity}, Available: {$product->stocks}");
+                            Log::error("Product not found: {$productName} (via webhook)");
+                            DB::rollBack(); // Rollback if product not found
+                            return response('Product not found', 404); // Or handle as appropriate
                         }
-                    } else {
-                        Log::error("Product not found: {$productName} via webhook.");
                     }
+
+                    DB::commit(); // Commit transaction if all stock deductions are successful
+                    return response('Webhook handled successfully', 200);
+
+                } catch (\Exception $e) {
+                    DB::rollBack(); // Rollback on any exception
+                    Log::error("Error processing webhook: " . $e->getMessage());
+                    return response('Error processing webhook', 500);
                 }
             } else {
-                Log::error("Checkout session not paid or invalid status via webhook.", ['checkoutSessionId' => $checkoutSessionId, 'response' => $responseData]);
+                Log::warning('Checkout session not paid or status unknown (via webhook)', ['status' => $responseData['data']['attributes']['status'] ?? 'unknown']);
             }
         }
 
-        return response()->json(['status' => 'success']); //  Always return a 200 OK
+        return response('Webhook received', 200);
     }
-
 }

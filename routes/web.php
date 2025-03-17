@@ -25,6 +25,9 @@ Route::get('/link-pay', [PaymentController::class, 'linkPay']);
 Route::get('/link-status/{linkid}', [PaymentController::class, 'linkStatus']);
 Route::post('/refund', [PaymentController::class, 'refund']);
 Route::get('/refund-status/{id}', [PaymentController::class, 'refundStatus']);
-Route::post('/payment/pay-link', [PaymentController::class, 'createMultipleItemsPayLink']);
-Route::get('/payment/pay-link/{linkId}', [PaymentController::class, 'checkMultiPayLinkStatus']);
+
+Route::post('/pay', [PaymentController::class, 'pay']);
+Route::get('/pay/{linkId}', [PaymentController::class, 'checkMultiPayLinkStatus']);
+
 Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebhook']);
+
