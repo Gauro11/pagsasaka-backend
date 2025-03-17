@@ -25,6 +25,7 @@ class Cart extends Model
         'account_id',
         'product_id',
         'quantity',
+        'unit',
     ];
 
     /**
