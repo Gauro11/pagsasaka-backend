@@ -163,7 +163,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebhook']);
 
-Route::post('/cod-order', [CODOrderController::class, 'createCODOrder']);
+Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
+
 
 
 

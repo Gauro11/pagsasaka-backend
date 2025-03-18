@@ -9,24 +9,15 @@ class Order extends Model
 {
     use HasFactory;
 
+    protected $table = 'orders'; // Ensure it's using the correct table
+
     protected $fillable = [
         'account_id',
         'product_id',
         'quantity',
         'total_amount',
-        'created_at',
-        'updated_at',
         'ship_to',
         'status',
+        'delivery_proof',
     ];
-
-// In Order model
-public function product()
-{
-    return $this->belongsTo(Product::class, 'product_id', 'id');
 }
-
-
-    
-}
-

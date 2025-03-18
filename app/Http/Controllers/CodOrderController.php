@@ -3,12 +3,19 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\CODOrder;
+use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CODOrderController extends Controller
 {
+    public function __construct()
+    {
+        // Ensure authentication for this controller
+        $this->middleware('auth:sanctum'); // Adjust if using session-based auth
+    }
+
     public function createCODOrder(Request $request)
     {
         $request->validate([
@@ -17,6 +24,13 @@ class CODOrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'buyer_address' => 'required|string',
         ]);
+
+        if (!auth()->check()) {
+            return response()->json(['error' => 'User is not authenticated.'], 401);
+        }
+
+        $userId = auth()->id();
+        Log::info('Authenticated user:', ['user_id' => $userId]);
 
         DB::beginTransaction();
         try {
@@ -35,16 +49,16 @@ class CODOrderController extends Controller
 
                 $totalAmount = $product->price * $item['quantity'];
 
-                $order = CODOrder::create([
-                    'account_id' => auth()->check() ? auth()->id() : null,
+                $order = Order::create([
+                    'account_id' => $userId, // Assign authenticated user ID
                     'product_id' => $product->id,
                     'quantity' => $item['quantity'],
                     'total_amount' => $totalAmount,
                     'ship_to' => $request->buyer_address,
-                    'status' => 'Pending',
+                    'status' => 'Order placed',
+                    'delivery_proof' => 'pending',
                 ]);
 
-                // Deduct stock
                 $product->decrement('stocks', $item['quantity']);
 
                 $orders[] = [
@@ -52,7 +66,7 @@ class CODOrderController extends Controller
                     'product' => $product->product_name,
                     'quantity' => $item['quantity'],
                     'total_amount' => $totalAmount,
-                    'status' => 'Pending'
+                    'status' => 'Order placed'
                 ];
             }
 
@@ -64,6 +78,7 @@ class CODOrderController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Order Placement Error:', ['message' => $e->getMessage()]);
             return response()->json(['error' => $e->getMessage()], 400);
         }
     }
