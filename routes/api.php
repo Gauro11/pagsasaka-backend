@@ -27,7 +27,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SalesController;
-
+use App\Http\Controllers\CODOrderController;
 
 
 
@@ -163,7 +163,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebhook']);
 
-
+Route::post('/cod-order', [CODOrderController::class, 'createCODOrder']);
 
 
 
