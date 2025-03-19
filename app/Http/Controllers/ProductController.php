@@ -494,7 +494,6 @@ class ProductController extends Controller
         }
     }
 
-
     public function addToCart(Request $request, $id)
     {
         $user = Auth::user();
@@ -504,7 +503,6 @@ class ProductController extends Controller
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
             ];
-            $this->logAPICalls('addToCart', "", $request->all(), [$response]);
             return response()->json($response, 401);
         }
 
@@ -516,12 +514,7 @@ class ProductController extends Controller
             $product = Product::find($id);
 
             if (!$product) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Product not found',
-                ];
-                $this->logAPICalls('addToCart', "", $request->all(), [$response]);
-                return response()->json($response, 404);
+                return response()->json(['isSuccess' => false, 'message' => 'Product not found'], 404);
             }
 
             $cart = Cart::where('account_id', $user->id)
@@ -533,35 +526,29 @@ class ProductController extends Controller
                 $newQuantity = $cart->quantity + $validated['quantity'];
 
                 if ($newQuantity > $product->stocks) {
-                    $response = [
+                    return response()->json([
                         'isSuccess' => false,
                         'message' => 'Updated quantity exceeds available stock.',
-                    ];
-                    $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]);
-                    return response()->json($response, 400);
+                    ], 400);
                 }
 
                 if ($newQuantity <= 0) {
-                    // Remove item from cart if quantity becomes 0 or negative
                     $cart->delete();
-                    $response = [
+                    return response()->json([
                         'isSuccess' => true,
                         'message' => 'Product removed from cart.',
                         'removed_product_id' => $product->id,
-                    ];
-                    $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]);
-                    return response()->json($response, 200);
+                    ], 200);
                 }
 
                 $cart->quantity = $newQuantity;
                 $cart->save();
             } else {
                 if ($validated['quantity'] <= 0) {
-                    $response = [
+                    return response()->json([
                         'isSuccess' => false,
                         'message' => 'Cannot add zero or negative quantity to cart.',
-                    ];
-                    return response()->json($response, 400);
+                    ], 400);
                 }
 
                 $cart = Cart::create([
@@ -572,7 +559,7 @@ class ProductController extends Controller
                 ]);
             }
 
-            $response = [
+            return response()->json([
                 'isSuccess' => true,
                 'message' => 'Product updated in cart successfully',
                 'cart' => [
@@ -582,17 +569,13 @@ class ProductController extends Controller
                     'quantity' => $cart->quantity,
                     'unit' => $cart->unit,
                 ],
-            ];
-            $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]);
-            return response()->json($response, 200);
+            ], 200);
         } catch (Throwable $e) {
-            $response = [
+            return response()->json([
                 'isSuccess' => false,
                 'message' => 'An error occurred while updating the cart.',
                 'error' => $e->getMessage(),
-            ];
-            $this->logAPICalls('addToCart', "", $request->all(), [$response]);
-            return response()->json($response, 500);
+            ], 500);
         }
     }
 
