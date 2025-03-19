@@ -625,6 +625,7 @@ class ProductController extends Controller
 
                     $cartData[] = [
                         'id' => $item->id,
+                        'product_name' => $product->product_name,
                         'quantity' => $item->quantity,
                         'unit' => $product->unit,
                         'price' => $product->price,
