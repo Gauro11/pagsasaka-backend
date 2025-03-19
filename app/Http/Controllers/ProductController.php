@@ -510,7 +510,7 @@ class ProductController extends Controller
 
         try {
             $validated = $request->validate([
-                'quantity' => 'required|integer|min:1',
+                'quantity' => 'required|integer',
             ]);
 
             $product = Product::find($id);
@@ -524,23 +524,15 @@ class ProductController extends Controller
                 return response()->json($response, 404);
             }
 
-            if ($validated['quantity'] > $product->stocks) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Requested quantity exceeds available stock.',
-                ];
-                $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]);
-                return response()->json($response, 400);
-            }
-
             $cart = Cart::where('account_id', $user->id)
                 ->where('product_id', $product->id)
                 ->first();
 
             if ($cart) {
-                $cart->quantity += $validated['quantity'];
+                // Handle increasing or decreasing quantity
+                $newQuantity = $cart->quantity + $validated['quantity'];
 
-                if ($cart->quantity > $product->stocks) {
+                if ($newQuantity > $product->stocks) {
                     $response = [
                         'isSuccess' => false,
                         'message' => 'Updated quantity exceeds available stock.',
@@ -549,30 +541,46 @@ class ProductController extends Controller
                     return response()->json($response, 400);
                 }
 
-                // Ensure the unit is properly set
-                if (!$cart->unit) {
-                    $cart->unit = $product->unit;
+                if ($newQuantity <= 0) {
+                    // Remove item from cart if quantity becomes 0 or negative
+                    $cart->delete();
+                    $response = [
+                        'isSuccess' => true,
+                        'message' => 'Product removed from cart.',
+                        'removed_product_id' => $product->id,
+                    ];
+                    $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]);
+                    return response()->json($response, 200);
                 }
 
+                $cart->quantity = $newQuantity;
                 $cart->save();
             } else {
+                if ($validated['quantity'] <= 0) {
+                    $response = [
+                        'isSuccess' => false,
+                        'message' => 'Cannot add zero or negative quantity to cart.',
+                    ];
+                    return response()->json($response, 400);
+                }
+
                 $cart = Cart::create([
                     'account_id' => $user->id,
                     'product_id' => $product->id,
                     'quantity' => $validated['quantity'],
-                    'unit' => $product->unit, // Ensure unit is stored
+                    'unit' => $product->unit ?? 'default_unit', // Ensure unit is set
                 ]);
             }
 
             $response = [
                 'isSuccess' => true,
-                'message' => 'Product added to cart successfully',
-                'addCart' => [
+                'message' => 'Product updated in cart successfully',
+                'cart' => [
                     'id' => $cart->id,
                     'account_id' => $cart->account_id,
                     'product_id' => $cart->product_id,
                     'quantity' => $cart->quantity,
-                    'unit' => $cart->unit, // Ensure unit is returned in the response
+                    'unit' => $cart->unit,
                 ],
             ];
             $this->logAPICalls('addToCart', $product->id, $request->all(), [$response]);
@@ -580,7 +588,7 @@ class ProductController extends Controller
         } catch (Throwable $e) {
             $response = [
                 'isSuccess' => false,
-                'message' => 'An error occurred while adding the product to the cart.',
+                'message' => 'An error occurred while updating the cart.',
                 'error' => $e->getMessage(),
             ];
             $this->logAPICalls('addToCart', "", $request->all(), [$response]);
@@ -621,6 +629,7 @@ class ProductController extends Controller
                         'unit' => $product->unit,
                         'price' => $product->price,
                         'itemTotal' => $itemTotal,
+                        'product_img' => $product->product_img,
                     ];
                 }
             }
