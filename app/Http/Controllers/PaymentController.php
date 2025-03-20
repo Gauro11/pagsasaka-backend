@@ -27,9 +27,11 @@ class PaymentController extends Controller
                 'items' => 'required|array',
                 'items.*.product_id' => 'required|exists:products,id',
                 'items.*.quantity' => 'required|integer|min:1',
+                'ship_to' => 'required|string|max:255', // Added for your Order model
             ]);
     
             if ($validator->fails()) {
+                Log::warning("Validation failed in pay method", ['errors' => $validator->errors()]);
                 return response()->json(['errors' => $validator->errors()], 422);
             }
     
@@ -41,11 +43,13 @@ class PaymentController extends Controller
     
                 // Validate product availability
                 if ($product->stocks <= 0 || $product->visibility !== 'Published' || $product->is_archived == 1) {
+                    Log::warning("Product not available", ['product_id' => $item['product_id'], 'product_name' => $product->product_name]);
                     return response()->json(['error' => "Product {$product->product_name} is not available for purchase"], 400);
                 }
     
                 // Validate quantity against available stock
                 if ($item['quantity'] > $product->stocks) {
+                    Log::warning("Insufficient stock", ['product_id' => $item['product_id'], 'requested_quantity' => $item['quantity'], 'available_stock' => $product->stocks]);
                     return response()->json(['error' => "Requested quantity exceeds available stock for {$product->product_name}"], 400);
                 }
     
@@ -71,13 +75,20 @@ class PaymentController extends Controller
                 'data' => [
                     'attributes' => [
                         'line_items' => $lineItems,
-                        'payment_method_types' => ['gcash', 'paymaya'], // Add other payment methods if needed
-                        'success_url' => url('/success'),
+                        'payment_method_types' => ['gcash', 'paymaya'],
+                        'success_url' => url('/payment/verify'), // Ensure this URL is correct
                         'cancel_url' => url('/cancel'),
                         'description' => 'Payment for multiple items',
+                        'metadata' => [ // Add metadata for order creation
+                            'account_id' => auth()->id() ?? null,
+                            'items' => $request->items,
+                            'ship_to' => $request->ship_to,
+                        ],
                     ],
                 ],
             ];
+    
+            Log::info("Sending request to PayMongo", ['data' => $data]);
     
             // Send request to PayMongo API
             $response = Http::withHeaders([
@@ -94,6 +105,13 @@ class PaymentController extends Controller
                 return response()->json(['error' => $responseData], 400);
             }
     
+            // Store session ID in session for verification
+            Session::put('checkout_session_id', $responseData['data']['id']);
+            Log::info("Checkout session created", [
+                'session_id' => $responseData['data']['id'],
+                'checkout_url' => $responseData['data']['attributes']['checkout_url']
+            ]);
+    
             DB::commit(); // Commit transaction if everything is successful
     
             return response()->json([
@@ -101,8 +119,94 @@ class PaymentController extends Controller
             ]);
         } catch (Exception $e) {
             DB::rollBack(); // Rollback transaction in case of an exception
-            Log::error("Payment processing error: " . $e->getMessage());
+            Log::error("Payment processing error: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['error' => 'Something went wrong. Please try again.'], 500);
+        }
+    }
+
+    /**
+     * Verify payment and save to orders table
+     */
+    public function verifyPayment(Request $request)
+    {
+        Log::info("verifyPayment method called");
+    
+        DB::beginTransaction();
+        
+        try {
+            $sessionId = Session::get('checkout_session_id');
+            if (!$sessionId) {
+                Log::error("Checkout session ID not found in session");
+                return redirect('/')->with('error', 'Payment session expired');
+            }
+    
+            Log::info("Verifying payment for session", ['session_id' => $sessionId]);
+    
+            // Verify payment status
+            $response = Http::withHeaders([
+                'Accept' => 'application/json',
+                'Authorization' => 'Basic ' . base64_encode(env('PAYMONGO_SECRET_KEY') . ':')
+            ])->get("https://api.paymongo.com/v1/checkout_sessions/{$sessionId}");
+    
+            $responseData = $response->json();
+    
+            if ($response->failed() || !isset($responseData['data']['attributes']['status'])) {
+                Log::error('Payment verification failed', ['response' => $responseData]);
+                DB::rollBack();
+                return redirect('/')->with('error', 'Payment verification failed');
+            }
+    
+            Log::info("Payment status", ['status' => $responseData['data']['attributes']['status']]);
+    
+            if ($responseData['data']['attributes']['status'] !== 'paid') {
+                Log::warning("Payment not completed", ['status' => $responseData['data']['attributes']['status']]);
+                DB::rollBack();
+                return redirect('/')->with('error', 'Payment not completed');
+            }
+    
+            // Payment is successful, create orders
+            $items = $responseData['data']['attributes']['metadata']['items'] ?? [];
+            $accountId = $responseData['data']['attributes']['metadata']['account_id'] ?? null;
+            $shipTo = $responseData['data']['attributes']['metadata']['ship_to'] ?? '';
+    
+            Log::info("Creating orders", [
+                'items' => $items,
+                'account_id' => $accountId,
+                'ship_to' => $shipTo
+            ]);
+    
+            foreach ($items as $item) {
+                $product = Product::findOrFail($item['product_id']);
+                
+                // Since stock was already deducted in pay(), just create the order
+                $order = Order::create([
+                    'account_id' => $accountId,
+                    'rider_id' => null, // As per your schema, initially null
+                    'product_id' => $product->id,
+                    'ship_to' => $shipTo,
+                    'quantity' => $item['quantity'],
+                    'total_amount' => $product->price * $item['quantity'],
+                    'status' => 'Order placed pending', // Match your database status
+                    'delivery_proof' => null, // Initially null
+                ]);
+    
+                Log::info("Order created successfully", [
+                    'order_id' => $order->id,
+                    'product_id' => $product->id,
+                    'quantity' => $item['quantity'],
+                    'ship_to' => $shipTo,
+                ]);
+            }
+    
+            DB::commit();
+            Session::forget('checkout_session_id');
+            Log::info("Payment verified and orders saved successfully");
+            return redirect('/')->with('message', 'Payment successful and order placed');
+    
+        } catch (Exception $e) {
+            DB::rollBack();
+            Log::error("Payment verification error: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return redirect('/')->with('error', 'Error processing payment');
         }
     }
 
@@ -112,8 +216,8 @@ class PaymentController extends Controller
     public function paymentCancel()
     {
         // Clear session data
-        Session::forget(['session_id', 'product_id', 'quantity']);
-
+        Session::forget(['session_id', 'product_id', 'quantity', 'checkout_session_id']);
+        Log::info("Payment cancelled, session cleared");
         return redirect('/')->with('message', 'Payment cancelled');
     }
 
@@ -130,6 +234,7 @@ class PaymentController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::warning("Validation failed in refund method", ['errors' => $validator->errors()]);
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
@@ -187,91 +292,4 @@ class PaymentController extends Controller
 
         return response()->json($responseData);
     }
-
-    /**
-     * Handle PayMongo webhook
-     */
-    /**
- * Handle PayMongo webhook
- */
-public function handlePaymongoWebhook(Request $request)
-{
-    Log::info('PayMongo Webhook Received:', $request->all());
-
-    $data = $request->json()->get('data');
-    $type = $request->json()->get('type');
-
-    if ($type === 'checkout_session.payment_succeeded') {
-        $checkoutSessionId = $data['id'];
-
-        // Fetch the checkout session details from PayMongo
-        $response = Http::withHeaders([
-            'Accept' => 'application/json',
-            'Authorization' => 'Basic ' . base64_encode(env('PAYMONGO_SECRET_KEY') . ':')
-        ])->get("https://api.paymongo.com/v1/checkout_sessions/{$checkoutSessionId}");
-
-        $responseData = $response->json();
-
-        if ($response->successful() && isset($responseData['data']['attributes']['status']) && $responseData['data']['attributes']['status'] === 'paid') {
-            $lineItems = $responseData['data']['attributes']['line_items'];
-
-            DB::beginTransaction(); // Start transaction
-
-            try {
-                foreach ($lineItems as $lineItem) {
-                    $productName = $lineItem['name'];
-                    $quantity = $lineItem['quantity'];
-
-                    // Find the product by name
-                    $product = Product::where('product_name', $productName)->first();
-
-                    if ($product) {
-                        if ($product->stocks >= $quantity) {
-                            // Deduct stock
-                            $product->decrement('stocks', $quantity);
-
-                            // Save order details
-                            Order::create([
-                                'user_id' => $responseData['data']['attributes']['metadata']['user_id'] ?? null, // Ensure this data is sent from frontend
-                                'product_id' => $product->id,
-                                'quantity' => $quantity,
-                                'total_price' => ($product->price * $quantity),
-                                'payment_status' => 'paid',
-                                'transaction_id' => $checkoutSessionId
-                            ]);
-
-                            Log::info("Order created successfully via webhook.", [
-                                'product_id' => $product->id,
-                                'product_name' => $product->product_name,
-                                'quantity_ordered' => $quantity,
-                                'remaining_stock' => $product->stocks
-                            ]);
-                        } else {
-                            Log::error("Insufficient stock for product {$product->product_name} (via webhook). Requested: {$quantity}, Available: {$product->stocks}");
-                            DB::rollBack();
-                            return response('Insufficient stock', 400);
-                        }
-                    } else {
-                        Log::error("Product not found: {$productName} (via webhook)");
-                        DB::rollBack();
-                        return response('Product not found', 404);
-                    }
-                }
-
-                DB::commit(); // Commit transaction
-                return response('Webhook handled successfully', 200);
-
-            } catch (\Exception $e) {
-                DB::rollBack();
-                Log::error("Error processing webhook: " . $e->getMessage());
-                return response('Error processing webhook', 500);
-            }
-        } else {
-            Log::warning('Checkout session not paid or status unknown (via webhook)', ['status' => $responseData['data']['attributes']['status'] ?? 'unknown']);
-        }
-    }
-
-    return response('Webhook received', 200);
-}
-
 }
