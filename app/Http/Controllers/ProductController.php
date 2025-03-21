@@ -187,13 +187,13 @@ class ProductController extends Controller
     public function getAllProductsList(Request $request)
     {
         try {
-            // Get optional query parameters
+            // Get optional search query
             $searchTerm = $request->input('search', null);
-            $perPage = $request->input('per_page', 5);
+            $perPage = 6;
 
-            // Build the query
+            // Query for fetching products
             $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
-                ->where('is_archived', '0') // Only active products
+                ->where('is_archived', '0')
                 ->when($searchTerm, function ($query, $searchTerm) {
                     return $query->where(function ($activeQuery) use ($searchTerm) {
                         $activeQuery->where('product_name', 'like', '%' . $searchTerm . '%')
@@ -204,7 +204,6 @@ class ProductController extends Controller
             // Paginate results
             $result = $query->paginate($perPage);
 
-            // Check if results are empty
             if ($result->isEmpty()) {
                 return response()->json([
                     'isSuccess' => false,
@@ -212,30 +211,8 @@ class ProductController extends Controller
                 ], 404);
             }
 
-            // Format the products
-            $formattedProducts = $result->getCollection()->transform(function ($product) {
-                $baseUrl = url('/img/products');
-
-                // ✅ Ensure product_img is always an array of strings
-                $productImages = is_string($product->product_img)
-                    ? explode(',', $product->product_img) // Convert CSV string to an array
-                    : (is_array($product->product_img) ? $product->product_img : []);
-
-                // ✅ Make sure each element is a valid string before calling parse_url()
-                $imagePaths = array_map(function ($img) use ($baseUrl) {
-                    if (!is_string($img) || empty($img)) {
-                        return null; // Skip invalid or empty entries
-                    }
-                    $pathParts = parse_url($img);
-                    if (!isset($pathParts['path'])) {
-                        return null; // Skip invalid URLs
-                    }
-                    $fileName = basename($pathParts['path']);
-                    return $baseUrl . '/' . $fileName;
-                }, $productImages);
-
-                // ✅ Remove null values from the array
-                $imagePaths = array_filter($imagePaths);
+            // ✅ Corrected the image formatting issue
+            $formattedProducts = $result->getCollection()->map(function ($product) {
 
                 return [
                     'id' => $product->id,
@@ -243,14 +220,14 @@ class ProductController extends Controller
                     'description' => $product->description,
                     'price' => $product->price,
                     'stocks' => $product->stocks,
-                    'product_img' => array_values($imagePaths), // Ensure proper JSON structure
+                    'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
                     'visibility' => $product->visibility,
                     'is_archived' => $product->is_archived == 0,
                 ];
             });
 
-            // Return the response
+            // Return response
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Products retrieved successfully.',
@@ -262,7 +239,7 @@ class ProductController extends Controller
                     'last_page' => $result->lastPage(),
                 ],
             ], 200);
-        } catch (\Throwable $e) {  // 🔹 Fixed namespace issue
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Failed to retrieve products.',
@@ -271,7 +248,69 @@ class ProductController extends Controller
         }
     }
 
+    public function getAllProductbyId(Request $request)
+    {
+        try {
+            // Get optional search query
+            $searchTerm = $request->input('search', null);
+            $perPage = 6;
 
+            // Query for fetching products
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
+                ->where('is_archived', '0')
+                ->when($searchTerm, function ($query, $searchTerm) {
+                    return $query->where(function ($activeQuery) use ($searchTerm) {
+                        $activeQuery->where('product_name', 'like', '%' . $searchTerm . '%')
+                            ->orWhere('description', 'like', '%' . $searchTerm . '%');
+                    });
+                });
+
+            // Paginate results
+            $result = $query->paginate($perPage);
+
+            if ($result->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No products found matching the criteria.',
+                ], 404);
+            }
+
+            // ✅ Corrected the image formatting issue
+            $formattedProducts = $result->getCollection()->map(function ($product) {
+
+                return [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'stocks' => $product->stocks,
+                    'product_img' => $product->product_img,
+                    'category_id' => $product->category_id,
+                    'visibility' => $product->visibility,
+                    'is_archived' => $product->is_archived == 0,
+                ];
+            });
+
+            // Return response
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Products retrieved successfully.',
+                'products' => $formattedProducts,
+                'pagination' => [
+                    'total' => $result->total(),
+                    'per_page' => $result->perPage(),
+                    'current_page' => $result->currentPage(),
+                    'last_page' => $result->lastPage(),
+                ],
+            ], 200);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve products.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
     public function getProductById($id)
     {
@@ -634,6 +673,45 @@ class ProductController extends Controller
             ];
             $this->logAPICalls('getCartList', "", [], [$response]);
             return response()->json($response, 500);
+        }
+    }
+
+    public function deleteFromCart($id)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => "User not authenticated.",
+                ], 500);
+            }
+
+            // Find the cart item belonging to the logged-in user
+            $cartItem = Cart::where('account_id', $user->id)
+                ->where('product_id', $id)
+                ->first();
+
+            if (!$cartItem) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => "Product not found in cart.",
+                ], 500);
+            }
+
+            // Delete the cart item
+            $cartItem->delete();
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => "Product successfully removed from cart.",
+            ], 200);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => "Failed to remove product from cart.",
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 
