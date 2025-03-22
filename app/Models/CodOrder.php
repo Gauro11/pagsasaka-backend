@@ -5,11 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Order extends Model
+class CODOrder extends Model
 {
     use HasFactory;
 
-    protected $table = 'orders'; // Ensure it's using the correct table
+    protected $table = 'cod_orders';
 
     protected $fillable = [
         'account_id',
@@ -18,6 +18,5 @@ class Order extends Model
         'total_amount',
         'ship_to',
         'status',
-        'delivery_proof',
     ];
 }

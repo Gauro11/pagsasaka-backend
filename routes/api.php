@@ -27,7 +27,11 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SalesController;
+
 use App\Http\Controllers\RiderController;
+
+
+use App\Http\Controllers\CODOrderController;
 
 
 
@@ -125,10 +129,13 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('edit/{id}', [ProductController::class, 'editProduct']);
     Route::post('account', [ProductController::class, 'getProductsByAccountId']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
-    Route::post('cart', [ProductController::class, 'addToCart']);
+    Route::post('cart/{id}', [ProductController::class, 'addToCart']);
+    Route::post('cart-list', [ProductController::class, 'getCartList']);
+    Route::post('cart-remove/{id}', [ProductController::class, 'deleteFromCart']);
 });
 
 Route::post('list', [ProductController::class, 'getAllProductsList']);
+Route::post('product-list-id', [ProductController::class, 'getAllProductbyId']);
 Route::get('by-id/{id}', [ProductController::class, 'getProductById']);
 
 Route::prefix('dropdown')->group(function () {
@@ -167,7 +174,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales', [SalesController::class, 'index']);
 });
 
+Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebhook']);
 
+Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
 
 
 
