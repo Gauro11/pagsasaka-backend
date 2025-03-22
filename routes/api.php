@@ -27,6 +27,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SalesController;
+use App\Http\Controllers\RiderController;
 
 
 
@@ -48,6 +49,12 @@ Route::middleware('auth:sanctum')->get('orders-for-pickup', [ShipmentController:
 Route::middleware('auth:sanctum')->post('pickupOrder/{id}', [ShipmentController::class, 'pickupOrder']);
 Route::middleware('auth:sanctum')->post('uploadDeliveryProof/{id}', [ShipmentController::class, 'uploadDeliveryProof']);
 
+
+
+
+Route::get('/rider/{id}', [RiderController::class, 'getRiderProfile']);
+Route::post('rider/apply', [RiderController::class, 'applyRider']);
+Route::post('rider/approve/{id}', [RiderController::class, 'approveRider']);
 
 
 

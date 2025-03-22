@@ -13,6 +13,7 @@ use Throwable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Account;
+use App\Models\Rider;
 
 class ShipmentController extends Controller
 {
@@ -387,12 +388,13 @@ class ShipmentController extends Controller
                  ], 400);
              }
      
-             // ✅ Update order status to "In transit"
+             // ✅ Assign Rider and Update Order Status
              $order->status = 'In transit';
+             $order->rider_id = $user->id; // 🔥 Record Rider's ID in orders table
              $order->save();
      
              // ✅ Fetch Rider's Firstname and Lastname from `accounts` table
-             $rider = Account::where('id', $user->id)->first(['id', 'first_name', 'last_name', 'role_id']);
+             $rider = Rider::where('id', $user->id)->first(['id', 'first_name', 'last_name', 'role_id']);
      
              // ✅ Format Rider's Name Properly
              $riderName = $rider ? trim("{$rider->first_name} {$rider->last_name}") : 'Unknown Rider';
@@ -403,7 +405,8 @@ class ShipmentController extends Controller
                  'message' => 'Order picked up successfully. Status updated to "In transit".',
                  'order' => [
                      'id' => $order->id,
-                     'account_id' => $order->account_id,
+                     'account_id' => $order->account_id, // Buyer
+                     'rider_id' => $order->rider_id, // Rider ID recorded
                      'status' => $order->status,
                      'ship_to' => $order->ship_to,
                      'quantity' => $order->quantity,
@@ -413,7 +416,7 @@ class ShipmentController extends Controller
                  ],
                  'rider' => [
                      'id' => $rider->id ?? $user->id, // Rider ID
-                     'name' => $riderName, // Rider Full Name (first_name + last_name)
+                     'name' => $riderName, // Rider Full Name
                      'role_id' => $rider->role_id ?? $user->role_id, // Should be 4
                  ],
              ], 200);
@@ -428,90 +431,92 @@ class ShipmentController extends Controller
      }
      
      
+     
 
      
 
-public function uploadDeliveryProof(Request $request, $id)
-{
-    try {
-        // Validate the uploaded image
-        $validated = $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ]);
-
-        // Ensure the user is authenticated
-        if (!auth()->check()) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Unauthorized. Please log in to upload proof of delivery.',
-            ];
-
-            // Log the API call
-            $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
-
-            return response()->json($response, 401);
-        }
-
-        // Check if the order exists
-        $order = Order::find($id);
-        if (!$order) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Order not found.',
-            ];
-
-            // Log the API call
-            $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
-
-            return response()->json($response, 404);
-        }
-
-        // Get authenticated user's account ID
-        $accountId = auth()->id();
-
-        // Handle the image upload
-        $directory = public_path('delivery_proof');
-        $fileName = 'DeliveryProof-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
-
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
-        }
-
-        $request->file('image')->move($directory, $fileName);
-        $filePath = asset('delivery_proof/' . $fileName);
-
-        // Update the order record
-        $order->delivery_proof = $filePath;
-        $order->save();
-
-        $response = [
-            'isSuccess' => true,
-            'message' => 'Delivery proof uploaded successfully.',
-            'quantity' => $order->quantity,
-            'total_amount' => $order->total_amount,
-            'delivery_proof' => $filePath,
-            
-        ];
-
-        // Log the API call
-        $this->logAPICalls('uploadDeliveryProof', $order->id, $request->all(), $response);
-
-        return response()->json($response, 200);
-
-    } catch (Throwable $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => 'Failed to upload delivery proof.',
-            'error' => $e->getMessage(),
-        ];
-
-        // Log the API call
-        $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
-
-        return response()->json($response, 500);
-    }
-}
-
+     public function uploadDeliveryProof(Request $request, $id)
+     {
+         try {
+             // Validate the uploaded image
+             $validated = $request->validate([
+                 'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+             ]);
+     
+             // Ensure the rider is authenticated using the correct guard
+             if (!auth()->check()) {
+                 $response = [
+                     'isSuccess' => false,
+                     'message' => 'Unauthorized. Please log in as a rider to upload proof of delivery.',
+                 ];
+     
+                 // Log the API call
+                 $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
+     
+                 return response()->json($response, 401);
+             }
+     
+             // Check if the order exists
+             $order = Order::find($id);
+             if (!$order) {
+                 $response = [
+                     'isSuccess' => false,
+                     'message' => 'Order not found.',
+                 ];
+     
+                 // Log the API call
+                 $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
+     
+                 return response()->json($response, 404);
+             }
+     
+             // Get authenticated rider's ID
+             $riderId = auth()->id();
+     
+             // Handle the image upload
+             $directory = public_path('delivery_proof');
+             $fileName = 'DeliveryProof-' . $riderId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
+     
+             if (!file_exists($directory)) {
+                 mkdir($directory, 0755, true);
+             }
+     
+             $request->file('image')->move($directory, $fileName);
+             $filePath = asset('delivery_proof/' . $fileName);
+     
+             // Update the order record
+             $order->delivery_proof = $filePath;
+             $order->save();
+     
+             $response = [
+                 'isSuccess' => true,
+                 'message' => 'Delivery proof uploaded successfully.',
+                 'quantity' => $order->quantity,
+                 'total_amount' => $order->total_amount,
+                 'delivery_proof' => $filePath,
+             ];
+     
+             // Log the API call
+             $this->logAPICalls('uploadDeliveryProof', $order->id, $request->all(), $response);
+     
+             return response()->json($response, 200);
+     
+         } catch (Throwable $e) {
+             $response = [
+                 'isSuccess' => false,
+                 'message' => 'Failed to upload delivery proof.',
+                 'error' => $e->getMessage(),
+             ];
+     
+             // Log the API call
+             $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
+     
+             return response()->json($response, 500);
+         }
+     }
+     
+     
+     
 
 
 
