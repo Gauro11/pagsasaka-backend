@@ -9,7 +9,7 @@ use App\Models\Order;
 
 class RiderController extends Controller
 {
-    // Get rider profile with total delivered amount
+    // Get rider profile with total delivered amount//
     public function getRiderProfile($id)
     {
         try {
