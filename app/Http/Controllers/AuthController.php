@@ -44,6 +44,14 @@ class AuthController extends Controller
             if (!$user) {
                 $user = Rider::where('email', $request->email)->first();
                 $isRider = true; // Flag to indicate rider login
+    
+                // Prevent login if rider status is "Pending"
+                if ($user && $user->status === 'Pending') {
+                    return response()->json([
+                        'isSuccess' => false,
+                        'message' => 'Your account is still pending approval. Please wait for admin approval.',
+                    ], 403);
+                }
             }
     
             // If user exists and password matches
@@ -96,6 +104,7 @@ class AuthController extends Controller
             return response()->json($response, 500);
         }
     }
+    
     
     
     // logout

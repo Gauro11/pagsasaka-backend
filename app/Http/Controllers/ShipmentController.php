@@ -32,7 +32,7 @@ class ShipmentController extends Controller
                 $this->logAPICalls('getOrders', "", $request->all(), [$response]);
                 return response()->json($response, 500);
             }
-
+    
             // Check if the user's role_id is Farmer (role_id = 2)
             if ($user->role_id !== 2) {
                 $response = [
@@ -42,9 +42,9 @@ class ShipmentController extends Controller
                 $this->logAPICalls('getOrders', $user->id, $request->all(), [$response]);
                 return response()->json($response, 403);
             }
-
+    
             // Retrieve orders with 'processing' status
-            $orders = Order::with('product') // Eager load the product relationship
+            $orders = Order::with('product') // Ensure the product relationship exists
                 ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
                 ->where('account_id', $user->id)
                 ->when($request->has('product_id'), function ($query) use ($request) {
@@ -52,30 +52,12 @@ class ShipmentController extends Controller
                 })
                 ->orderBy('created_at', 'desc')
                 ->paginate($request->get('paginate', 10));
-
-            // Transform the collection to update statuses and format the response
+    
+            // Transform and format orders
             $orders->getCollection()->transform(function ($order) {
-                $now = Carbon::now();
-                $orderCreatedAt = Carbon::parse($order->created_at);
-
-                // Update statuses immediately within the same day
-                if ($order->status === 'processing') {
-                    $order->status = 'Toship';
-                } elseif ($order->status === 'Toship') {
-                    $order->status = 'shipping';
-                } elseif ($order->status === 'shipping') {
-                    $order->status = 'To Receive';
-                } elseif ($order->status === 'To Receive') {
-                    $order->status = 'Completed';
-                }
-
-                // Save the updated status
-                $order->save();
-
-                // Format the created_at and updated_at fields
-                $order->created_at = $orderCreatedAt->format('F d Y');
-                $order->updated_at = $now->format('F d Y');
-
+                $order->created_at = Carbon::parse($order->created_at)->format('F d Y');
+                $order->updated_at = Carbon::parse($order->updated_at)->format('F d Y');
+    
                 return [
                     'id' => $order->id,
                     'account_id' => $order->account_id,
@@ -89,7 +71,7 @@ class ShipmentController extends Controller
                     'updated_at' => $order->updated_at,
                 ];
             });
-
+    
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Orders retrieved successfully.',
@@ -103,6 +85,7 @@ class ShipmentController extends Controller
             ], 500);
         }
     }
+    
 
     public function updateOrderStatus(Request $request, $id)
     {
