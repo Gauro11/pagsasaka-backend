@@ -18,6 +18,7 @@ class Order extends Model
         'quantity',
         'total_amount',
         'status',
+        'delivery_proof',
         'created_at',
         'updated_at'
     ];
