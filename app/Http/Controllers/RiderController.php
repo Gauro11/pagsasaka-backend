@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\Account;
 use App\Models\Rider;
 use App\Models\Order;
+use App\Models\ApiLog;
+use Throwable;
 
 class RiderController extends Controller
 {
@@ -55,31 +57,72 @@ class RiderController extends Controller
 
     public function applyRider(Request $request)
 {
-    $request->validate([
-        'first_name' => 'required|string|max:255',
-        'last_name' => 'required|string|max:255',
-        'email' => 'required|email|unique:riders,email',
-        'password' => 'required|string|min:6',
-        'phone_number' => 'required|string|max:20',
-        'license' => 'required|image|mimes:jpg,png,jpeg|max:2048', // Validate image
-    ]);
+    try {
+        // Validate request input
+        $validated = $request->validate([
+            'first_name'    => 'required|string|max:255',
+            'last_name'     => 'required|string|max:255',
+            'email'         => 'required|email|unique:riders,email',
+            'password'      => 'required|string|min:9',
+            'phone_number'  => 'required|string|max:20',
+            'license'       => 'required|image|mimes:jpg,png,jpeg|max:2048',
+        ]);
 
-    // Store the license image
-    $licensePath = $request->file('license')->store('licenses', 'public');
+        // Ensure the directory exists
+        $directory = public_path('img/licenses');
+        if (!file_exists($directory)) {
+            mkdir($directory, 0755, true);
+        }
 
-    $rider = Rider::create([
-        'first_name' => $request->first_name,
-        'last_name' => $request->last_name,
-        'email' => $request->email,
-        'password' => bcrypt($request->password),
-        'phone_number' => $request->phone_number,
-        'license' => $licensePath, // Save the image path
-        'status' => 'Pending', // Set status as pending
-        'role_id' => 4 // Set role_id to 4
-    ]);
+        // Generate a unique file name
+        $fileName = 'License-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('license')->getClientOriginalExtension();
+        
+        // Move file to the directory
+        $request->file('license')->move($directory, $fileName);
 
-    return response()->json(['message' => 'Application submitted. Waiting for approval.', 'rider' => $rider], 201);
+        // Store the full image URL
+        $licensePath = asset('img/licenses/' . $fileName);
+
+        // Create rider entry
+        $rider = Rider::create([
+            'first_name'   => $validated['first_name'],
+            'last_name'    => $validated['last_name'],
+            'email'        => $validated['email'],
+            'password'     => bcrypt($validated['password']),
+            'phone_number' => $validated['phone_number'],
+            'license'      => $licensePath, // Save full image URL
+            'status'       => 'Pending',
+            'role_id'      => 4
+        ]);
+
+        // Prepare success response
+        $response = [
+            'isSuccess' => true,
+            'message'   => 'Application submitted successfully. Waiting for approval.',
+            'rider_id'  => $rider->id,
+            'license_url' => $licensePath,
+        ];
+
+        // Log the API call
+        $this->logAPICalls('applyRider', $rider->id, $request->all(), $response);
+
+        return response()->json($response, 201);
+
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message'   => 'Failed to submit application.',
+            'error'     => $e->getMessage(),
+        ];
+
+        // Log the API call
+        $this->logAPICalls('applyRider', null, $request->all(), $response);
+
+        return response()->json($response, 500);
+    }
 }
+
+    
 
 public function approveRider($id)
 {
@@ -92,6 +135,21 @@ public function approveRider($id)
     $rider->update(['status' => 'Approve']);
 
     return response()->json(['message' => 'Rider approved successfully.', 'rider' => $rider], 200);
+}
+
+public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
+{
+    try {
+        ApiLog::create([
+            'method_name' => $methodName,
+            'user_id' => $userId,
+            'api_request' => json_encode($param),
+            'api_response' => json_encode($resp)
+        ]);
+    } catch (Throwable $e) {
+        return false;
+    }
+    return true;
 }
 
 
