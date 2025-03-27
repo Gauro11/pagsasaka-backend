@@ -52,6 +52,8 @@ Route::middleware('auth:sanctum')->post('confirmOrderReceived/{id}', [ShipmentCo
 Route::middleware('auth:sanctum')->get('orders-for-pickup', [ShipmentController::class, 'getOrdersForPickup']);
 Route::middleware('auth:sanctum')->post('pickupOrder/{id}', [ShipmentController::class, 'pickupOrder']);
 Route::middleware('auth:sanctum')->post('uploadDeliveryProof/{id}', [ShipmentController::class, 'uploadDeliveryProof']);
+Route::middleware('auth:sanctum')->get('orders-in-transit', [ShipmentController::class, 'getInTransitOrders']);
+
 
 
 

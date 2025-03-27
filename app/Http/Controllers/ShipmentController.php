@@ -412,6 +412,29 @@ class ShipmentController extends Controller
              ], 500);
          }
      }
+
+     public function getInTransitOrders()
+{
+    try {
+        // Fetch orders where status is 'shipping' (in-transit)
+        $orders = Order::where('status', 'In transit')->get();
+        
+
+        return response()->json([
+            'isSuccess' => true,
+            'message'   => 'In-transit orders retrieved successfully.',
+            'orders'    => $orders
+        ], 200);
+
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message'   => 'Failed to retrieve in-transit orders.',
+            'error'     => $e->getMessage(),
+        ], 500);
+    }
+}
+
      
      
      
