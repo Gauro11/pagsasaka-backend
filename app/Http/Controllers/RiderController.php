@@ -56,71 +56,84 @@ class RiderController extends Controller
     
 
     public function applyRider(Request $request)
-{
-    try {
-        // Validate request input
-        $validated = $request->validate([
-            'first_name'    => 'required|string|max:255',
-            'last_name'     => 'required|string|max:255',
-            'email'         => 'required|email|unique:riders,email',
-            'password'      => 'required|string|min:9',
-            'phone_number'  => 'required|string|max:20',
-            'license'       => 'required|image|mimes:jpg,png,jpeg|max:2048',
-        ]);
-
-        // Ensure the directory exists
-        $directory = public_path('img/licenses');
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
+    {
+        try {
+            // Validate request input
+            $validated = $request->validate([
+                'first_name'    => 'required|string|max:255',
+                'last_name'     => 'required|string|max:255',
+                'email'         => 'required|email|unique:riders,email',
+                'password'      => 'required|string|min:9',
+                'phone_number'  => 'required|string|max:20',
+                'license'       => 'required|image|mimes:jpg,png,jpeg|max:2048',
+                'valid_id'      => 'required|image|mimes:jpg,png,jpeg|max:2048', // New validation rule for valid ID
+            ]);
+    
+            // Ensure directories exist
+            $licenseDirectory = public_path('img/licenses');
+            $validIdDirectory = public_path('img/valid_ids');
+    
+            if (!file_exists($licenseDirectory)) {
+                mkdir($licenseDirectory, 0755, true);
+            }
+    
+            if (!file_exists($validIdDirectory)) {
+                mkdir($validIdDirectory, 0755, true);
+            }
+    
+            // Generate unique file names
+            $licenseFileName = 'License-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('license')->getClientOriginalExtension();
+            $validIdFileName = 'ValidID-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('valid_id')->getClientOriginalExtension();
+            
+            // Move files to the respective directories
+            $request->file('license')->move($licenseDirectory, $licenseFileName);
+            $request->file('valid_id')->move($validIdDirectory, $validIdFileName);
+    
+            // Store full image URLs
+            $licensePath = asset('img/licenses/' . $licenseFileName);
+            $validIdPath = asset('img/valid_ids/' . $validIdFileName);
+    
+            // Create rider entry
+            $rider = Rider::create([
+                'first_name'   => $validated['first_name'],
+                'last_name'    => $validated['last_name'],
+                'email'        => $validated['email'],
+                'password'     => bcrypt($validated['password']),
+                'phone_number' => $validated['phone_number'],
+                'license'      => $licensePath, // Save full image URL for license
+                'valid_id'     => $validIdPath, // Save full image URL for valid ID
+                'status'       => 'Pending',
+                'role_id'      => 4
+            ]);
+    
+            // Prepare success response
+            $response = [
+                'isSuccess'   => true,
+                'message'     => 'Application submitted successfully. Waiting for approval.',
+                'rider_id'    => $rider->id,
+                'license' => $licensePath,
+                'valid_id' => $validIdPath,
+            ];
+    
+            // Log the API call
+            $this->logAPICalls('applyRider', $rider->id, $request->all(), $response);
+    
+            return response()->json($response, 201);
+    
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message'   => 'Failed to submit application.',
+                'error'     => $e->getMessage(),
+            ];
+    
+            // Log the API call
+            $this->logAPICalls('applyRider', null, $request->all(), $response);
+    
+            return response()->json($response, 500);
         }
-
-        // Generate a unique file name
-        $fileName = 'License-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('license')->getClientOriginalExtension();
-        
-        // Move file to the directory
-        $request->file('license')->move($directory, $fileName);
-
-        // Store the full image URL
-        $licensePath = asset('img/licenses/' . $fileName);
-
-        // Create rider entry
-        $rider = Rider::create([
-            'first_name'   => $validated['first_name'],
-            'last_name'    => $validated['last_name'],
-            'email'        => $validated['email'],
-            'password'     => bcrypt($validated['password']),
-            'phone_number' => $validated['phone_number'],
-            'license'      => $licensePath, // Save full image URL
-            'status'       => 'Pending',
-            'role_id'      => 4
-        ]);
-
-        // Prepare success response
-        $response = [
-            'isSuccess' => true,
-            'message'   => 'Application submitted successfully. Waiting for approval.',
-            'rider_id'  => $rider->id,
-            'license_url' => $licensePath,
-        ];
-
-        // Log the API call
-        $this->logAPICalls('applyRider', $rider->id, $request->all(), $response);
-
-        return response()->json($response, 201);
-
-    } catch (Throwable $e) {
-        $response = [
-            'isSuccess' => false,
-            'message'   => 'Failed to submit application.',
-            'error'     => $e->getMessage(),
-        ];
-
-        // Log the API call
-        $this->logAPICalls('applyRider', null, $request->all(), $response);
-
-        return response()->json($response, 500);
     }
-}
+    
 
     
 

@@ -21,6 +21,7 @@ class Rider extends Authenticatable
         'password',
         'phone_number',
         'license',
+        'valid_id',
         'status',
         'role_id'
     ];
