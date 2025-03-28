@@ -108,11 +108,9 @@ class RiderController extends Controller
     
             // Prepare success response
             $response = [
-                'isSuccess'   => true,
-                'message'     => 'Application submitted successfully. Waiting for approval.',
-                'rider_id'    => $rider->id,
-                'license' => $licensePath,
-                'valid_id' => $validIdPath,
+                'isSuccess' => true,
+                'message'   => 'Application submitted successfully. Waiting for approval.',
+                'rider'     => $rider->makeHidden(['password']), // Hide the password field
             ];
     
             // Log the API call
@@ -134,7 +132,7 @@ class RiderController extends Controller
         }
     }
     
-    
+
 
     
 
