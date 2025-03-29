@@ -414,26 +414,45 @@ class ShipmentController extends Controller
      }
 
      public function getInTransitOrders()
-{
-    try {
-        // Fetch orders where status is 'shipping' (in-transit)
-        $orders = Order::where('status', 'In transit')->get();
-        
-
-        return response()->json([
-            'isSuccess' => true,
-            'message'   => 'In-transit orders retrieved successfully.',
-            'orders'    => $orders
-        ], 200);
-
-    } catch (Throwable $e) {
-        return response()->json([
-            'isSuccess' => false,
-            'message'   => 'Failed to retrieve in-transit orders.',
-            'error'     => $e->getMessage(),
-        ], 500);
-    }
-}
+     {
+         try {
+             // Authenticate the user
+             $user = Auth::user();
+             if (!$user) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message'   => 'User not authenticated.',
+                 ], 401);
+             }
+     
+             // Ensure the user is a Rider (role_id = 4)
+             if ($user->role_id !== 4) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message'   => 'Access denied. Only Riders can view in-transit orders.',
+                 ], 403);
+             }
+     
+             // Fetch orders assigned to the authenticated rider where status is 'In transit'
+             $orders = Order::where('status', 'In transit')
+                             ->where('rider_id', $user->id)
+                             ->get();
+     
+             return response()->json([
+                 'isSuccess' => true,
+                 'message'   => 'In-transit orders retrieved successfully.',
+                 'orders'    => $orders
+             ], 200);
+     
+         } catch (\Throwable $e) {
+             return response()->json([
+                 'isSuccess' => false,
+                 'message'   => 'Failed to retrieve in-transit orders.',
+                 'error'     => $e->getMessage(),
+             ], 500);
+         }
+     }
+     
 
      
 
