@@ -380,7 +380,7 @@ class ProductController extends Controller
             $perPage = $request->input('per_page', 10); // Items per page (default: 10)
 
             // Build the query
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks','unit', 'product_img', 'category_id', 'visibility', 'is_archived')
                 ->where('account_id', $accountId)
                 ->where('is_archived', '0') // Assuming we only want active products
                 ->when($searchTerm, function ($query, $searchTerm) {
