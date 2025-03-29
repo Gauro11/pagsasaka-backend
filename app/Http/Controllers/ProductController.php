@@ -73,7 +73,18 @@ class ProductController extends Controller
             $response = [
                 'isSuccess' => true,
                 'message' => 'Product successfully created.',
-                'product' => $product,
+                'product' => [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'stocks' => $product->stocks,
+                    'unit' => $product->unit,
+                    'product_img' => $product->product_img,
+                    'category_id' => $product->category_id,
+                    'visibility' => $product->visibility,
+                    'is_archived' => $product->is_archived,
+                ],
             ];
 
             // Log the API call
@@ -149,11 +160,21 @@ class ProductController extends Controller
             // Update the product with the validated data
             $product->update($validated);
 
-            // Prepare success response
             $response = [
                 'isSuccess' => true,
-                'message' => 'Product successfully updated.',
-                'product' => $product,
+                'message' => 'Product successfully created.',
+                'product' => [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'stocks' => $product->stocks,
+                    'unit' => $product->unit,
+                    'product_img' => $product->product_img,
+                    'category_id' => $product->category_id,
+                    'visibility' => $product->visibility,
+                    'is_archived' => $product->is_archived,
+                ],
             ];
 
             // Log API call
@@ -721,32 +742,32 @@ class ProductController extends Controller
     }
 
     public function buyNow($product_id, $quantity = 1)
-{
-    $product = Product::find($product_id);
+    {
+        $product = Product::find($product_id);
 
-    if (!$product) {
+        if (!$product) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Product not found.'
+            ], 404);
+        }
+
+        $total = $product->price * max(1, intval($quantity));
+
         return response()->json([
-            'isSuccess' => false,
-            'message' => 'Product not found.'
-        ], 404);
+            'isSuccess' => true,
+            'message' => 'Checkout successful.',
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->product_name,
+                'price' => $product->price,
+                'quantity' => intval($quantity),
+                'unit' => $product->unit,
+                'total' => $total,
+                'product_img' => $product->product_img,
+            ]
+        ]);
     }
-
-    $total = $product->price * max(1, intval($quantity));
-
-    return response()->json([
-        'isSuccess' => true,
-        'message' => 'Checkout successful.',
-        'product' => [
-            'id' => $product->id,
-            'name' => $product->product_name,
-            'price' => $product->price,
-            'quantity' => intval($quantity),
-            'unit' => $product->unit,
-            'total' => $total,
-            'product_img' => $product->product_img,
-        ]
-    ]);
-}
 
     //     public function checkout(Request $request)
     // {
