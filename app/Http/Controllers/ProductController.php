@@ -26,7 +26,7 @@ class ProductController extends Controller
                 'description' => 'nullable|string',
                 'price' => 'required|numeric|min:0',
                 'stocks' => 'required|integer|min:0',
-                'unit' => 'required|in:kg,net,box',
+                'unit' => 'required|string|in:kg,net,box',
                 'product_img' => 'required|array|min:3',
                 'product_img.*' => 'max:2048',
                 'visibility' => 'required|in:Published,Scheduled',
@@ -83,7 +83,6 @@ class ProductController extends Controller
                     'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
                     'visibility' => $product->visibility,
-                    'is_archived' => $product->is_archived,
                 ],
             ];
 
@@ -118,7 +117,7 @@ class ProductController extends Controller
                 'description' => 'sometimes|string',
                 'price' => 'sometimes|numeric|min:0',
                 'stocks' => 'sometimes|integer|min:0',
-                'unit' => 'sometimes|in:kg,net,box',
+                'unit' => 'sometimes|string|in:kg,net,box',
                 'product_img' => 'sometimes|array',
                 'product_img.*' => 'sometimes|max:2048',
                 'visibility' => 'sometimes|in:Published,Scheduled',
@@ -173,7 +172,6 @@ class ProductController extends Controller
                     'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
                     'visibility' => $product->visibility,
-                    'is_archived' => $product->is_archived,
                 ],
             ];
 
@@ -215,7 +213,7 @@ class ProductController extends Controller
             $perPage = 6;
 
             // Query for fetching products
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img','unit', 'category_id', 'visibility', 'is_archived')
                 ->where('is_archived', '0')
                 ->when($searchTerm, function ($query, $searchTerm) {
                     return $query->where(function ($activeQuery) use ($searchTerm) {
@@ -280,7 +278,7 @@ class ProductController extends Controller
             $perPage = 10;
 
             // Query for fetching products
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks','unit', 'product_img', 'category_id', 'visibility', 'is_archived')
                 ->where('is_archived', '0')
                 ->when($searchTerm, function ($query, $searchTerm) {
                     return $query->where(function ($activeQuery) use ($searchTerm) {
