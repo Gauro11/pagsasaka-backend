@@ -13,6 +13,7 @@ use Throwable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Account;
+use App\Models\Rider;
 
 class ShipmentController extends Controller
 {
@@ -31,7 +32,7 @@ class ShipmentController extends Controller
                 $this->logAPICalls('getOrders', "", $request->all(), [$response]);
                 return response()->json($response, 500);
             }
-
+    
             // Check if the user's role_id is Farmer (role_id = 2)
             if ($user->role_id !== 2) {
                 $response = [
@@ -41,9 +42,9 @@ class ShipmentController extends Controller
                 $this->logAPICalls('getOrders', $user->id, $request->all(), [$response]);
                 return response()->json($response, 403);
             }
-
+    
             // Retrieve orders with 'processing' status
-            $orders = Order::with('product') // Eager load the product relationship
+            $orders = Order::with('product') // Ensure the product relationship exists
                 ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
                 ->where('account_id', $user->id)
                 ->when($request->has('product_id'), function ($query) use ($request) {
@@ -51,30 +52,12 @@ class ShipmentController extends Controller
                 })
                 ->orderBy('created_at', 'desc')
                 ->paginate($request->get('paginate', 10));
-
-            // Transform the collection to update statuses and format the response
+    
+            // Transform and format orders
             $orders->getCollection()->transform(function ($order) {
-                $now = Carbon::now();
-                $orderCreatedAt = Carbon::parse($order->created_at);
-
-                // Update statuses immediately within the same day
-                if ($order->status === 'processing') {
-                    $order->status = 'Toship';
-                } elseif ($order->status === 'Toship') {
-                    $order->status = 'shipping';
-                } elseif ($order->status === 'shipping') {
-                    $order->status = 'To Receive';
-                } elseif ($order->status === 'To Receive') {
-                    $order->status = 'Completed';
-                }
-
-                // Save the updated status
-                $order->save();
-
-                // Format the created_at and updated_at fields
-                $order->created_at = $orderCreatedAt->format('F d Y');
-                $order->updated_at = $now->format('F d Y');
-
+                $order->created_at = Carbon::parse($order->created_at)->format('F d Y');
+                $order->updated_at = Carbon::parse($order->updated_at)->format('F d Y');
+    
                 return [
                     'id' => $order->id,
                     'account_id' => $order->account_id,
@@ -88,7 +71,7 @@ class ShipmentController extends Controller
                     'updated_at' => $order->updated_at,
                 ];
             });
-
+    
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Orders retrieved successfully.',
@@ -102,6 +85,7 @@ class ShipmentController extends Controller
             ], 500);
         }
     }
+    
 
     public function updateOrderStatus(Request $request, $id)
     {
@@ -387,12 +371,13 @@ class ShipmentController extends Controller
                  ], 400);
              }
      
-             // ✅ Update order status to "In transit"
+             // ✅ Assign Rider and Update Order Status
              $order->status = 'In transit';
+             $order->rider_id = $user->id; // 🔥 Record Rider's ID in orders table
              $order->save();
      
              // ✅ Fetch Rider's Firstname and Lastname from `accounts` table
-             $rider = Account::where('id', $user->id)->first(['id', 'first_name', 'last_name', 'role_id']);
+             $rider = Rider::where('id', $user->id)->first(['id', 'first_name', 'last_name', 'role_id']);
      
              // ✅ Format Rider's Name Properly
              $riderName = $rider ? trim("{$rider->first_name} {$rider->last_name}") : 'Unknown Rider';
@@ -403,7 +388,8 @@ class ShipmentController extends Controller
                  'message' => 'Order picked up successfully. Status updated to "In transit".',
                  'order' => [
                      'id' => $order->id,
-                     'account_id' => $order->account_id,
+                     'account_id' => $order->account_id, // Buyer
+                     'rider_id' => $order->rider_id, // Rider ID recorded
                      'status' => $order->status,
                      'ship_to' => $order->ship_to,
                      'quantity' => $order->quantity,
@@ -413,7 +399,7 @@ class ShipmentController extends Controller
                  ],
                  'rider' => [
                      'id' => $rider->id ?? $user->id, // Rider ID
-                     'name' => $riderName, // Rider Full Name (first_name + last_name)
+                     'name' => $riderName, // Rider Full Name
                      'role_id' => $rider->role_id ?? $user->role_id, // Should be 4
                  ],
              ], 200);
@@ -426,99 +412,114 @@ class ShipmentController extends Controller
              ], 500);
          }
      }
-     
-     
 
-     
-
-public function uploadDeliveryProof(Request $request, $id)
+     public function getInTransitOrders()
 {
     try {
-        // Validate the uploaded image
-        $validated = $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ]);
+        // Fetch orders where status is 'shipping' (in-transit)
+        $orders = Order::where('status', 'In transit')->get();
+        
 
-        // Ensure the user is authenticated
-        if (!auth()->check()) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Unauthorized. Please log in to upload proof of delivery.',
-            ];
-
-            // Log the API call
-            $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
-
-            return response()->json($response, 401);
-        }
-
-        // Check if the order exists
-        $order = Order::find($id);
-        if (!$order) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Order not found.',
-            ];
-
-            // Log the API call
-            $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
-
-            return response()->json($response, 404);
-        }
-
-        // Get authenticated user's account ID
-        $accountId = auth()->id();
-
-        // Handle the image upload
-        $directory = public_path('delivery_proof');
-        $fileName = 'DeliveryProof-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
-
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
-        }
-
-        $request->file('image')->move($directory, $fileName);
-        $filePath = asset('delivery_proof/' . $fileName);
-
-        // Update the order record
-        $order->delivery_proof = $filePath;
-        $order->save();
-
-        $response = [
+        return response()->json([
             'isSuccess' => true,
-            'message' => 'Delivery proof uploaded successfully.',
-            'quantity' => $order->quantity,
-            'total_amount' => $order->total_amount,
-            'delivery_proof' => $filePath,
-            
-        ];
-
-        // Log the API call
-        $this->logAPICalls('uploadDeliveryProof', $order->id, $request->all(), $response);
-
-        return response()->json($response, 200);
+            'message'   => 'In-transit orders retrieved successfully.',
+            'orders'    => $orders
+        ], 200);
 
     } catch (Throwable $e) {
-        $response = [
+        return response()->json([
             'isSuccess' => false,
-            'message' => 'Failed to upload delivery proof.',
-            'error' => $e->getMessage(),
-        ];
-
-        // Log the API call
-        $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
-
-        return response()->json($response, 500);
+            'message'   => 'Failed to retrieve in-transit orders.',
+            'error'     => $e->getMessage(),
+        ], 500);
     }
 }
 
+     
 
+     
 
-
-
-
-
-
+     public function uploadDeliveryProof(Request $request, $id)
+     {
+         try {
+             // Validate the uploaded image
+             $validated = $request->validate([
+                 'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+             ]);
+     
+             // Ensure the rider is authenticated using the correct guard
+             if (!auth()->check()) {
+                 $response = [
+                     'isSuccess' => false,
+                     'message' => 'Unauthorized. Please log in as a rider to upload proof of delivery.',
+                 ];
+     
+                 // Log the API call
+                 $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
+     
+                 return response()->json($response, 401);
+             }
+     
+             // Check if the order exists
+             $order = Order::find($id);
+             if (!$order) {
+                 $response = [
+                     'isSuccess' => false,
+                     'message' => 'Order not found.',
+                 ];
+     
+                 // Log the API call
+                 $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
+     
+                 return response()->json($response, 404);
+             }
+     
+             // Get authenticated rider's ID
+             $riderId = auth()->id();
+     
+             // Handle the image upload
+             $directory = public_path('delivery_proof');
+             $fileName = 'DeliveryProof-' . $riderId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
+     
+             if (!file_exists($directory)) {
+                 mkdir($directory, 0755, true);
+             }
+     
+             $request->file('image')->move($directory, $fileName);
+             $filePath = asset('delivery_proof/' . $fileName);
+     
+             // Update the order record
+             $order->delivery_proof = $filePath;
+             $order->save();
+     
+             $response = [
+                 'isSuccess' => true,
+                 'message' => 'Delivery proof uploaded successfully.',
+                 'quantity' => $order->quantity,
+                 'total_amount' => $order->total_amount,
+                 'delivery_proof' => $filePath,
+             ];
+     
+             // Log the API call
+             $this->logAPICalls('uploadDeliveryProof', $order->id, $request->all(), $response);
+     
+             return response()->json($response, 200);
+     
+         } catch (Throwable $e) {
+             $response = [
+                 'isSuccess' => false,
+                 'message' => 'Failed to upload delivery proof.',
+                 'error' => $e->getMessage(),
+             ];
+     
+             // Log the API call
+             $this->logAPICalls('uploadDeliveryProof', null, $request->all(), $response);
+     
+             return response()->json($response, 500);
+         }
+     }
+     
+     
 
 
 
@@ -594,6 +595,96 @@ public function uploadDeliveryProof(Request $request, $id)
             ], 500);
         }
     }
+
+    public function getCancellationReasons()
+{
+    $reasons = [
+        'Changed my mind',
+        'Found a better price',
+        'Order delayed',
+        'Item no longer needed',
+        'Wrong item ordered',
+        'Other (please specify)'
+    ];
+
+    return response()->json([
+        'isSuccess' => true,
+        'message' => 'Cancellation reasons retrieved successfully.',
+        'reasons' => $reasons
+    ], 200);
+}
+
+
+    public function cancelOrder(Request $request, $id)
+    {
+        try {
+            // Validate request
+            $validated = $request->validate([
+                'reason' => 'required|string|max:255',
+            ]);
+    
+            // Get authenticated user
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'User not authenticated.',
+                ], 401);
+            }
+    
+            // Find the order
+            $order = Order::find($id);
+            if (!$order) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Order not found.',
+                ], 404);
+            }
+    
+            // Ensure order can be cancelled
+            if (!in_array($order->status, ['Order placed', 'Waiting for courier'])) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Order cannot be cancelled at this stage.',
+                ], 400);
+            }
+    
+            // Update order status
+            $order->status = 'Cancelled';
+            $order->cancellation_reason = $validated['reason'];
+            $order->save();
+    
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Order cancelled successfully.',
+                'order' => [
+                    'id' => $order->id,
+                    'account_id' => $order->account_id,
+                    'status' => $order->status,
+                    'cancellation_reason' => $order->cancellation_reason,
+                    'ship_to' => $order->ship_to,
+                    'quantity' => $order->quantity,
+                    'total_amount' => $order->total_amount,
+                    'created_at' => $order->created_at->format('F d Y'),
+                    'updated_at' => now()->format('F d Y'),
+                ],
+                'user' => [
+                    'id' => $user->id,
+                    'name' => "{$user->first_name} {$user->last_name}",
+                    'role_id' => $user->role_id,
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'An error occurred while cancelling the order.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+
+
 
 
     public function getRefundOrders(Request $request)

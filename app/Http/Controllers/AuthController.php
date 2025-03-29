@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Account;
+use App\Models\Rider;
 use App\Models\Session;
 use App\Models\ApiLog;
 use Illuminate\Support\Facades\Hash;
@@ -32,21 +33,38 @@ class AuthController extends Controller
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
-
-            // Retrieve the user and eager load the 'role' relationship
+    
+            // Check if the user exists in the accounts table
             $user = Account::where('email', $request->email)
                 ->with('role') // Eager load the role relationship
                 ->first();
-
+    
+            // If not found in accounts, check in riders
+            $isRider = false;
+            if (!$user) {
+                $user = Rider::where('email', $request->email)->first();
+                $isRider = true; // Flag to indicate rider login
+    
+                // Prevent login if rider status is "Pending"
+                if ($user && $user->status === 'Pending') {
+                    return response()->json([
+                        'isSuccess' => false,
+                        'message' => 'Your account is still pending approval. Please wait for admin approval.',
+                    ], 403);
+                }
+            }
+    
+            // If user exists and password matches
             if ($user && Hash::check($request->password, $user->password)) {
                 $token = $user->createToken('auth-token')->plainTextToken;
-
+    
                 // Generate session code by calling insertSession
                 $sessionCode = $this->insertSession($user->id);
                 if (!$sessionCode) {
                     return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
                 }
-
+    
+                // Prepare response
                 $response = [
                     'isSuccess' => true,
                     'message' => 'Logged in successfully',
@@ -55,18 +73,17 @@ class AuthController extends Controller
                     'user' => [
                         'id' => $user->id,
                         'first_name' => $user->first_name,
-                        'middle_name' => $user->middle_name,
+                        'middle_name' => $user->middle_name ?? null,
                         'last_name' => $user->last_name,
                         'email' => $user->email,
                     ],
-                    'role_name' => $user->role->role ?? 'No Role Assigned',
-                    'role_id' => $user->role_id
-
+                    'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
+                    'role_id' => $isRider ? 4 : ($user->role_id ?? null)
                 ];
-
+    
                 // Log successful login attempt
                 $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
-
+    
                 return response()->json($response, 200);
             } else {
                 // Log invalid credentials attempt
@@ -81,12 +98,14 @@ class AuthController extends Controller
                 'message' => 'An error occurred during login.',
                 'error' => $e->getMessage(),
             ];
-
+    
             $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-
+    
             return response()->json($response, 500);
         }
     }
+    
+    
     
     // logout
     public function logout(Request $request)

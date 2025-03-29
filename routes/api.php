@@ -27,7 +27,12 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SalesController;
+
+use App\Http\Controllers\RiderController;
+
+
 use App\Http\Controllers\CODOrderController;
+
 
 
 
@@ -47,7 +52,17 @@ Route::middleware('auth:sanctum')->post('confirmOrderReceived/{id}', [ShipmentCo
 Route::middleware('auth:sanctum')->get('orders-for-pickup', [ShipmentController::class, 'getOrdersForPickup']);
 Route::middleware('auth:sanctum')->post('pickupOrder/{id}', [ShipmentController::class, 'pickupOrder']);
 Route::middleware('auth:sanctum')->post('uploadDeliveryProof/{id}', [ShipmentController::class, 'uploadDeliveryProof']);
+Route::middleware('auth:sanctum')->get('orders-in-transit', [ShipmentController::class, 'getInTransitOrders']);
+Route::middleware('auth:sanctum')->post('cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
+Route::middleware('auth:sanctum')->get('cancellation-reasons', [ShipmentController::class, 'getCancellationReasons']);
 
+
+
+
+
+Route::get('/rider/{id}', [RiderController::class, 'getRiderProfile']);
+Route::post('rider/apply', [RiderController::class, 'applyRider']);
+Route::post('rider/approve/{id}', [RiderController::class, 'approveRider']);
 
 
 

@@ -14,10 +14,19 @@ class Order extends Model
     protected $fillable = [
         'account_id',
         'product_id',
+        'ship_to',
         'quantity',
         'total_amount',
-        'ship_to',
         'status',
+        'cancellation_reason',
         'delivery_proof',
+        'created_at',
+        'updated_at'
     ];
+
+    // Define relationship with Product
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id');
+    }
 }

@@ -70,9 +70,9 @@ class RoleController extends Controller
     public function getRoles()
     {
         try {
-            // Fetch roles excluding "Admin"
+            // Fetch roles excluding "Admin" and "Rider"
             $role = Role::select('id', 'role')
-                ->where('role', '!=', 'Admin')
+                ->whereNotIn('role', ['Admin', 'Rider'])
                 ->get();
     
             $response = [
@@ -89,5 +89,6 @@ class RoleController extends Controller
             return response()->json($response, 500);
         }
     }
+    
     
 }
