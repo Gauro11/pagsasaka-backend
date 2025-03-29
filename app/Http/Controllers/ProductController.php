@@ -26,6 +26,7 @@ class ProductController extends Controller
                 'description' => 'nullable|string',
                 'price' => 'required|numeric|min:0',
                 'stocks' => 'required|integer|min:0',
+                'unit' => 'required|in:kg,net,box',
                 'product_img' => 'required|array|min:3',
                 'product_img.*' => 'max:2048',
                 'visibility' => 'required|in:Published,Scheduled',
@@ -106,6 +107,7 @@ class ProductController extends Controller
                 'description' => 'sometimes|string',
                 'price' => 'sometimes|numeric|min:0',
                 'stocks' => 'sometimes|integer|min:0',
+                'unit' => 'sometimes|in:kg,net,box',
                 'product_img' => 'sometimes|array',
                 'product_img.*' => 'sometimes|max:2048',
                 'visibility' => 'sometimes|in:Published,Scheduled',
@@ -220,6 +222,7 @@ class ProductController extends Controller
                     'description' => $product->description,
                     'price' => $product->price,
                     'stocks' => $product->stocks,
+                    'unit' => $product->unit,
                     'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
                     'visibility' => $product->visibility,
@@ -253,7 +256,7 @@ class ProductController extends Controller
         try {
             // Get optional search query
             $searchTerm = $request->input('search', null);
-            $perPage = 6;
+            $perPage = 10;
 
             // Query for fetching products
             $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'category_id', 'visibility', 'is_archived')
@@ -284,6 +287,7 @@ class ProductController extends Controller
                     'description' => $product->description,
                     'price' => $product->price,
                     'stocks' => $product->stocks,
+                    'unit' => $product->unit,
                     'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
                     'visibility' => $product->visibility,
@@ -386,6 +390,7 @@ class ProductController extends Controller
                     'description' => $product->description,
                     'price' => $product->price,
                     'stocks' => $product->stocks,
+                    'unit' => $product->unit,
                     'product_img' => $product->product_img,
                     'category_id' => $product->category_id,
                     'visibility' => $product->visibility,
@@ -449,89 +454,89 @@ class ProductController extends Controller
         }
     }
 
-    public function buyProduct(Request $request, $product_id)
-    {
-        $user = Auth::user();
+    // public function buyProduct(Request $request, $product_id)
+    // {
+    //     $user = Auth::user();
 
-        if (!$user) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'User not authenticated',
-            ];
-            $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the failed API call
-            return response()->json($response, 500);
-        }
+    //     if (!$user) {
+    //         $response = [
+    //             'isSuccess' => false,
+    //             'message' => 'User not authenticated',
+    //         ];
+    //         $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the failed API call
+    //         return response()->json($response, 500);
+    //     }
 
-        try {
-            $validated = $request->validate([
-                'quantity' => 'required|integer|min:1',
-            ]);
+    //     try {
+    //         $validated = $request->validate([
+    //             'quantity' => 'required|integer|min:1',
+    //         ]);
 
-            $product = Product::find($product_id);
+    //         $product = Product::find($product_id);
 
-            if (!$product) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Product not found',
-                ];
-                $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the failed API call
-                return response()->json($response, 500);
-            }
+    //         if (!$product) {
+    //             $response = [
+    //                 'isSuccess' => false,
+    //                 'message' => 'Product not found',
+    //             ];
+    //             $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the failed API call
+    //             return response()->json($response, 500);
+    //         }
 
-            if ($product->stocks < $validated['quantity']) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Insufficient stock',
-                ];
-                $this->logAPICalls('buyProduct', $product->id, $request->all(), [$response]); // Log the failed API call
-                return response()->json($response, 500);
-            }
+    //         if ($product->stocks < $validated['quantity']) {
+    //             $response = [
+    //                 'isSuccess' => false,
+    //                 'message' => 'Insufficient stock',
+    //             ];
+    //             $this->logAPICalls('buyProduct', $product->id, $request->all(), [$response]); // Log the failed API call
+    //             return response()->json($response, 500);
+    //         }
 
-            // Deduct stock
-            $product->stocks -= $validated['quantity'];
-            $product->save();
+    //         // Deduct stock
+    //         $product->stocks -= $validated['quantity'];
+    //         $product->save();
 
-            // Calculate total price
-            $totalAmount = $product->price * $validated['quantity'];
+    //         // Calculate total price
+    //         $totalAmount = $product->price * $validated['quantity'];
 
-            // Create order with 'processing' as the initial status
-            $order = Order::create([
-                'account_id' => $user->id,
-                'product_id' => $product->id,
-                'quantity' => $validated['quantity'],
-                'total_amount' => $totalAmount,
-                'status' => 'processing', // Default status set to 'processing'
-                'ship_to' => $request->input('ship_to', 'Default Shipping Address'), // Provide a default if not sent
-                'created_at' => now()->format('Y-m-d H:i:s'), // Explicitly set created_at
-                'updated_at' => now()->format('Y-m-d H:i:s'), // Explicitly set updated_at
-            ]);
+    //         // Create order with 'processing' as the initial status
+    //         $order = Order::create([
+    //             'account_id' => $user->id,
+    //             'product_id' => $product->id,
+    //             'quantity' => $validated['quantity'],
+    //             'total_amount' => $totalAmount,
+    //             'status' => 'processing', // Default status set to 'processing'
+    //             'ship_to' => $request->input('ship_to', 'Default Shipping Address'), // Provide a default if not sent
+    //             'created_at' => now()->format('Y-m-d H:i:s'), // Explicitly set created_at
+    //             'updated_at' => now()->format('Y-m-d H:i:s'), // Explicitly set updated_at
+    //         ]);
 
-            $response = [
-                'isSuccess' => true,
-                'message' => 'Order placed successfully',
-                'order' => [
-                    'id' => $order->id,
-                    'account_id' => $order->account_id,
-                    'product_id' => $order->product_id,
-                    'quantity' => $order->quantity,
-                    'total_amount' => $order->total_amount,
-                    'status' => $order->status, // Include the status in the response
-                    'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
-                    'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
-                ],
-            ];
-            $this->logAPICalls('buyProduct', $product->id, $request->all(), [$response]); // Log the successful API call
-            return response()->json($response, 200);
-        } catch (Throwable $e) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'An error occurred while placing the order.',
-                'error' => $e->getMessage(),
-            ];
-            $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the exception
-            return response()->json($response, 500);
-        }
-    }
+    //         $response = [
+    //             'isSuccess' => true,
+    //             'message' => 'Order placed successfully',
+    //             'order' => [
+    //                 'id' => $order->id,
+    //                 'account_id' => $order->account_id,
+    //                 'product_id' => $order->product_id,
+    //                 'quantity' => $order->quantity,
+    //                 'total_amount' => $order->total_amount,
+    //                 'status' => $order->status, // Include the status in the response
+    //                 'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
+    //                 'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
+    //             ],
+    //         ];
+    //         $this->logAPICalls('buyProduct', $product->id, $request->all(), [$response]); // Log the successful API call
+    //         return response()->json($response, 200);
+    //     } catch (Throwable $e) {
+    //         $response = [
+    //             'isSuccess' => false,
+    //             'message' => 'An error occurred while placing the order.',
+    //             'error' => $e->getMessage(),
+    //         ];
+    //         $this->logAPICalls('buyProduct', "", $request->all(), [$response]); // Log the exception
+    //         return response()->json($response, 500);
+    //     }
+    // }
 
     public function addToCart(Request $request, $id)
     {
@@ -714,6 +719,34 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function buyNow($product_id, $quantity = 1)
+{
+    $product = Product::find($product_id);
+
+    if (!$product) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Product not found.'
+        ], 404);
+    }
+
+    $total = $product->price * max(1, intval($quantity));
+
+    return response()->json([
+        'isSuccess' => true,
+        'message' => 'Checkout successful.',
+        'product' => [
+            'id' => $product->id,
+            'name' => $product->product_name,
+            'price' => $product->price,
+            'quantity' => intval($quantity),
+            'unit' => $product->unit,
+            'total' => $total,
+            'product_img' => $product->product_img,
+        ]
+    ]);
+}
 
     //     public function checkout(Request $request)
     // {
