@@ -616,6 +616,7 @@ class ProductController extends Controller
                     'id' => $cart->id,
                     'account_id' => $cart->account_id,
                     'product_id' => $cart->product_id,
+                    'product_img'=> $product->product_img,
                     'quantity' => $cart->quantity,
                     'unit' => $cart->unit,
                     'price' => number_format($cart->price, 2),
