@@ -340,28 +340,18 @@ class ProductController extends Controller
     {
         try {
             $product = Product::find($id);
-    
+
             if (!$product) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'Product not found.',
                 ], 404);
             }
-    
+
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Product retrieved successfully.',
-                'product' => [
-                    'id' => $product->id,
-                    'product_name' => $product->product_name,
-                    'description' => $product->description,
-                    'price' => number_format($product->price, 2),
-                    'stocks' => $product->stocks,
-                    'unit' => $product->unit,
-                    'product_img' => $product->product_img,
-                    'category_id' => $product->category_id,
-                    'visibility' => $product->visibility,
-                ],
+                'product' => [$product],
             ], 200);
         } catch (Throwable $e) {
             return response()->json([
@@ -372,7 +362,6 @@ class ProductController extends Controller
         }
     }
     
-
     public function getProductsByAccountId(Request $request)
     {
         try {
