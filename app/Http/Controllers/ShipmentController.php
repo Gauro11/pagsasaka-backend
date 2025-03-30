@@ -185,7 +185,7 @@ class ShipmentController extends Controller
     
 
 
-    
+
 
 
      //order received//
@@ -414,44 +414,64 @@ class ShipmentController extends Controller
      }
 
      public function getInTransitOrders()
-     {
-         try {
-             // Authenticate the user
-             $user = Auth::user();
-             if (!$user) {
-                 return response()->json([
-                     'isSuccess' => false,
-                     'message'   => 'User not authenticated.',
-                 ], 401);
-             }
-     
-             // Ensure the user is a Rider (role_id = 4)
-             if ($user->role_id !== 4) {
-                 return response()->json([
-                     'isSuccess' => false,
-                     'message'   => 'Access denied. Only Riders can view in-transit orders.',
-                 ], 403);
-             }
-     
-             // Fetch orders assigned to the authenticated rider where status is 'In transit'
-             $orders = Order::where('status', 'In transit')
-                             ->where('rider_id', $user->id)
-                             ->get();
-     
-             return response()->json([
-                 'isSuccess' => true,
-                 'message'   => 'In-transit orders retrieved successfully.',
-                 'orders'    => $orders
-             ], 200);
-     
-         } catch (\Throwable $e) {
-             return response()->json([
-                 'isSuccess' => false,
-                 'message'   => 'Failed to retrieve in-transit orders.',
-                 'error'     => $e->getMessage(),
-             ], 500);
-         }
-     }
+{
+    try {
+        // Authenticate the user
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message'   => 'User not authenticated.',
+            ], 401);
+        }
+
+        // Ensure the user is a Rider (role_id = 4)
+        if ($user->role_id !== 4) {
+            return response()->json([
+                'isSuccess' => false,
+                'message'   => 'Access denied. Only Riders can view in-transit orders.',
+            ], 403);
+        }
+
+        // Fetch orders assigned to the authenticated rider where status is 'In transit'
+        $orders = Order::where('status', 'In transit')
+                        ->where('rider_id', $user->id)
+                        ->with(['account:id,first_name,last_name']) // Load account details
+                        ->get();
+
+        // Format response to include the account (customer) name
+        $formattedOrders = $orders->map(function ($order) {
+            return [
+                'id'                 => $order->id,
+                'account_id'         => $order->account_id,
+                'customer_name'      => $order->account ? "{$order->account->first_name} {$order->account->last_name}" : 'Unknown',
+                'rider_id'           => $order->rider_id,
+                'product_id'         => $order->product_id,
+                'ship_to'            => $order->ship_to,
+                'quantity'           => $order->quantity,
+                'total_amount'       => $order->total_amount,
+                'created_at'         => $order->created_at->format('F d Y'),
+                'updated_at'         => $order->updated_at->format('F d Y'),
+                'status'             => $order->status,
+                'delivery_proof'     => $order->delivery_proof,
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'message'   => 'In-transit orders retrieved successfully.',
+            'orders'    => $formattedOrders
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message'   => 'Failed to retrieve in-transit orders.',
+            'error'     => $e->getMessage(),
+        ], 500);
+    }
+}
+
      
 
      

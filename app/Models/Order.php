@@ -24,6 +24,11 @@ class Order extends Model
         'updated_at'
     ];
 
+    public function account()
+    {
+        return $this->belongsTo(Account::class, 'account_id');
+    }
+
     // Define relationship with Product
     public function product()
     {
