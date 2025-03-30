@@ -31,45 +31,45 @@ class ProductController extends Controller
                 'product_img.*' => 'max:2048',
                 'visibility' => 'required|in:Published,Scheduled',
             ]);
-
+    
             // Ensure the user is authenticated
             if (!auth()->check()) {
                 $response = [
                     'isSuccess' => false,
                     'message' => 'Unauthorized. Please log in to add a product.',
                 ];
-
+    
                 // Log the API call
                 $this->logAPICalls('addProduct', null, $request->all(), $response);
-
+    
                 return response()->json($response, 401);
             }
-
+    
             // Get the authenticated user's account ID
             $accountId = auth()->id();
-
+    
             // Handle image uploads
             $imagePaths = [];
             if ($request->hasFile('product_img')) {
                 foreach ($request->file('product_img') as $image) {
                     $directory = public_path('img/products');
                     $fileName = 'Product-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
-
+    
                     if (!file_exists($directory)) {
                         mkdir($directory, 0755, true);
                     }
-
+    
                     $image->move($directory, $fileName);
                     $imagePaths[] = asset('img/products/' . $fileName);
                 }
             }
-
+    
             // Save product
             $validated['product_img'] = $imagePaths; // Save as array
             $validated['account_id'] = $accountId;
-
+    
             $product = Product::create($validated);
-
+    
             $response = [
                 'isSuccess' => true,
                 'message' => 'Product successfully created.',
@@ -77,7 +77,7 @@ class ProductController extends Controller
                     'id' => $product->id,
                     'product_name' => $product->product_name,
                     'description' => $product->description,
-                    'price' => $product->price,
+                    'price' => number_format($product->price, 2), // Format price with commas
                     'stocks' => $product->stocks,
                     'unit' => $product->unit,
                     'product_img' => $product->product_img,
@@ -85,10 +85,10 @@ class ProductController extends Controller
                     'visibility' => $product->visibility,
                 ],
             ];
-
+    
             // Log the API call
             $this->logAPICalls('addProduct', $product->id, $request->all(), $response);
-
+    
             return response()->json($response, 200);
         } catch (Throwable $e) {
             $response = [
@@ -96,13 +96,14 @@ class ProductController extends Controller
                 'message' => 'Failed to create the product.',
                 'error' => $e->getMessage(),
             ];
-
+    
             // Log the API call
             $this->logAPICalls('addProduct', null, $request->all(), $response);
-
+    
             return response()->json($response, 500);
         }
     }
+    
 
     public function editProduct(Request $request, $id)
     {
@@ -166,7 +167,7 @@ class ProductController extends Controller
                     'id' => $product->id,
                     'product_name' => $product->product_name,
                     'description' => $product->description,
-                    'price' => $product->price,
+                    'price' => number_format($product->price, 2),
                     'stocks' => $product->stocks,
                     'unit' => $product->unit,
                     'product_img' => $product->product_img,
@@ -213,7 +214,7 @@ class ProductController extends Controller
             $perPage = 6;
 
             // Query for fetching products
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img','unit', 'category_id', 'visibility', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'product_img', 'unit', 'category_id', 'visibility', 'is_archived')
                 ->where('is_archived', '0')
                 ->when($searchTerm, function ($query, $searchTerm) {
                     return $query->where(function ($activeQuery) use ($searchTerm) {
@@ -239,7 +240,7 @@ class ProductController extends Controller
                     'id' => $product->id,
                     'product_name' => $product->product_name,
                     'description' => $product->description,
-                    'price' => $product->price,
+                    'price' => number_format($product->price, 2),
                     'stocks' => $product->stocks,
                     'unit' => $product->unit,
                     'product_img' => $product->product_img,
@@ -278,7 +279,7 @@ class ProductController extends Controller
             $perPage = 10;
 
             // Query for fetching products
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks','unit', 'product_img', 'category_id', 'visibility', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'unit', 'product_img', 'category_id', 'visibility', 'is_archived')
                 ->where('is_archived', '0')
                 ->when($searchTerm, function ($query, $searchTerm) {
                     return $query->where(function ($activeQuery) use ($searchTerm) {
@@ -304,7 +305,7 @@ class ProductController extends Controller
                     'id' => $product->id,
                     'product_name' => $product->product_name,
                     'description' => $product->description,
-                    'price' => $product->price,
+                    'price' => number_format($product->price, 2),
                     'stocks' => $product->stocks,
                     'unit' => $product->unit,
                     'product_img' => $product->product_img,
@@ -339,18 +340,28 @@ class ProductController extends Controller
     {
         try {
             $product = Product::find($id);
-
+    
             if (!$product) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'Product not found.',
                 ], 404);
             }
-
+    
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Product retrieved successfully.',
-                'product' => [$product],
+                'product' => [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'description' => $product->description,
+                    'price' => number_format($product->price, 2),
+                    'stocks' => $product->stocks,
+                    'unit' => $product->unit,
+                    'product_img' => $product->product_img,
+                    'category_id' => $product->category_id,
+                    'visibility' => $product->visibility,
+                ],
             ], 200);
         } catch (Throwable $e) {
             return response()->json([
@@ -360,6 +371,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
+    
 
     public function getProductsByAccountId(Request $request)
     {
@@ -380,7 +392,7 @@ class ProductController extends Controller
             $perPage = $request->input('per_page', 10); // Items per page (default: 10)
 
             // Build the query
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks','unit', 'product_img', 'category_id', 'visibility', 'is_archived')
+            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'unit', 'product_img', 'category_id', 'visibility', 'is_archived')
                 ->where('account_id', $accountId)
                 ->where('is_archived', '0') // Assuming we only want active products
                 ->when($searchTerm, function ($query, $searchTerm) {
@@ -407,7 +419,7 @@ class ProductController extends Controller
                     'id' => $product->id,
                     'product_name' => $product->product_name,
                     'description' => $product->description,
-                    'price' => $product->price,
+                    'price' => number_format($product->price, 2),
                     'stocks' => $product->stocks,
                     'unit' => $product->unit,
                     'product_img' => $product->product_img,
@@ -562,16 +574,15 @@ class ProductController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            $response = [
+            return response()->json([
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
-            ];
-            return response()->json($response, 401);
+            ], 401);
         }
 
         try {
             $validated = $request->validate([
-                'quantity' => 'required|integer',
+                'quantity' => 'required|integer|min:1',
             ]);
 
             $product = Product::find($id);
@@ -585,7 +596,7 @@ class ProductController extends Controller
                 ->first();
 
             if ($cart) {
-                // Handle increasing or decreasing quantity
+                // Update quantity and recalculate total
                 $newQuantity = $cart->quantity + $validated['quantity'];
 
                 if ($newQuantity > $product->stocks) {
@@ -595,30 +606,17 @@ class ProductController extends Controller
                     ], 400);
                 }
 
-                if ($newQuantity <= 0) {
-                    $cart->delete();
-                    return response()->json([
-                        'isSuccess' => true,
-                        'message' => 'Product removed from cart.',
-                        'removed_product_id' => $product->id,
-                    ], 200);
-                }
-
                 $cart->quantity = $newQuantity;
+                $cart->item_total = $newQuantity * $product->price;
                 $cart->save();
             } else {
-                if ($validated['quantity'] <= 0) {
-                    return response()->json([
-                        'isSuccess' => false,
-                        'message' => 'Cannot add zero or negative quantity to cart.',
-                    ], 400);
-                }
-
                 $cart = Cart::create([
                     'account_id' => $user->id,
                     'product_id' => $product->id,
                     'quantity' => $validated['quantity'],
-                    'unit' => $product->unit ?? 'default_unit', // Ensure unit is set
+                    'unit' => $product->unit ?? 'default_unit',
+                    'price' => $product->price,
+                    'item_total' => $validated['quantity'] * $product->price,
                 ]);
             }
 
@@ -631,6 +629,8 @@ class ProductController extends Controller
                     'product_id' => $cart->product_id,
                     'quantity' => $cart->quantity,
                     'unit' => $cart->unit,
+                    'price' => number_format($cart->price, 2),
+                    'item_total' => number_format($cart->item_total, 2),
                 ],
             ], 200);
         } catch (Throwable $e) {
@@ -647,60 +647,52 @@ class ProductController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            $response = [
+            return response()->json([
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
-            ];
-            $this->logAPICalls('getCartList', "", [], [$response]);
-            return response()->json($response, 401);
+            ], 401);
         }
 
         try {
-            $cartItems = Cart::where('account_id', $user->id)
-                ->get(['id', 'quantity', 'unit', 'product_id']); // Fetch only necessary fields
+            $cartItems = Cart::where('account_id', $user->id)->get();
 
-            // Calculate total amount
             $totalAmount = 0;
             $cartData = [];
 
             foreach ($cartItems as $item) {
                 $product = Product::find($item->product_id);
                 if ($product) {
-                    $itemTotal = $product->price * $item->quantity;
-                    $totalAmount += $itemTotal;
+                    $totalAmount += $item->item_total;
 
                     $cartData[] = [
                         'id' => $item->id,
                         'product_name' => $product->product_name,
+                        'product_id' => $item->product_id,
                         'quantity' => $item->quantity,
-                        'unit' => $product->unit,
-                        'price' => $product->price,
-                        'itemTotal' => $itemTotal,
+                        'unit' => $item->unit,
+                        'price' => number_format($item->price, 2),
+                        'item_total' => number_format($item->item_total, 2),
                         'product_img' => $product->product_img,
                     ];
                 }
             }
 
-            $response = [
+            return response()->json([
                 'isSuccess' => true,
                 'message' => 'Cart items retrieved successfully.',
                 'cart' => $cartData,
-                'totalAmount' => $totalAmount,
-            ];
-            $this->logAPICalls('getCartList', $user->id, [], [$response]);
-            return response()->json($response, 200);
+                'totalAmount' => number_format($totalAmount, 2), // Format total amount
+            ], 200);
         } catch (Throwable $e) {
-            $response = [
+            return response()->json([
                 'isSuccess' => false,
                 'message' => 'An error occurred while retrieving the cart items.',
                 'error' => $e->getMessage(),
-            ];
-            $this->logAPICalls('getCartList', "", [], [$response]);
-            return response()->json($response, 500);
+            ], 500);
         }
     }
 
-    public function deleteFromCart($id)
+    public function deleteFromCart($cartId)
     {
         try {
             $user = Auth::user();
@@ -708,19 +700,19 @@ class ProductController extends Controller
                 return response()->json([
                     'isSuccess' => false,
                     'message' => "User not authenticated.",
-                ], 500);
+                ], 401);
             }
 
-            // Find the cart item belonging to the logged-in user
-            $cartItem = Cart::where('account_id', $user->id)
-                ->where('product_id', $id)
+            // Find the cart item by its ID and ensure it belongs to the authenticated user
+            $cartItem = Cart::where('id', $cartId)
+                ->where('account_id', $user->id)
                 ->first();
 
             if (!$cartItem) {
                 return response()->json([
                     'isSuccess' => false,
-                    'message' => "Product not found in cart.",
-                ], 500);
+                    'message' => "Cart item not found.",
+                ], 404);
             }
 
             // Delete the cart item

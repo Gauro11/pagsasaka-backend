@@ -26,6 +26,8 @@ class Cart extends Model
         'product_id',
         'quantity',
         'unit',
+        'price',
+        'item_total',
     ];
 
     /**
