@@ -563,15 +563,16 @@ class ProductController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return response()->json([
+            $response = [
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
-            ], 401);
+            ];
+            return response()->json($response, 401);
         }
 
         try {
             $validated = $request->validate([
-                'quantity' => 'required|integer|min:1',
+                'quantity' => 'required|integer',
             ]);
 
             $product = Product::find($id);
@@ -585,7 +586,7 @@ class ProductController extends Controller
                 ->first();
 
             if ($cart) {
-                // Update quantity and recalculate total
+                // Handle increasing or decreasing quantity
                 $newQuantity = $cart->quantity + $validated['quantity'];
 
                 if ($newQuantity > $product->stocks) {
@@ -595,17 +596,30 @@ class ProductController extends Controller
                     ], 400);
                 }
 
+                if ($newQuantity <= 0) {
+                    $cart->delete();
+                    return response()->json([
+                        'isSuccess' => true,
+                        'message' => 'Product removed from cart.',
+                        'removed_product_id' => $product->id,
+                    ], 200);
+                }
+
                 $cart->quantity = $newQuantity;
-                $cart->item_total = $newQuantity * $product->price;
                 $cart->save();
             } else {
+                if ($validated['quantity'] <= 0) {
+                    return response()->json([
+                        'isSuccess' => false,
+                        'message' => 'Cannot add zero or negative quantity to cart.',
+                    ], 400);
+                }
+
                 $cart = Cart::create([
                     'account_id' => $user->id,
                     'product_id' => $product->id,
                     'quantity' => $validated['quantity'],
-                    'unit' => $product->unit ?? 'default_unit',
-                    'price' => $product->price,
-                    'item_total' => $validated['quantity'] * $product->price,
+                    'unit' => $product->unit ?? 'default_unit', // Ensure unit is set
                 ]);
             }
 
@@ -616,11 +630,8 @@ class ProductController extends Controller
                     'id' => $cart->id,
                     'account_id' => $cart->account_id,
                     'product_id' => $cart->product_id,
-                    'product_img'=> $product->product_img,
                     'quantity' => $cart->quantity,
                     'unit' => $cart->unit,
-                    'price' => number_format($cart->price, 2),
-                    'item_total' => number_format($cart->item_total, 2),
                 ],
             ], 200);
         } catch (Throwable $e) {
@@ -637,51 +648,60 @@ class ProductController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return response()->json([
+            $response = [
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
-            ], 401);
+            ];
+            $this->logAPICalls('getCartList', "", [], [$response]);
+            return response()->json($response, 401);
         }
 
         try {
-            $cartItems = Cart::where('account_id', $user->id)->get();
+            $cartItems = Cart::where('account_id', $user->id)
+                ->get(['id', 'quantity', 'unit', 'product_id']); // Fetch only necessary fields
 
+            // Calculate total amount
             $totalAmount = 0;
             $cartData = [];
 
             foreach ($cartItems as $item) {
                 $product = Product::find($item->product_id);
                 if ($product) {
-                    $totalAmount += $item->item_total;
+                    $itemTotal = $product->price * $item->quantity;
+                    $totalAmount += $itemTotal;
 
                     $cartData[] = [
                         'id' => $item->id,
                         'product_name' => $product->product_name,
-                        'product_id' => $item->product_id,
+                        'product_id' => $product->product_id,
                         'quantity' => $item->quantity,
-                        'unit' => $item->unit,
-                        'price' => number_format($item->price, 2),
-                        'item_total' => number_format($item->item_total, 2),
+                        'unit' => $product->unit,
+                        'price' => $product->price,
+                        'itemTotal' => $itemTotal,
                         'product_img' => $product->product_img,
                     ];
                 }
             }
 
-            return response()->json([
+            $response = [
                 'isSuccess' => true,
                 'message' => 'Cart items retrieved successfully.',
                 'cart' => $cartData,
-                'totalAmount' => number_format($totalAmount, 2), // Format total amount
-            ], 200);
+                'totalAmount' => $totalAmount,
+            ];
+            $this->logAPICalls('getCartList', $user->id, [], [$response]);
+            return response()->json($response, 200);
         } catch (Throwable $e) {
-            return response()->json([
+            $response = [
                 'isSuccess' => false,
                 'message' => 'An error occurred while retrieving the cart items.',
                 'error' => $e->getMessage(),
-            ], 500);
+            ];
+            $this->logAPICalls('getCartList', "", [], [$response]);
+            return response()->json($response, 500);
         }
     }
-
+    
     public function deleteFromCart($cartId)
     {
         try {
