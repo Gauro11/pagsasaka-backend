@@ -537,13 +537,11 @@ class ShipmentController extends Controller
                 'order' => [
                     'id' => $order->id,
                     'account_id' => $order->account_id,
-                    'rider_id' => $order->rider_id,
                     'product_id' => $order->product_id,
                     'ship_to' => $order->ship_to,
                     'quantity' => $order->quantity,
                     'total_amount' => $order->total_amount,
                     'status' => $order->status,
-                    'cancellation_reason' => $order->cancellation_reason,
                     'delivery_proof' => $filePath,
                     'created_at' => $order->created_at->format('F d Y'),
                     'updated_at' => now()->format('F d Y'),
