@@ -581,7 +581,7 @@ class ShipmentController extends Controller
         }
 
         // Check if the user has the Rider role (role_id = 4)
-        if ($user->role_id !== 4) {
+        if ($user->role_id !== 2) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'You are not authorized as a rider.',
