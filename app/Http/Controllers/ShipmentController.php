@@ -568,62 +568,60 @@ class ShipmentController extends Controller
      }
 
      public function getDeliveryProofs()
-{
-    try {
-        // Get the authenticated user
-        $user = auth()->user();
-
-        if (!$user) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Unauthorized access.',
-            ], 401);
-        }
-
-        // Check if the user has the Rider role (role_id = 4)
-        if ($user->role_id !== 2) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'You are not authorized as a rider.',
-            ], 403);
-        }
-
-        // Fetch all orders assigned to this rider
-        $orders = Order::where('rider_id', $user->id) // Assuming `rider_id` is linked to the user's ID
-            ->with('rider')
-            ->latest()
-            ->get();
-
-        if ($orders->isEmpty()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'No assigned orders found.',
-            ], 404);
-        }
-
-        // Format response with list of delivery proofs
-        $deliveryProofs = $orders->map(function ($order) {
-            return [
-                'order_id' => $order->id,
-               
-                'delivery_proof' => asset($order->delivery_proof),
-            ];
-        });
-
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Delivery proofs retrieved successfully.',
-            'data' => $deliveryProofs,
-        ], 200);
-
-    } catch (\Throwable $e) {
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'Failed to retrieve delivery proofs.',
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-}
+     {
+         try {
+             // Get the authenticated user
+             $user = auth()->user();
+     
+             if (!$user) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Unauthorized access.',
+                 ], 401);
+             }
+     
+             // Allow only farmers (role_id = 2)
+             if ($user->role_id !== 2) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'Access denied. Only farmers can view delivery proofs.',
+                 ], 403);
+             }
+     
+             // Fetch all orders with rider details
+             $orders = Order::with('rider')->latest()->get();
+     
+             if ($orders->isEmpty()) {
+                 return response()->json([
+                     'isSuccess' => false,
+                     'message' => 'No delivery proofs found.',
+                 ], 404);
+             }
+     
+             // Format response as a list
+             $deliveryProofs = $orders->map(function ($order) {
+                 return [
+                     'order_id' => $order->id,
+                     
+                     'delivery_proof' => asset($order->delivery_proof),
+                 ];
+             });
+     
+             return response()->json([
+                 'isSuccess' => true,
+                 'message' => 'Delivery proofs retrieved successfully.',
+                 'data' => $deliveryProofs,
+             ], 200);
+         } catch (\Throwable $e) {
+             return response()->json([
+                 'isSuccess' => false,
+                 'message' => 'Failed to retrieve delivery proofs.',
+                 'error' => $e->getMessage(),
+             ], 500);
+         }
+     }
+     
+     
 
      
      
