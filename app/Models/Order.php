@@ -29,6 +29,11 @@ class Order extends Model
         return $this->belongsTo(Account::class, 'account_id');
     }
 
+    public function rider()
+    {
+        return $this->belongsTo(Rider::class, 'rider_id');
+    }
+
     // Define relationship with Product
     public function product()
     {

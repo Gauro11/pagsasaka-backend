@@ -557,6 +557,43 @@ class ShipmentController extends Controller
              return response()->json($response, 500);
          }
      }
+
+     public function getDeliveryProofByOrderId($id)
+    {
+        try {
+            // Fetch order with rider details
+            $order = Order::with('rider')->find($id);
+
+            if (!$order) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Order not found.',
+                ], 404);
+            }
+
+            // Format response with rider's name
+            $rider = $order->rider;
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Delivery proof retrieved successfully.',
+                'order_id' => $order->id,
+                'product_id' => $order->product_id,
+                'rider_id' => $order->rider_id,
+                'rider_name' => $rider ? $rider->first_name . ' ' . $rider->last_name : 'Unknown',
+                'delivery_proof' => asset($order->delivery_proof),
+            ];
+
+            return response()->json($response, 200);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve delivery proof.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
      
      
 

@@ -34,6 +34,8 @@ class Rider extends Authenticatable
         return 4;
     }
 
+    
+
     // Relationship: A rider has many orders
     public function orders()
     {
