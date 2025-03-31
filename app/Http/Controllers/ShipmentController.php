@@ -605,9 +605,7 @@ class ShipmentController extends Controller
         $deliveryProofs = $orders->map(function ($order) {
             return [
                 'order_id' => $order->id,
-                'product_id' => $order->product_id,
-                'rider_id' => $order->rider_id,
-                'rider_name' => $order->rider ? $order->rider->first_name . ' ' . $order->rider->last_name : 'Unknown',
+               
                 'delivery_proof' => asset($order->delivery_proof),
             ];
         });
