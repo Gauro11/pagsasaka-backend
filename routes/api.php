@@ -53,7 +53,7 @@ Route::middleware('auth:sanctum')->get('orders-for-pickup', [ShipmentController:
 Route::middleware('auth:sanctum')->post('pickupOrder/{id}', [ShipmentController::class, 'pickupOrder']);
 Route::middleware('auth:sanctum')->post('uploadDeliveryProof/{id}', [ShipmentController::class, 'uploadDeliveryProof']);
 Route::middleware('auth:sanctum')->get('orders-in-transit', [ShipmentController::class, 'getInTransitOrders']);
-Route::middleware('auth:sanctum')->get('get-delivery-proof/{id}', [ShipmentController::class, 'getDeliveryProofByOrderId']);
+Route::middleware('auth:sanctum')->get('get-delivery-proof', [ShipmentController::class, 'getDeliveryProofs']);
 Route::middleware('auth:sanctum')->post('cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
 Route::middleware('auth:sanctum')->get('cancellation-reasons', [ShipmentController::class, 'getCancellationReasons']);
 

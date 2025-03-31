@@ -567,42 +567,66 @@ class ShipmentController extends Controller
          }
      }
 
-     public function getDeliveryProofByOrderId($id)
-    {
-        try {
-            // Fetch order with rider details
-            $order = Order::with('rider')->find($id);
+     public function getDeliveryProofs()
+{
+    try {
+        // Get the authenticated user
+        $user = auth()->user();
 
-            if (!$order) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Order not found.',
-                ], 404);
-            }
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Unauthorized access.',
+            ], 401);
+        }
 
-            // Format response with rider's name
-            $rider = $order->rider;
+        // Check if the user has the Rider role (role_id = 4)
+        if ($user->role_id !== 4) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'You are not authorized as a rider.',
+            ], 403);
+        }
 
-            $response = [
-                'isSuccess' => true,
-                'message' => 'Delivery proof retrieved successfully.',
+        // Fetch all orders assigned to this rider
+        $orders = Order::where('rider_id', $user->id) // Assuming `rider_id` is linked to the user's ID
+            ->with('rider')
+            ->latest()
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No assigned orders found.',
+            ], 404);
+        }
+
+        // Format response with list of delivery proofs
+        $deliveryProofs = $orders->map(function ($order) {
+            return [
                 'order_id' => $order->id,
                 'product_id' => $order->product_id,
                 'rider_id' => $order->rider_id,
-                'rider_name' => $rider ? $rider->first_name . ' ' . $rider->last_name : 'Unknown',
+                'rider_name' => $order->rider ? $order->rider->first_name . ' ' . $order->rider->last_name : 'Unknown',
                 'delivery_proof' => asset($order->delivery_proof),
             ];
+        });
 
-            return response()->json($response, 200);
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Delivery proofs retrieved successfully.',
+            'data' => $deliveryProofs,
+        ], 200);
 
-        } catch (\Throwable $e) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Failed to retrieve delivery proof.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to retrieve delivery proofs.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
      
      
 
