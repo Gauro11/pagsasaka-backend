@@ -50,6 +50,96 @@ class MessageController extends Controller
     }
 
     /**
+     * Send a new message in a conversation.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function sendMessage(Request $request, $id)
+{
+    try {
+        $user = Auth::user();
+
+        // Ensure the user is authenticated
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        // Validate the request
+        $validator = Validator::make($request->all(), [
+            'message' => 'required|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Fetch the conversation
+        $conversation = Conversation::findOrFail($id);
+
+        // Check if the user is authorized to send a message in this conversation
+        if ($conversation->account_id != $user->account_id && $conversation->role_id != $user->role_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to send a message in this conversation',
+            ], 403);
+        }
+
+        // Fetch the last message in the conversation to get the sender's account_id
+        $lastMessage = Message::where('conversation_id', $id)
+            ->latest()
+            ->first();
+
+        // Get the sender's account_id to reply to them
+        $receiver_id = $lastMessage->sender_id == $user->id 
+            ? $conversation->account_id 
+            : $conversation->role_id;
+
+        // Create the new message as a reply
+        $message = Message::create([
+            'conversation_id' => $id,
+            'message' => $request->message,
+            'sender_id' => $user->id, // Sender is the authenticated user
+            'account_id' => $receiver_id, // The receiver_id (based on the sender of the last message)
+            'is_read' => 0, // Initially unread
+        ]);
+
+        // Load the sender and receiver relationships for the new message
+        $message->load([
+            'sender' => function ($q) {
+                $q->select('id', 'first_name', 'middle_name', 'last_name', 'avatar');
+            },
+            'receiver' => function ($q) {
+                $q->select('id', 'first_name', 'middle_name', 'last_name', 'avatar');
+            }
+        ]);
+
+        // Update the conversation's updated_at timestamp
+        $conversation->touch();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Message sent successfully',
+            'data' => $message
+        ], 201);
+
+    } catch (Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to send message: ' . $e->getMessage(),
+        ], 500);
+    }
+}
+
+    /**
      * Mark messages as read.
      */
     public function markAsRead(Request $request)

@@ -163,7 +163,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/messages/unread', [MessageController::class, 'unreadCount']);
     Route::delete('/messages/{id}', [MessageController::class, 'destroy']);
 });
-
+Route::middleware('auth:sanctum')->post('/messages/{id}', [MessageController::class, 'sendMessage']);
 
 // In routes/api.php payment
 Route::post('pay', [PaymentController::class, 'pay']);

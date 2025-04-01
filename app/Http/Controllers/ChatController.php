@@ -17,48 +17,52 @@ class ChatController extends Controller
      * @return \Illuminate\Http\JsonResponse
      */
     public function index()
-    {
-        try {
-            $user = Auth::user();
+{
+    try {
+        $user = Auth::user();
 
-            // Ensure the user is authenticated and has an account_id
-            if (!$user || !isset($user->account_id)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated or account_id not found',
-                ], 401);
-            }
-
-            // Fetch conversations where the user is either the account_id or role_id
-            $conversations = Conversation::where('account_id', $user->account_id)
-                ->orWhere('role_id', $user->role_id)
-                ->with([
-                    'latestMessage' => function ($query) {
-                        $query->with([
-                            'sender' => function ($q) {
-                                $q->select('id', 'first_name', 'middle_name', 'last_name', 'avatar');
-                            },
-                            'receiver' => function ($q) {
-                                $q->select('id', 'first_name', 'middle_name', 'last_name', 'avatar');
-                            }
-                        ]);
-                    }
-                ])
-                ->orderBy('updated_at', 'desc')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Conversations retrieved successfully',
-                'data' => $conversations
-            ], 200);
-        } catch (Exception $e) {
+        if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve conversations: ' . $e->getMessage(),
-            ], 500);
+                'message' => 'User not authenticated',
+            ], 401);
         }
+
+        if (!isset($user->account_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'account_id not found for user ID: ' . $user->id,
+            ], 401);
+        }
+
+        $conversations = Conversation::where('account_id', $user->account_id)
+            ->orWhere('role_id', $user->role_id)
+            ->with('latestMessage.sender', 'latestMessage.receiver')
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        if ($conversations->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'No conversations found',
+                'data' => []
+            ], 200);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Conversations retrieved successfully',
+            'data' => $conversations
+        ], 200);
+
+    } catch (Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve conversations: ' . $e->getMessage(),
+        ], 500);
     }
+}
+
 
     /**
      * Create a new conversation.
@@ -186,87 +190,7 @@ class ChatController extends Controller
         }
     }
 
-    /**
-     * Send a new message in a conversation.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function sendMessage(Request $request, $id)
-    {
-        try {
-            $user = Auth::user();
 
-            // Ensure the user is authenticated
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated',
-                ], 401);
-            }
-
-            // Validate the request
-            $validator = Validator::make($request->all(), [
-                'message' => 'required|string|max:1000',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors(),
-                ], 422);
-            }
-
-            // Fetch the conversation
-            $conversation = Conversation::findOrFail($id);
-
-            // Check if the user is authorized to send a message in this conversation
-            if ($conversation->account_id != $user->account_id && $conversation->role_id != $user->role_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized to send a message in this conversation',
-                ], 403);
-            }
-
-            // Determine the receiver_id based on the conversation
-            $receiver_id = $conversation->account_id == $user->account_id ? $conversation->role_id : $conversation->account_id;
-
-            // Create the new message
-            $message = Message::create([
-                'conversation_id' => $id,
-                'message' => $request->message,
-                'sender_id' => $user->id, // Changed from $user->account_id to $user->id
-                'account_id' => $receiver_id,
-                'is_read' => 0,
-            ]);
-
-            // Load the sender and receiver relationships for the new message
-            $message->load([
-                'sender' => function ($q) {
-                    $q->select('id', 'first_name', 'middle_name', 'last_name', 'avatar');
-                },
-                'receiver' => function ($q) {
-                    $q->select('id', 'first_name', 'middle_name', 'last_name', 'avatar');
-                }
-            ]);
-
-            // Update the conversation's updated_at timestamp
-            $conversation->touch();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Message sent successfully',
-                'data' => $message
-            ], 201);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to send message: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
 
     /**
      * Delete a conversation and its messages.
