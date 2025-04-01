@@ -149,19 +149,19 @@ Route::prefix('dropdown')->group(function () {
 });
 
 
-// Messenger API Routes
-Route::middleware('auth:sanctum')->prefix('api/messenger')->group(function () {
-    // Conversations (left side of UI)
+// Conversations
+Route::middleware('auth:sanctum')->group(function () {
+    // Conversation endpoints
     Route::get('/conversations', [ChatController::class, 'index']);
-    Route::post('/conversations', [ChatController::class, 'create']);
-    Route::delete('/conversations/{id}', [ChatController::class, 'delete']);
+    Route::post('/conversations', [ChatController::class, 'store']);
+    Route::get('/conversations/{id}', [ChatController::class, 'show']);
+    Route::delete('/conversations/{id}', [ChatController::class, 'destroy']);
     
-    // Messages within a conversation (right side of UI)
-    Route::get('/conversations/{id}/messages', [ChatController::class, 'getMessages']);
-    Route::post('/conversations/{id}/messages', [MessageController::class, 'sendMessage']);
-    Route::put('/conversations/{id}/read', [MessageController::class, 'markAsRead']);
-    Route::get('/unread', [MessageController::class, 'getUnreadCount']);
-    Route::delete('/messages/{id}', [MessageController::class, 'deleteMessage']);
+    // Message endpoints
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::post('/messages/read', [MessageController::class, 'markAsRead']);
+    Route::get('/messages/unread', [MessageController::class, 'unreadCount']);
+    Route::delete('/messages/{id}', [MessageController::class, 'destroy']);
 });
 
 
