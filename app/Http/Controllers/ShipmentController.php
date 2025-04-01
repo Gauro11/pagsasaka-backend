@@ -588,8 +588,8 @@ class ShipmentController extends Controller
                  ], 403);
              }
      
-             // Fetch order with rider details
-             $order = Order::with('rider')->find($id);
+             // Fetch order based on ID
+             $order = Order::find($id);
      
              if (!$order) {
                  return response()->json([
@@ -598,16 +598,12 @@ class ShipmentController extends Controller
                  ], 404);
              }
      
-             // Get the assigned rider
-             $rider = $order->rider;
-     
              return response()->json([
                  'isSuccess' => true,
                  'message' => 'Delivery proof retrieved successfully.',
                  'order_id' => $order->id,
                  'product_id' => $order->product_id,
                  'rider_id' => $order->rider_id,
-                 'rider_name' => $rider ? $rider->first_name . ' ' . $rider->last_name : 'Unknown',
                  'delivery_proof' => asset($order->delivery_proof),
              ], 200);
      
@@ -619,6 +615,7 @@ class ShipmentController extends Controller
              ], 500);
          }
      }
+     
      
      
      
