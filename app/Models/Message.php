@@ -30,7 +30,8 @@ class Message extends Model
      */
     public function sender()
     {
-        return $this->belongsTo(User::class, 'sender_id')->select(['id', 'name', 'avatar']);
+        return $this->belongsTo(Account::class, 'sender_id')
+            ->select(['id', 'first_name', 'middle_name', 'last_name', 'avatar']);
     }
 
     /**
@@ -38,6 +39,7 @@ class Message extends Model
      */
     public function receiver()
     {
-        return $this->belongsTo(User::class, 'account_id')->select(['id', 'name', 'avatar']);
+        return $this->belongsTo(Account::class, 'account_id')
+            ->select(['id', 'first_name', 'middle_name', 'last_name', 'avatar']);
     }
 }

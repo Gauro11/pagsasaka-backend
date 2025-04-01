@@ -27,6 +27,7 @@ class Account extends Authenticatable
             'security_answer',
             'phone_number',
             'is_archived',
+            'avatar',
             
         ];
     public function role()
