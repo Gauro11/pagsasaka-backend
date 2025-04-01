@@ -30,14 +30,14 @@ class Message extends Model
      */
     public function sender()
     {
-        return $this->belongsTo(User::class, 'sender_id');
+        return $this->belongsTo(User::class, 'sender_id')->select(['id', 'name', 'avatar']);
     }
 
     /**
-     * Get the account associated with the message.
+     * Get the receiver of the message.
      */
-    public function account()
+    public function receiver()
     {
-        return $this->belongsTo(Account::class, 'account_id');
+        return $this->belongsTo(User::class, 'account_id')->select(['id', 'name', 'avatar']);
     }
 }

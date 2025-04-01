@@ -19,7 +19,7 @@ class ChatController extends Controller
         
         $conversations = Conversation::where('account_id', $user->account_id)
             ->orWhere('role_id', $user->role_id)
-            ->with(['latestMessage'])
+            ->with(['latestMessage.sender', 'latestMessage.receiver'])
             ->orderBy('updated_at', 'desc')
             ->get();
             
@@ -77,9 +77,12 @@ class ChatController extends Controller
      */
     public function show($id)
     {
-        $conversation = Conversation::with(['messages' => function($query) {
-            $query->orderBy('created_at', 'asc');
-        }])->findOrFail($id);
+        $conversation = Conversation::with([
+            'messages' => function ($query) {
+                $query->orderBy('created_at', 'asc')
+                    ->with(['sender', 'receiver']); // Include sender & receiver
+            }
+        ])->findOrFail($id);
 
         // Mark all unread messages as read
         Message::where('conversation_id', $id)
