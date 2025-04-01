@@ -568,53 +568,47 @@ class ShipmentController extends Controller
      }
 
      public function getDeliveryProofByOrderId($id)
-     {
-         try {
-             // Get the authenticated user
-             $user = auth()->user();
-     
-             if (!$user) {
-                 return response()->json([
-                     'isSuccess' => false,
-                     'message' => 'Unauthorized access.',
-                 ], 401);
-             }
-     
-             // Allow only farmers (role_id = 2)
-             if ($user->role_id !== 2) {
-                 return response()->json([
-                     'isSuccess' => false,
-                     'message' => 'Access denied. Only farmers can view delivery proofs.',
-                 ], 403);
-             }
-     
-             // Fetch order based on ID
-             $order = Order::find($id);
-     
-             if (!$order) {
-                 return response()->json([
-                     'isSuccess' => false,
-                     'message' => 'Order not found.',
-                 ], 404);
-             }
-     
-             return response()->json([
-                 'isSuccess' => true,
-                 'message' => 'Delivery proof retrieved successfully.',
-                 'order_id' => $order->id,
-                 'product_id' => $order->product_id,
-                 'rider_id' => $order->rider_id,
-                 'delivery_proof' => asset($order->delivery_proof),
-             ], 200);
-     
-         } catch (\Throwable $e) {
-             return response()->json([
-                 'isSuccess' => false,
-                 'message' => 'Failed to retrieve delivery proof.',
-                 'error' => $e->getMessage(),
-             ], 500);
-         }
-     }
+{
+    try {
+        // Get the authenticated user
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Unauthorized access.',
+            ], 401);
+        }
+
+        // Allow only farmers (role_id = 2)
+        if ($user->role_id !== 2) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Access denied. Only farmers can view delivery proofs.',
+            ], 403);
+        }
+
+        // Fetch order based on ID (No "Order Not Found" check)
+        $order = Order::find($id);
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Delivery proof retrieved successfully.',
+            'order_id' => optional($order)->id,
+            'product_id' => optional($order)->product_id,
+            'rider_id' => optional($order)->rider_id,
+            'delivery_proof' => $order ? asset($order->delivery_proof) : null,
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to retrieve delivery proof.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
      
      
      
