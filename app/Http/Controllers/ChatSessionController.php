@@ -7,6 +7,7 @@ use App\Models\Messages;
 use App\Models\Account; // Ensure this import is present
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class ChatSessionController extends Controller
 {
@@ -200,4 +201,56 @@ class ChatSessionController extends Controller
             'data' => $chatSession
         ], 201);
     }
+
+    public function destroy($id)
+{
+    try {
+        $userId = Auth::id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        $user = Account::find($userId);
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found in accounts table',
+            ], 404);
+        }
+
+        $chatSession = ChatSession::findOrFail($id);
+
+        $authorized = ($chatSession->user1_id == $user->id) || ($chatSession->user2_id == $user->id);
+
+        if (!$authorized) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to delete this chat session',
+            ], 403);
+        }
+
+        // Delete all messages associated with the chat session
+        Messages::where('conversation_id', $id)->delete();
+
+        // Delete the chat session
+        $chatSession->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Chat session deleted successfully',
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to delete chat session: ' . $e->getMessage(),
+        ], 500);
+    }
+}
+
 }
