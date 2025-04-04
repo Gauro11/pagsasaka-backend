@@ -23,8 +23,7 @@ use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShipmentController;
-use App\Http\Controllers\ChatController;
-use App\Http\Controllers\MessageController;
+
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SalesController;
 
@@ -34,7 +33,8 @@ use App\Http\Controllers\RiderController;
 use App\Http\Controllers\CODOrderController;
 
 
-
+use App\Http\Controllers\ChatSessionController;
+use App\Http\Controllers\MessagesController;
 
 
 //connection//
@@ -149,21 +149,11 @@ Route::prefix('dropdown')->group(function () {
 });
 
 
-// Conversations
-Route::middleware('auth:sanctum')->group(function () {
-    // Conversation endpoints
-    Route::get('/conversations', [ChatController::class, 'index']);
-    Route::post('/conversations', [ChatController::class, 'store']);
-    Route::get('/conversations/{id}', [ChatController::class, 'show']);
-    Route::delete('/conversations/{id}', [ChatController::class, 'destroy']);
-    
-    // Message endpoints
-    Route::post('/messages', [MessageController::class, 'store']);
-    Route::post('/messages/read', [MessageController::class, 'markAsRead']);
-    Route::get('/messages/unread', [MessageController::class, 'unreadCount']);
-    Route::delete('/messages/{id}', [MessageController::class, 'destroy']);
-});
-Route::middleware('auth:sanctum')->post('/messages/{id}', [MessageController::class, 'sendMessage']);
+
+
+
+
+
 
 // In routes/api.php payment
 Route::post('pay', [PaymentController::class, 'pay']);
@@ -186,7 +176,19 @@ Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
 
 
 
+Route::middleware('auth:sanctum')->group(function () {
+    // Chat session endpoints
+    Route::get('/chat-sessions', [ChatSessionController::class, 'index']);
+    Route::post('/chat-sessions', [ChatSessionController::class, 'store']);
+    Route::get('/chat-sessions/{id}', [ChatSessionController::class, 'show']);
+    Route::delete('/chat-sessions/{id}', [ChatSessionController::class, 'destroy']);
 
+    // Message endpoints
+    Route::post('/messages', [MessagesController::class, 'store']); // Updated to MessagesController
+    Route::post('/messages/read', [MessagesController::class, 'markAsRead']);
+    Route::get('/messages/unread', [MessagesController::class, 'unreadCount']);
+    Route::delete('/messages/{id}', [MessagesController::class, 'destroy']);
+});
 
 
 // other routes...
