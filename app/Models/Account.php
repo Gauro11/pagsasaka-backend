@@ -27,11 +27,17 @@ class Account extends Authenticatable
             'security_answer',
             'phone_number',
             'is_archived',
+            'avatar',
             
         ];
     public function role()
 {
     return $this->belongsTo(Role::class, 'role_id', 'id');
+}
+// Add this method to the bottom of app/Models/Account.php
+public function ratings()
+{
+    return $this->hasMany(Rating::class);
 }
 
 }
