@@ -4,14 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\ChatSession;
 use App\Models\Messages;
-use App\Models\Account; // Ensure this import is present
+use App\Models\Account;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class MessagesController extends Controller
 {
-    public function store(Request $request, $conversation_id)
+    public function store(Request $request)
 {
     $validator = Validator::make($request->all(), [
         'message' => 'required|string',
@@ -42,28 +42,29 @@ class MessagesController extends Controller
         ], 404);
     }
 
-    $chatSession = ChatSession::findOrFail($conversation_id);
+    // Assuming the user has an active conversation. You could get it in a different way.
+    $chatSession = ChatSession::where('user1_id', $user->id)->orWhere('user2_id', $user->id)->first();
 
-    $authorized = ($chatSession->user1_id == $user->id) || ($chatSession->user2_id == $user->id);
-    if (!$authorized) {
+    if (!$chatSession) {
         return response()->json([
             'success' => false,
-            'message' => 'Unauthorized to send a message in this chat session',
-        ], 403);
+            'message' => 'No active chat session found for the user.',
+        ], 404);
     }
 
-    // Determine the receiver_id (the other participant in the chat session)
-    $receiverId = ($chatSession->user1_id == $user->id) ? $chatSession->user2_id : $chatSession->user1_id;
+    // Get the other participant (receiver) in the chat session.
+    $otherParticipantId = ($chatSession->user1_id == $user->id) ? $chatSession->user2_id : $chatSession->user1_id;
 
+    // Assuming you want to send the message to the other participant
     $message = Messages::create([
-        'conversation_id' => $conversation_id,
+        'conversation_id' => $chatSession->id,
         'sender_id' => $user->id,
-        'receiver_id' => $receiverId,
+        'receiver_id' => $otherParticipantId,
         'message' => $request->message,
         'is_read' => 0,
     ]);
 
-    $chatSession->touch(); // Update the updated_at timestamp of the chat session
+    $chatSession->touch(); // Update the chat session's timestamp.
 
     return response()->json([
         'success' => true,
@@ -71,6 +72,7 @@ class MessagesController extends Controller
         'data' => $message
     ], 201);
 }
+
 
     public function markAsRead(Request $request)
     {
