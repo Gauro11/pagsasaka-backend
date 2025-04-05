@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Account;
 use App\Models\Rider;
+use App\Models\Refund;
 
 class ShipmentController extends Controller
 {
@@ -780,78 +781,130 @@ class ShipmentController extends Controller
 
 
 
-    public function getRefundOrders(Request $request)
-    {
-        try {
-            // Authenticate the user
-            $user = Auth::user();
-            if (!$user) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'User not authenticated',
-                ];
-                $this->logAPICalls('getRefundOrders', "", $request->all(), [$response]);
-                return response()->json($response, 500);
-            }
+    public function requestRefundByOrderId($order_id, Request $request)
+{
+    try {
+        $user = auth()->user();
 
-            // Check if the user's role_id is Farmer (role_id = 2)
-            if ($user->role_id !== 2) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Access denied. Only Farmers can retrieve refund orders.',
-                ];
-                $this->logAPICalls('getRefundOrders', $user->id, $request->all(), [$response]);
-                return response()->json($response, 403);
-            }
-
-            // Retrieve orders with 'Refund' status
-            $orders = Order::with('product') // Eager load the product relationship
-                ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
-                ->where('account_id', $user->id)
-                ->where('status', 'Refund') // Only get orders with 'Refund' status
-                ->when($request->has('product_id'), function ($query) use ($request) {
-                    $query->where('product_id', $request->product_id);
-                })
-                ->orderBy('created_at', 'desc')
-                ->paginate($request->get('paginate', 10));
-
-            // Transform the collection to format the response and include product_name
-            $orders->getCollection()->transform(function ($order) {
-                // Retrieve product_name from the related product model, or return 'N/A' if not found
-                $productName = $order->product ? $order->product->product_name : 'N/A';
-
-                // Format the created_at and updated_at fields to "December 11 2024"
-                $order->created_at = Carbon::parse($order->created_at)->format('F d Y');
-                $order->updated_at = Carbon::parse($order->updated_at)->format('F d Y');
-
-                // Return the transformed order
-                return [
-                    'id' => $order->id,
-                    'account_id' => $order->account_id,
-                    'product_id' => $order->product_id,
-                    'product_name' => $productName, // Assign the product name
-                    'ship_to' => $order->ship_to,
-                    'quantity' => $order->quantity,
-                    'total_amount' => $order->total_amount,
-                    'status' => $order->status,
-                    'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
-                    'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
-                ];
-            });
-
-            return response()->json([
-                'isSuccess' => true,
-                'message' => 'Refund orders retrieved successfully.',
-                'orders' => $orders,
-            ], 200);
-        } catch (Throwable $e) {
+        // Check if the user is a consumer or a farmer
+        if (!$user || !in_array($user->role_id, [2, 3])) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'An error occurred while retrieving refund orders.',
-                'error' => $e->getMessage(),
-            ], 500);
+                'message' => 'Unauthorized. Only consumers and farmers can request a refund.',
+            ], 403);
         }
+
+        // Validate the reason field
+        $request->validate([
+            'reason' => 'required|string|max:255',
+        ]);
+
+        // Find the order by ID
+        $order = Order::find($order_id);
+
+        // Check if the order exists
+        if (!$order) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Order not found.',
+            ], 404);
+        }
+
+        // Debug log
+        Log::debug('Order Account ID: ' . $order->account_id . ' Logged-in User ID: ' . $user->id);
+
+        // Check ownership
+        if ($order->account_id !== $user->id) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'You are not authorized to request a refund for this order.',
+            ], 403);
+        }
+
+        // Check order status
+        if ($order->status !== 'Order delivered') {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Refund can only be requested for orders marked as "Order Delivered".',
+            ], 400);
+        }
+
+        // Update refund reason and status
+        $order->refund_reason = $request->reason;
+        $order->status = 'Pending';
+        $order->save();
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Refund request submitted successfully.',
+            'data' => $order,
+        ], 201);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to submit refund request.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
+
+public function approveRefundRequest($order_id)
+{
+    try {
+        $user = auth()->user();
+
+        // Only the seller with ID 2 can approve refund requests
+        if (!$user || $user->role_id != 2) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Unauthorized. Only the seller can approve refund requests.',
+            ], 403);
+        }
+
+        $order = Order::find($order_id);
+
+        if (!$order) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Order not found.',
+            ], 404);
+        }
+
+        if ($order->status !== 'Pending') {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'This refund request is not pending.',
+            ], 400);
+        }
+
+        // Approve the refund
+        $order->status = 'Approved';
+        $order->status = 'Refund'; // Optional: update order status to 'Refund'
+        $order->save();
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Refund request approved successfully.',
+            'data' => $order,
+        ]);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to approve refund request.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
+
+
+
+    
+
 
 
 
