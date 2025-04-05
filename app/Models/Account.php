@@ -34,6 +34,11 @@ class Account extends Authenticatable
 {
     return $this->belongsTo(Role::class, 'role_id', 'id');
 }
+// Add this method to the bottom of app/Models/Account.php
+public function ratings()
+{
+    return $this->hasMany(Rating::class);
+}
 
 }
 

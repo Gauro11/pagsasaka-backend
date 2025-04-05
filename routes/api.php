@@ -36,6 +36,8 @@ use App\Http\Controllers\CODOrderController;
 use App\Http\Controllers\ChatSessionController;
 use App\Http\Controllers\MessagesController;
 
+use App\Http\Controllers\RatingController;
+
 
 //connection//
 Route::options('/{any}', function (Request $request) {
@@ -188,6 +190,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/messages/read', [MessagesController::class, 'markAsRead']);
     Route::get('/messages/unread', [MessagesController::class, 'unreadCount']);
     Route::delete('/messages/{id}', [MessagesController::class, 'destroy']);
+});
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/products/{product}/ratings', [RatingController::class, 'store'])->name('ratings.store');
+    Route::get('/products/{product}/ratings', [RatingController::class, 'index'])->name('ratings.index');
 });
 
 
