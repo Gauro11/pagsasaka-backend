@@ -9,20 +9,19 @@ use Illuminate\Support\Facades\Auth;
 
 class RatingController extends Controller
 {
-    // Apply Sanctum middleware to protect the rating submission
     public function __construct()
     {
         $this->middleware('auth:sanctum')->only(['store']);
     }
 
-    // Store a new rating
+    // Store a new rating with an optional comment
     public function store(Request $request, Product $product)
     {
         $request->validate([
             'rating' => 'required|integer|between:1,5',
+            'comment' => 'nullable|string|max:500', // Add validation for comment
         ]);
 
-        // Use Sanctum's authenticated user
         $account = Auth::user();
 
         if (!$account) {
@@ -38,11 +37,12 @@ class RatingController extends Controller
             return response()->json(['error' => 'You have already rated this product.'], 403);
         }
 
-        // Create the rating
+        // Create the rating with comment
         $rating = Rating::create([
             'account_id' => $account->id,
             'product_id' => $product->id,
             'rating' => $request->rating,
+            'comment' => $request->comment, // Include the comment
         ]);
 
         // Recalculate the average rating and total ratings
@@ -53,18 +53,29 @@ class RatingController extends Controller
             'success' => 'Rating submitted successfully!',
             'average_rating' => number_format($averageRating, 1),
             'total_ratings' => $totalRatings,
+            'rating' => [
+                'stars' => $rating->rating,
+                'comment' => $rating->comment, // Return the submitted comment
+            ],
         ]);
     }
 
-    // Get the ratings for a product
+    // Get the ratings for a product, including comments
     public function index(Product $product)
     {
         $averageRating = $product->averageRating();
         $totalRatings = $product->totalRatings();
 
+        // Fetch all ratings with comments for the product
+        $ratings = Rating::where('product_id', $product->id)
+            ->select('rating', 'comment', 'created_at')
+            ->with('account:id,first_name,last_name') // Include account details (e.g., name)
+            ->get();
+
         return response()->json([
             'average_rating' => number_format($averageRating, 1),
             'total_ratings' => $totalRatings,
+            'ratings' => $ratings, // Include individual ratings with comments
         ]);
     }
 }

@@ -189,14 +189,14 @@ Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
 
 
 Route::middleware('auth:sanctum')->group(function () {
-    // Chat session endpoints
+    // Chat Sessions
     Route::get('/chat-sessions', [ChatSessionController::class, 'index']);
     Route::post('/chat-sessions', [ChatSessionController::class, 'store']);
     Route::get('/chat-sessions/{id}', [ChatSessionController::class, 'show']);
     Route::delete('/chat-sessions/{id}', [ChatSessionController::class, 'destroy']);
 
-    // Message endpoints
-    Route::post('/messages', [MessagesController::class, 'store']); // Updated to MessagesController
+    // Messages
+    Route::post('/chat-sessions/{conversation_id}/messages', [MessagesController::class, 'store']);
     Route::post('/messages/read', [MessagesController::class, 'markAsRead']);
     Route::get('/messages/unread', [MessagesController::class, 'unreadCount']);
     Route::delete('/messages/{id}', [MessagesController::class, 'destroy']);
