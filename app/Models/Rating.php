@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Rating extends Model
 {
-    protected $fillable = ['account_id', 'product_id', 'rating'];
+    protected $fillable = ['account_id', 'product_id', 'rating', 'comment'];
 
     // A rating belongs to an account
     public function account()
