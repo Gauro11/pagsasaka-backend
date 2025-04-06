@@ -53,6 +53,33 @@ class RiderController extends Controller
             ], 500);
         }
     }
+
+    public function getPendingRiders()
+{
+    try {
+        $riders = Rider::where('status', 'Pending')->get();
+
+        if ($riders->isEmpty()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No pending riders found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Pending riders retrieved successfully.',
+            'data' => $riders,
+        ], 200);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to retrieve pending riders.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
     
 
     public function applyRider(Request $request)
