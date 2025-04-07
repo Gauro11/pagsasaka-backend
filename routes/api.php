@@ -206,7 +206,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/products/{product}/ratings', [RatingController::class, 'store'])->name('ratings.store');
-    Route::get('/products/{product}/ratings', [RatingController::class, 'index'])->name('ratings.index');
+    Route::get('/ratings/{product}/', [RatingController::class, 'index'])->name('ratings.index');
 });
 
 
