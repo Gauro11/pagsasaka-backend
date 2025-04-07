@@ -55,30 +55,45 @@ class RiderController extends Controller
     }
 
     public function getPendingRiders()
-{
-    try {
-        $riders = Rider::where('status', 'Pending')->get();
-
-        if ($riders->isEmpty()) {
+    {
+        try {
+            $riders = Rider::where('status', 'Pending')->get();
+    
+            if ($riders->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No pending riders found.',
+                ], 404);
+            }
+    
+            // Format the riders list with full name
+            $formattedRiders = $riders->map(function ($rider) {
+                return [
+                    'id' => $rider->id,
+                    'full_name' => $rider->first_name . ' ' . $rider->last_name,
+                    'email' => $rider->email,
+                    'phone_number' => $rider->phone_number,
+                    'license' => $rider->license,
+                    'valid_id' => $rider->valid_id,
+                    'status' => $rider->status,
+                    // Add any other fields you want to include
+                ];
+            });
+    
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Pending riders retrieved successfully.',
+                'data' => $formattedRiders,
+            ], 200);
+        } catch (\Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'No pending riders found.',
-            ], 404);
+                'message' => 'Failed to retrieve pending riders.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Pending riders retrieved successfully.',
-            'data' => $riders,
-        ], 200);
-    } catch (\Throwable $e) {
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'Failed to retrieve pending riders.',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
+    
 
     
 
