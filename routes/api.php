@@ -191,16 +191,16 @@ Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
 
 Route::middleware('auth:sanctum')->group(function () {
     // Chat Sessions
-    Route::get('/chat-sessions', [ChatSessionController::class, 'index']);
-    Route::post('/chat-sessions', [ChatSessionController::class, 'store']);
-    Route::get('/chat-sessions/{id}', [ChatSessionController::class, 'show']);
-    Route::delete('/chat-sessions/{id}', [ChatSessionController::class, 'destroy']);
+    Route::get('/chat-sessions-lists', [ChatSessionController::class, 'index']); // fetch chatlist
+    Route::post('/chatnow', [ChatSessionController::class, 'store']); // start new chat
+    Route::get('/chat-view/{id}', [ChatSessionController::class, 'show']); // view conversation
+    Route::delete('/chat-delete/{id}', [ChatSessionController::class, 'destroy']); // delete conversation
 
     // Messages
-    Route::post('/chat-sessions/{conversation_id}/messages', [MessagesController::class, 'store']);
-    Route::post('/messages/read', [MessagesController::class, 'markAsRead']);
-    Route::get('/messages/unread', [MessagesController::class, 'unreadCount']);
-    Route::delete('/messages/{id}', [MessagesController::class, 'destroy']);
+    Route::post('/send/{conversation_id}/messages', [MessagesController::class, 'store']); // send messsage
+    Route::post('/messages/read', [MessagesController::class, 'markAsRead']); // read message 
+    Route::get('/messages/unread', [MessagesController::class, 'unreadCount']); //undread message
+    Route::delete('/messages/delete{id}', [MessagesController::class, 'destroy']); //delete message
 });
 
 
