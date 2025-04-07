@@ -27,7 +27,7 @@ class PaymentController extends Controller
                 'items' => 'required|array',
                 'items.*.product_id' => 'required|exists:products,id',
                 'items.*.quantity' => 'required|integer|min:1',
-                'ship_to' => 'required|string|max:255', // Added for your Order model
+                'buyer_address' => 'required|string|max:255', // Added for your Order model
             ]);
     
             if ($validator->fails()) {
@@ -82,7 +82,7 @@ class PaymentController extends Controller
                         'metadata' => [ // Add metadata for order creation
                             'account_id' => auth()->id() ?? null,
                             'items' => $request->items,
-                            'ship_to' => $request->ship_to,
+                            'buyer_address' => $request->buyer_address,
                         ],
                     ],
                 ],
@@ -167,12 +167,12 @@ class PaymentController extends Controller
             // Payment is successful, create orders
             $items = $responseData['data']['attributes']['metadata']['items'] ?? [];
             $accountId = $responseData['data']['attributes']['metadata']['account_id'] ?? null;
-            $shipTo = $responseData['data']['attributes']['metadata']['ship_to'] ?? '';
+            $buyer_address = $responseData['data']['attributes']['metadata']['buyer_address'] ?? '';
     
             Log::info("Creating orders", [
                 'items' => $items,
                 'account_id' => $accountId,
-                'ship_to' => $shipTo
+                'buyer_address' => $buyer_address
             ]);
     
             foreach ($items as $item) {
@@ -183,7 +183,7 @@ class PaymentController extends Controller
                     'account_id' => $accountId,
                     'rider_id' => null, // As per your schema, initially null
                     'product_id' => $product->id,
-                    'ship_to' => $shipTo,
+                    'buyer_address' => $buyer_address,
                     'quantity' => $item['quantity'],
                     'total_amount' => $product->price * $item['quantity'],
                     'status' => 'Order placed pending', // Match your database status
@@ -194,7 +194,7 @@ class PaymentController extends Controller
                     'order_id' => $order->id,
                     'product_id' => $product->id,
                     'quantity' => $item['quantity'],
-                    'ship_to' => $shipTo,
+                    'buyer_address' => $buyer_address,
                 ]);
             }
     
