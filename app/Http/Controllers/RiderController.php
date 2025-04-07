@@ -191,6 +191,35 @@ public function approveRider($id)
     return response()->json(['message' => 'Rider approved successfully.', 'rider' => $rider], 200);
 }
 
+public function invalidateRider($id)
+{
+    $rider = Rider::find($id);
+
+    if (!$rider) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Rider not found.',
+        ], 404);
+    }
+
+    if ($rider->status === 'Invalid') {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Rider is already marked as invalid.',
+        ], 400);
+    }
+
+    $rider->status = 'Invalid';
+    $rider->save();
+
+    return response()->json([
+        'isSuccess' => true,
+        'message' => 'Rider has been marked as invalid.',
+        'rider' => $rider,
+    ], 200);
+}
+
+
 public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
 {
     try {

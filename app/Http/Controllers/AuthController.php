@@ -27,83 +27,78 @@ use Illuminate\Support\Facades\Mail;
 class AuthController extends Controller
 {
     public function login(Request $request)
-    {
-        try {
-            $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
-            ]);
-    
-            // Check if the user exists in the accounts table
-            $user = Account::where('email', $request->email)
-                ->with('role') // Eager load the role relationship
-                ->first();
-    
-            // If not found in accounts, check in riders
-            $isRider = false;
-            if (!$user) {
-                $user = Rider::where('email', $request->email)->first();
-                $isRider = true; // Flag to indicate rider login
-    
-                // Prevent login if rider status is "Pending"
-                if ($user && $user->status === 'Pending') {
-                    return response()->json([
-                        'isSuccess' => false,
-                        'message' => 'Your account is still pending approval. Please wait for admin approval.',
-                    ], 403);
-                }
+{
+    try {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        // Check if the user exists in the accounts table
+        $user = Account::where('email', $request->email)
+            ->with('role') // Eager load the role relationship
+            ->first();
+
+        // If not found in accounts, check in riders
+        $isRider = false;
+        if (!$user) {
+            $user = Rider::where('email', $request->email)->first();
+            $isRider = true; // Flag to indicate rider login
+
+            // Prevent login if rider status is "Pending" or "Invalid"
+            if ($user && in_array($user->status, ['Pending', 'Invalid'])) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Your rider account is not allowed to log in. Current status: ' . $user->status,
+                ], 403);
             }
-    
-            // If user exists and password matches
-            if ($user && Hash::check($request->password, $user->password)) {
-                $token = $user->createToken('auth-token')->plainTextToken;
-    
-                // Generate session code by calling insertSession
-                $sessionCode = $this->insertSession($user->id);
-                if (!$sessionCode) {
-                    return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
-                }
-    
-                // Prepare response
-                $response = [
-                    'isSuccess' => true,
-                    'message' => 'Logged in successfully',
-                    'token' => $token,
-                    'session_code' => $sessionCode,
-                    'user' => [
-                        'id' => $user->id,
-                        'first_name' => $user->first_name,
-                        'middle_name' => $user->middle_name ?? null,
-                        'last_name' => $user->last_name,
-                        'email' => $user->email,
-                    ],
-                    'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
-                    'role_id' => $isRider ? 4 : ($user->role_id ?? null)
-                ];
-    
-                // Log successful login attempt
-                $this->logAPICalls('login', $user->email, $request->except(['password']), $response);
-    
-                return response()->json($response, 200);
-            } else {
-                // Log invalid credentials attempt
-                $response = ['message' => 'Invalid Credentials.'];
-                $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-                return response()->json($response, 401);
-            }
-        } catch (Throwable $e) {
-            // Log error during login attempt
-            $response = [
-                'isSuccess' => false,
-                'message' => 'An error occurred during login.',
-                'error' => $e->getMessage(),
-            ];
-    
-            $this->logAPICalls('login', $request->email ?? 'unknown', $request->except(['password']), $response);
-    
-            return response()->json($response, 500);
         }
+
+        // If user exists and password matches
+        if ($user && Hash::check($request->password, $user->password)) {
+            $token = $user->createToken('auth-token')->plainTextToken;
+
+            // Generate session code by calling insertSession
+            $sessionCode = $this->insertSession($user->id);
+            if (!$sessionCode) {
+                return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
+            }
+
+            // Prepare response
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Logged in successfully',
+                'token' => $token,
+                'session_code' => $sessionCode,
+                'user' => [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'middle_name' => $user->middle_name ?? null,
+                    'last_name' => $user->last_name,
+                    'email' => $user->email,
+                ],
+                'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
+                'role_id' => $isRider ? 4 : ($user->role_id ?? null)
+            ];
+
+            return response()->json($response, 200);
+        }
+
+        // Invalid credentials
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Invalid credentials.',
+        ], 401);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Login failed.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
     
     
     

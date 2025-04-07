@@ -75,6 +75,7 @@ Route::get('/rider/{id}', [RiderController::class, 'getRiderProfile']);
 Route::post('rider/apply', [RiderController::class, 'applyRider']);
 Route::post('rider/approve/{id}', [RiderController::class, 'approveRider']);
 Route::get('riders/pending', [RiderController::class, 'getPendingRiders']);
+Route::post('ridersinvalidate/{id}', [RiderController::class, 'invalidateRider']);
 
 
 
