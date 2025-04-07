@@ -35,8 +35,7 @@ class RiderController extends Controller
                 'message' => 'Rider profile retrieved successfully.',
                 'rider' => [
                     'id' => $rider->id,
-                    'first_name' => $rider->first_name,
-                    'last_name' => $rider->last_name,
+                    'rider_name' => $rider->first_name . ' ' . $rider->last_name,
                     'email' => $rider->email,
                     'phone_number' => $rider->phone_number, // Include phone number
 
@@ -53,6 +52,48 @@ class RiderController extends Controller
             ], 500);
         }
     }
+
+    public function getPendingRiders()
+    {
+        try {
+            $riders = Rider::where('status', 'Pending')->get();
+    
+            if ($riders->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No pending riders found.',
+                ], 404);
+            }
+    
+            // Format the riders list with full name
+            $formattedRiders = $riders->map(function ($rider) {
+                return [
+                    'id' => $rider->id,
+                    'rider_name' => $rider->first_name . ' ' . $rider->last_name,
+                    'email' => $rider->email,
+                    'phone_number' => $rider->phone_number,
+                    'license' => $rider->license,
+                    'valid_id' => $rider->valid_id,
+                    'status' => $rider->status,
+                    // Add any other fields you want to include
+                ];
+            });
+    
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Pending riders retrieved successfully.',
+                'data' => $formattedRiders,
+            ], 200);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve pending riders.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+
     
 
     public function applyRider(Request $request)
@@ -148,6 +189,35 @@ public function approveRider($id)
 
     return response()->json(['message' => 'Rider approved successfully.', 'rider' => $rider], 200);
 }
+
+public function invalidateRider($id)
+{
+    $rider = Rider::find($id);
+
+    if (!$rider) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Rider not found.',
+        ], 404);
+    }
+
+    if ($rider->status === 'Invalid') {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Rider is already marked as invalid.',
+        ], 400);
+    }
+
+    $rider->status = 'Invalid';
+    $rider->save();
+
+    return response()->json([
+        'isSuccess' => true,
+        'message' => 'Rider has been marked as invalid.',
+        'rider' => $rider,
+    ], 200);
+}
+
 
 public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
 {
