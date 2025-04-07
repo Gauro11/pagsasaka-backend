@@ -35,8 +35,7 @@ class RiderController extends Controller
                 'message' => 'Rider profile retrieved successfully.',
                 'rider' => [
                     'id' => $rider->id,
-                    'first_name' => $rider->first_name,
-                    'last_name' => $rider->last_name,
+                    'rider_name' => $rider->first_name . ' ' . $rider->last_name,
                     'email' => $rider->email,
                     'phone_number' => $rider->phone_number, // Include phone number
 
