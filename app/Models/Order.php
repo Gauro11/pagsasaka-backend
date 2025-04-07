@@ -19,6 +19,7 @@ class Order extends Model
         'total_amount',
         'status',
         'cancellation_reason',
+        'refund_reason',
         'delivery_proof',
         'created_at',
         'updated_at'
