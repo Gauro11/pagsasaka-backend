@@ -68,8 +68,8 @@ class RatingController extends Controller
 
     // Fetch all ratings with comments for the product
     $ratings = Rating::where('product_id', $product->id)
-        ->select('rating', 'comment', 'created_at')
-        ->with('account:id,first_name,last_name') // Include account details (e.g., name)
+        ->with('account:id,first_name,last_name') // Ensure account details are loaded
+        ->select('rating', 'comment', 'created_at', 'account_id') // Include account_id in the selection
         ->get();
 
     return response()->json([
@@ -78,5 +78,6 @@ class RatingController extends Controller
         'ratings' => $ratings, // Include individual ratings with comments
     ]);
 }
+
 
 }
