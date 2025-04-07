@@ -14,6 +14,14 @@ class ChatSessionController extends Controller
     public function show($id)
 {
     try {
+        // Validate the id parameter
+        if (!is_numeric($id) || $id <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid chat session ID provided',
+            ], 400);
+        }
+
         $userId = Auth::id();
 
         if (!$userId) {
@@ -57,6 +65,11 @@ class ChatSessionController extends Controller
             'data' => $chatSession
         ], 200);
 
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Chat session not found',
+        ], 404);
     } catch (\Exception $e) {
         return response()->json([
             'success' => false,
