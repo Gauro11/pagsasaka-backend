@@ -62,20 +62,21 @@ class RatingController extends Controller
 
     // Get the ratings for a product, including comments
     public function index(Product $product)
-    {
-        $averageRating = $product->averageRating();
-        $totalRatings = $product->totalRatings();
+{
+    $averageRating = $product->averageRating();
+    $totalRatings = $product->totalRatings();
 
-        // Fetch all ratings with comments for the product
-        $ratings = Rating::where('product_id', $product->id)
-            ->select('rating', 'comment', 'created_at')
-            ->with('account:id,first_name,last_name') // Include account details (e.g., name)
-            ->get();
+    // Fetch all ratings with comments for the product
+    $ratings = Rating::where('product_id', $product->id)
+        ->select('rating', 'comment', 'created_at')
+        ->with('account:id,first_name,last_name') // Include account details (e.g., name)
+        ->get();
 
-        return response()->json([
-            'average_rating' => number_format($averageRating, 1),
-            'total_ratings' => $totalRatings,
-            'ratings' => $ratings, // Include individual ratings with comments
-        ]);
-    }
+    return response()->json([
+        'average_rating' => number_format($averageRating, 1),
+        'total_ratings' => $totalRatings,
+        'ratings' => $ratings, // Include individual ratings with comments
+    ]);
+}
+
 }
