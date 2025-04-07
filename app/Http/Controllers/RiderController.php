@@ -70,7 +70,7 @@ class RiderController extends Controller
             $formattedRiders = $riders->map(function ($rider) {
                 return [
                     'id' => $rider->id,
-                    'full_name' => $rider->first_name . ' ' . $rider->last_name,
+                    'rider_name' => $rider->first_name . ' ' . $rider->last_name,
                     'email' => $rider->email,
                     'phone_number' => $rider->phone_number,
                     'license' => $rider->license,
