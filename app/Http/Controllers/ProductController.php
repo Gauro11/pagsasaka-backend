@@ -799,9 +799,7 @@ class ProductController extends Controller
         'message' => 'Checkout preview loaded.',
         'user_info' => [
             'id' => $account->id,
-            'first_name' => $account->first_name,
-            'middle_name' => $account->middle_name,
-            'last_name' => $account->last_name,
+            'buyer_name' => $account->first_name . ' ' . $account->last_name,
             'email' => $account->email,
             'contact_number' => $account->phone_number,
             'delivery_address' => $account->delivery_address,
