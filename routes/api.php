@@ -151,8 +151,9 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('cart-list', [ProductController::class, 'getCartList']);                                                                
     Route::post('cart-remove/{id}', [ProductController::class, 'deleteFromCart']);
 });
+Route::middleware('auth:sanctum')->get('checkout/{id}/{quantity}', [ProductController::class, 'buyNow']);
 
-Route::get('checkout/{id}/{quantity}', [ProductController::class, 'buyNow']);
+
 Route::post('list', [ProductController::class, 'getAllProductsList']);
 Route::post('product-list-id', [ProductController::class, 'getAllProductbyId']);
 Route::get('by-id/{id}', [ProductController::class, 'getProductById']);
@@ -162,6 +163,8 @@ Route::prefix('dropdown')->group(function () {
 });
 
 
+Route::middleware('auth:sanctum')->get('checkout-preview/{account_id}/{product_id}', [ProductController::class, 'getCheckoutPreview']);
+
 
 
 
@@ -169,7 +172,8 @@ Route::prefix('dropdown')->group(function () {
 
 
 // In routes/api.php payment
-Route::post('pay', [PaymentController::class, 'pay']);
+Route::post('pay/{account_id}/{product_id}', [PaymentController::class, 'payment']);
+
 Route::get('success', [PaymentController::class, 'success']);
 
 Route::get('/payment/success/{productId}', [PaymentController::class, 'paymentSuccess']);

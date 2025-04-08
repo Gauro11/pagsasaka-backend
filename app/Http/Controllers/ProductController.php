@@ -8,11 +8,13 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Models\ApiLog;
 use App\Models\Product;
+use App\Models\Account;
 use App\Models\Order;
 use App\Models\Cart;
 use Illuminate\Support\Facades\Auth;
 use Throwable;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
@@ -721,19 +723,29 @@ class ProductController extends Controller
         }
     }
 
+    
+
     public function buyNow($product_id, $quantity = 1)
     {
+        // Fetch the product
         $product = Product::find($product_id);
-
+        $account = auth()->user(); // Fetch the authenticated user
+    
         if (!$product) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Product not found.'
             ], 404);
         }
-
-        $total = $product->price * max(1, intval($quantity));
-
+    
+        // Ensure that quantity does not exceed available stock
+        $quantity = min($quantity, $product->stocks);
+    
+        // Store the quantity in cache for the user, using a unique key
+        Cache::put('purchase_' . $account->id . '_' . $product->id, $quantity, 60); // Cache for 60 minutes
+    
+        $total = $product->price * $quantity;
+    
         return response()->json([
             'isSuccess' => true,
             'message' => 'Checkout successful.',
@@ -741,13 +753,70 @@ class ProductController extends Controller
                 'id' => $product->id,
                 'name' => $product->product_name,
                 'price' => $product->price,
-                'quantity' => intval($quantity),
+                'quantity' => $quantity,
                 'unit' => $product->unit,
                 'total' => $total,
                 'product_img' => $product->product_img,
+            ],
+            'buyer_info' => [
+                'name' => $account->first_name . ' ' . $account->last_name,
+                'contact_number' => $account->phone_number,
+                'delivery_address' => $account->delivery_address
             ]
         ]);
     }
+    
+
+
+
+
+public function getCheckoutPreview(Request $request, $account_id, $product_id)
+{
+    $account = auth()->user();
+    $product = Product::find($product_id);
+
+    if (!$account || !$product) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Invalid account or product ID.',
+        ], 404);
+    }
+
+    $quantity = Cache::get('purchase_' . $account->id . '_' . $product->id, 1);
+    $quantity = min($quantity, $product->stocks);
+    $subtotal = $product->price * $quantity;
+
+    // 👇 Accept payment method (default to COD if not set)
+    $payment_method = $request->input('payment_method', 'COD');
+
+    return response()->json([
+        'isSuccess' => true,
+        'message' => 'Checkout preview loaded.',
+        'buyer_info' => [
+            'name' => $account->first_name . ' ' . $account->last_name,
+            'contact_number' => $account->phone_number,
+            'delivery_address' => $account->delivery_address
+        ],
+        'product' => [
+            'id' => $product->id,
+            'name' => $product->product_name,
+            'price' => $product->price,
+            'unit' => $product->unit,
+            'quantity' => $quantity,
+            'subtotal' => $subtotal,
+            'product_img' => $product->product_img
+        ],
+        'payment_method' => $payment_method,
+        'total_amount' => $subtotal
+    ]);
+}
+
+    
+
+
+
+    
+
 
     //     public function checkout(Request $request)
     // {
