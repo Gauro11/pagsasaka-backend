@@ -781,28 +781,31 @@ class ProductController extends Controller
 
     public function getCheckoutPreview(Request $request, $account_id, $product_id)
     {
-        // Fetch the account and product using their IDs
+        // Log incoming parameters for debugging
+        \Log::info("Checkout Preview Request - account_id: {$account_id}, product_id: {$product_id}, payment_method: " . $request->input('payment_method', 'COD'));
+
         $account = Account::find($account_id);
-        $product = Product::find($product_id);
-    
-        if (!$account || !$product) {
+        if (!$account) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Invalid account or product ID.',
+                'message' => "Account ID {$account_id} not found.",
             ], 404);
         }
-    
-        // Get the quantity of the product, default to 1 if not cached
+
+        $product = Product::find($product_id);
+        if (!$product) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => "Product ID {$product_id} not found.",
+            ], 404);
+        }
+
         $quantity = Cache::get('purchase_' . $account->id . '_' . $product->id, 1);
-        $quantity = min($quantity, $product->stocks);  // Ensure quantity doesn't exceed available stock
-    
-        // Calculate the subtotal for the product
+        $quantity = min($quantity, $product->stocks);
+
         $subtotal = $product->price * $quantity;
-    
-        // Get the payment method, default to COD if not provided
         $payment_method = $request->input('payment_method', 'COD');
-    
-        // Build the response data with extended product information
+
         return response()->json([
             'isSuccess' => true,
             'message' => 'Checkout preview loaded.',
@@ -821,17 +824,17 @@ class ProductController extends Controller
                 'quantity' => $quantity,
                 'stock_available' => $product->stocks,
                 'images' => $product->product_img,
-                'description' => $product->description ?? 'No description available', // Assuming there's a description field
-                'category' => $product->category ?? 'Uncategorized', // Assuming there's a category field
-                'sku' => $product->sku ?? null, // Assuming there's an SKU field
-                'weight' => $product->weight ?? null, // Assuming there's a weight field
-                'dimensions' => $product->dimensions ?? null, // Assuming there's a dimensions field
+                'description' => $product->description ?? 'No description available',
+                'category' => $product->category ?? 'Uncategorized',
+                'sku' => $product->sku ?? null,
+                'weight' => $product->weight ?? null,
+                'dimensions' => $product->dimensions ?? null,
             ],
             'order_summary' => [
                 'payment_method' => $payment_method,
                 'subtotal' => number_format($subtotal, 2),
                 'quantity' => $quantity,
-                'total_amount' => number_format($subtotal, 2), // Could be modified to include shipping/taxes later
+                'total_amount' => number_format($subtotal, 2),
             ],
         ]);
     }
