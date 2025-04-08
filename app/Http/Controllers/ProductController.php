@@ -770,9 +770,10 @@ class ProductController extends Controller
 
 
 
-public function getCheckoutPreview(Request $request, $account_id, $product_id)
+    public function getCheckoutPreview(Request $request, $account_id, $product_id)
 {
-    $account = auth()->user();
+    // Fetch the account and product using their IDs
+    $account = Account::find($account_id);
     $product = Product::find($product_id);
 
     if (!$account || !$product) {
@@ -782,34 +783,42 @@ public function getCheckoutPreview(Request $request, $account_id, $product_id)
         ], 404);
     }
 
+    // Get the quantity of the product, default to 1 if not cached
     $quantity = Cache::get('purchase_' . $account->id . '_' . $product->id, 1);
-    $quantity = min($quantity, $product->stocks);
+    $quantity = min($quantity, $product->stocks);  // Ensure quantity doesn't exceed available stock
+
+    // Calculate the subtotal for the product
     $subtotal = $product->price * $quantity;
 
-    // 👇 Accept payment method (default to COD if not set)
+    // Get the payment method, default to COD if not provided
     $payment_method = $request->input('payment_method', 'COD');
 
+    // Build the response data in the required format
     return response()->json([
         'isSuccess' => true,
         'message' => 'Checkout preview loaded.',
-        'buyer_info' => [
-            'name' => $account->first_name . ' ' . $account->last_name,
+        'user_info' => [
+            'id' => $account->id,
+            'first_name' => $account->first_name,
+            'middle_name' => $account->middle_name,
+            'last_name' => $account->last_name,
+            'email' => $account->email,
             'contact_number' => $account->phone_number,
-            'delivery_address' => $account->delivery_address
+            'delivery_address' => $account->delivery_address,
+            'product_name' => $product->product_name,
+            'product_price' => number_format($product->price, 2),  // Format price to 2 decimal places
+            'product_unit' => $product->unit,
+            'product_quantity' => $quantity,
+            'product_img' => $product->product_img,  // Assuming product images are stored as a list of URLs
+            'payment_method' => $payment_method,
+            'total_amount' => number_format($subtotal, 2),  // Format total amount to 2 decimal places    
         ],
-        'product' => [
-            'id' => $product->id,
-            'name' => $product->product_name,
-            'price' => $product->price,
-            'unit' => $product->unit,
-            'quantity' => $quantity,
-            'subtotal' => $subtotal,
-            'product_img' => $product->product_img
-        ],
-        'payment_method' => $payment_method,
-        'total_amount' => $subtotal
+       
     ]);
 }
+
+
+    
 
     
 
