@@ -18,6 +18,7 @@ class PaymentController extends Controller
     /**
      * Process payment for multiple items
      */
+
     public function payment(Request $request, $account_id, $product_id)
 {
     DB::beginTransaction();
@@ -86,6 +87,75 @@ class PaymentController extends Controller
                         'ship_to' => $shipTo,
                         'full_name' => $fullName,  // Include full name in metadata
                         'total_amount' => $totalAmount,  // Include total amount
+=======
+    public function pay(Request $request)
+    {
+        DB::beginTransaction(); // Start transaction
+    
+        try {
+            // Validate the request
+            $validator = Validator::make($request->all(), [
+                'items' => 'required|array',
+                'items.*.product_id' => 'required|exists:products,id',
+                'items.*.quantity' => 'required|integer|min:1',
+                'buyer_address' => 'required|string|max:255', // Added for your Order model
+            ]);
+    
+            if ($validator->fails()) {
+                Log::warning("Validation failed in pay method", ['errors' => $validator->errors()]);
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+    
+            $lineItems = [];
+            $totalAmount = 0;
+    
+            foreach ($request->items as $item) {
+                $product = Product::findOrFail($item['product_id']);
+    
+                // Validate product availability
+                if ($product->stocks <= 0 || $product->visibility !== 'Published' || $product->is_archived == 1) {
+                    Log::warning("Product not available", ['product_id' => $item['product_id'], 'product_name' => $product->product_name]);
+                    return response()->json(['error' => "Product {$product->product_name} is not available for purchase"], 400);
+                }
+    
+                // Validate quantity against available stock
+                if ($item['quantity'] > $product->stocks) {
+                    Log::warning("Insufficient stock", ['product_id' => $item['product_id'], 'requested_quantity' => $item['quantity'], 'available_stock' => $product->stocks]);
+                    return response()->json(['error' => "Requested quantity exceeds available stock for {$product->product_name}"], 400);
+                }
+    
+                // Deduct stock (Consider reserving instead of deducting here)
+                $product->stocks -= $item['quantity'];
+                $product->save();
+    
+                // Prepare line items for PayMongo
+                $lineItems[] = [
+                    'currency' => 'PHP',
+                    'amount' => $product->price * 100, // Convert PHP to cents
+                    'description' => "{$item['quantity']}x {$product->product_name}",
+                    'name' => $product->product_name,
+                    'quantity' => $item['quantity'],
+                ];
+    
+                // Calculate total amount
+                $totalAmount += $product->price * 100 * $item['quantity'];
+            }
+    
+            // Create checkout session data
+            $data = [
+                'data' => [
+                    'attributes' => [
+                        'line_items' => $lineItems,
+                        'payment_method_types' => ['gcash', 'paymaya'],
+                        'success_url' => url('/payment/verify'), // Ensure this URL is correct
+                        'cancel_url' => url('/cancel'),
+                        'description' => 'Payment for multiple items',
+                        'metadata' => [ // Add metadata for order creation
+                            'account_id' => auth()->id() ?? null,
+                            'items' => $request->items,
+                            'buyer_address' => $request->buyer_address,
+                        ],
+>>>>>>> 281e2a2d2d0315f5c1ffb5a7bf57322caf86324f
                     ],
                 ],
             ],
@@ -192,12 +262,12 @@ class PaymentController extends Controller
             // Payment is successful, create orders
             $items = $responseData['data']['attributes']['metadata']['items'] ?? [];
             $accountId = $responseData['data']['attributes']['metadata']['account_id'] ?? null;
-            $shipTo = $responseData['data']['attributes']['metadata']['ship_to'] ?? '';
+            $buyer_address = $responseData['data']['attributes']['metadata']['buyer_address'] ?? '';
     
             Log::info("Creating orders", [
                 'items' => $items,
                 'account_id' => $accountId,
-                'ship_to' => $shipTo
+                'buyer_address' => $buyer_address
             ]);
     
             foreach ($items as $item) {
@@ -208,7 +278,7 @@ class PaymentController extends Controller
                     'account_id' => $accountId,
                     'rider_id' => null, // As per your schema, initially null
                     'product_id' => $product->id,
-                    'ship_to' => $shipTo,
+                    'buyer_address' => $buyer_address,
                     'quantity' => $item['quantity'],
                     'total_amount' => $product->price * $item['quantity'],
                     'status' => 'Order placed pending', // Match your database status
@@ -219,7 +289,7 @@ class PaymentController extends Controller
                     'order_id' => $order->id,
                     'product_id' => $product->id,
                     'quantity' => $item['quantity'],
-                    'ship_to' => $shipTo,
+                    'buyer_address' => $buyer_address,
                 ]);
             }
     

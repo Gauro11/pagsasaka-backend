@@ -12,69 +12,71 @@ use Illuminate\Support\Facades\Validator;
 class ChatSessionController extends Controller
 {
     public function show($id)
-    {
-        try {
-            // Get the authenticated user's ID (from the token)
-            $userId = Auth::id();
-
-            if (!$userId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated',
-                ], 401);
-            }
-
-            // Fetch the user from the accounts table
-            $user = Account::find($userId);
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found in accounts table',
-                ], 404);
-            }
-
-            $chatSession = ChatSession::with([
-                'messages' => function ($query) {
-                    $query->orderBy('created_at', 'asc')
-                          ->with([
-                                'sender' => function ($q) {
-                                    $q->select('id', 'first_name', 'middle_name', 'last_name', 'avatar');
-                                },
-                                'receiver' => function ($q) {
-                                    $q->select('id', 'first_name', 'middle_name', 'last_name', 'avatar');
-                                }
-                          ]);
-                }
-            ])->findOrFail($id);
-
-            $authorized = ($chatSession->user1_id == $user->id) || ($chatSession->user2_id == $user->id);
-
-            if (!$authorized) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized to view this chat session',
-                ], 403);
-            }
-
-            Messages::where('conversation_id', $id)
-                   ->where('is_read', 0)
-                   ->where('sender_id', '!=', $user->id)
-                   ->update(['is_read' => 1]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Chat session retrieved successfully',
-                'data' => $chatSession
-            ], 200);
-
-        } catch (\Exception $e) {
+{
+    try {
+        // Validate the id parameter
+        if (!is_numeric($id) || $id <= 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve chat session: ' . $e->getMessage(),
-            ], 500);
+                'message' => 'Invalid chat session ID provided',
+            ], 400);
         }
+
+        $userId = Auth::id();
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        $user = Account::find($userId);
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found in accounts table',
+            ], 404);
+        }
+
+        $chatSession = ChatSession::findOrFail($id);
+
+        $authorized = ($chatSession->user1_id == $user->id) || ($chatSession->user2_id == $user->id);
+        if (!$authorized) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to view this chat session',
+            ], 403);
+        }
+
+        $chatSession->load(['messages' => function ($query) {
+            $query->with(['sender', 'receiver'])->orderBy('created_at', 'asc');
+        }]);
+
+        // Mark messages as read for the authenticated user
+        $chatSession->messages->where('receiver_id', $user->id)->where('is_read', 0)->each(function ($message) {
+            $message->update(['is_read' => 1]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Chat session retrieved successfully',
+            'data' => $chatSession
+        ], 200);
+
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Chat session not found',
+        ], 404);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve chat session: ' . $e->getMessage(),
+        ], 500);
     }
+}
 
     public function index(Request $request)
 {
