@@ -725,16 +725,23 @@ class ProductController extends Controller
 
     
 
-    public function buyNow($product_id, $quantity = 1)
+    public function buyNow($account_id, $product_id, $quantity = 1)
     {
         // Fetch the product
         $product = Product::find($product_id);
-        $account = auth()->user(); // Fetch the authenticated user
-    
+        $account = Account::find($account_id); // Fetch the account by the provided account_id
+        
         if (!$product) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Product not found.'
+            ], 404);
+        }
+        
+        if (!$account) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Account not found.'
             ], 404);
         }
     
@@ -744,6 +751,7 @@ class ProductController extends Controller
         // Store the quantity in cache for the user, using a unique key
         Cache::put('purchase_' . $account->id . '_' . $product->id, $quantity, 60); // Cache for 60 minutes
     
+        // Calculate total price
         $total = $product->price * $quantity;
     
         return response()->json([
@@ -752,10 +760,10 @@ class ProductController extends Controller
             'product' => [
                 'id' => $product->id,
                 'name' => $product->product_name,
-                'price' => $product->price,
+                'price' => number_format($product->price, 2), // Format price to 2 decimal places
                 'quantity' => $quantity,
                 'unit' => $product->unit,
-                'total' => $total,
+                'total' => number_format($total, 2), // Format total to 2 decimal places
                 'product_img' => $product->product_img,
             ],
             'buyer_info' => [
@@ -765,6 +773,7 @@ class ProductController extends Controller
             ]
         ]);
     }
+    
     
 
 

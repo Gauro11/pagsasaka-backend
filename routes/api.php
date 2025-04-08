@@ -151,7 +151,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('cart-list', [ProductController::class, 'getCartList']);                                                                
     Route::post('cart-remove/{id}', [ProductController::class, 'deleteFromCart']);
 });
-Route::middleware('auth:sanctum')->get('checkout/{id}/{quantity}', [ProductController::class, 'buyNow']);
+Route::middleware('auth:sanctum')->get('buy-now/{account_id}/{product_id}/{quantity}', [ProductController::class, 'buyNow']);
 
 
 Route::post('list', [ProductController::class, 'getAllProductsList']);
