@@ -151,7 +151,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('cart-list', [ProductController::class, 'getCartList']);                                                                
     Route::post('cart-remove/{id}', [ProductController::class, 'deleteFromCart']);
 });
-Route::middleware('auth:sanctum')->post('buy-now/{account_id}/{product_id}/{quantity}', [ProductController::class, 'buyNow']);
+
 
 
 Route::post('list', [ProductController::class, 'getAllProductsList']);
@@ -162,8 +162,8 @@ Route::prefix('dropdown')->group(function () {
     Route::get('category', [CategoryController::class, 'dropdownCategory']);
 });
 
-
-Route::middleware('auth:sanctum')->post('checkout-preview/{account_id}/{product_id}', [ProductController::class, 'getCheckoutPreview']);
+Route::middleware('auth:sanctum')->post('buy-now/{product_id}', [ProductController::class, 'buyNow']);
+Route::middleware('auth:sanctum')->post('checkout-preview/{product_id}', [ProductController::class, 'getCheckoutPreview']);
 
 
 

@@ -725,125 +725,177 @@ class ProductController extends Controller
 
     
 
-    public function buyNow($account_id, $product_id, $quantity = 1)
-    {
-        // Fetch the product
-        $product = Product::find($product_id);
-        $account = Account::find($account_id); // Fetch the account by the provided account_id
-        
-        if (!$product) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Product not found.'
-            ], 404);
-        }
-        
-        if (!$account) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Account not found.'
-            ], 404);
-        }
-    
-        // Ensure that quantity does not exceed available stock
-        $quantity = min($quantity, $product->stocks);
-    
-        // Store the quantity in cache for the user, using a unique key
-        Cache::put('purchase_' . $account->id . '_' . $product->id, $quantity, 60); // Cache for 60 minutes
-    
-        // Calculate total price
-        $total = $product->price * $quantity;
-    
+    public function buyNow(Request $request, $product_id)
+{
+    // Log the full request details
+    \Log::info("Buy Now Request", [
+        'product_id' => $product_id,
+        'quantity' => $request->input('quantity', 1),
+        'headers' => $request->headers->all(),
+    ]);
+
+    // Get the authenticated user
+    $account = $request->user();
+    if (!$account) {
+        \Log::warning("No authenticated user found in buyNow");
         return response()->json([
-            'isSuccess' => true,
-            'message' => 'Checkout successful.',
-            'product' => [
-                'id' => $product->id,
-                'name' => $product->product_name,
-                'price' => number_format($product->price, 2), // Format price to 2 decimal places
-                'quantity' => $quantity,
-                'unit' => $product->unit,
-                'total' => number_format($total, 2), // Format total to 2 decimal places
-                'product_img' => $product->product_img,
-            ],
-            'buyer_info' => [
-                'name' => $account->first_name . ' ' . $account->last_name,
-                'contact_number' => $account->phone_number,
-                'delivery_address' => $account->delivery_address
-            ]
-        ]);
+            'isSuccess' => false,
+            'message' => 'No authenticated account found. Please log in.',
+        ], 401);
     }
-    
-    
 
+    \Log::info("Authenticated user in buyNow", [
+        'id' => $account->id,
+        'email' => $account->email,
+    ]);
 
-
-
-    public function getCheckoutPreview(Request $request, $account_id, $product_id)
-    {
-        // Log request details
-        \Log::info("Checkout Preview Request - account_id: {$account_id}, product_id: {$product_id}, payment_method: " . $request->input('payment_method', 'COD'));
-
-        // Check authenticated user
-        $authenticatedUser = $request->user();
-        \Log::info("Authenticated user ID: " . ($authenticatedUser ? $authenticatedUser->id : 'None'));
-
-        $account = Account::find($account_id);
-        if (!$account) {
-            \Log::info("Account not found for account_id: {$account_id}");
-            return response()->json([
-                'isSuccess' => false,
-                'message' => "Account ID {$account_id} not found.",
-            ], 404);
-        }
-
-        $product = Product::find($product_id);
-        if (!$product) {
-            \Log::info("Product not found for product_id: {$product_id}");
-            return response()->json([
-                'isSuccess' => false,
-                'message' => "Product ID {$product_id} not found.",
-            ], 404);
-        }
-
-        $quantity = Cache::get('purchase_' . $account->id . '_' . $product->id, 1);
-        $quantity = min($quantity, $product->stocks);
-
-        $subtotal = $product->price * $quantity;
-        $payment_method = $request->input('payment_method', 'COD');
-
+    // Validate product_id format
+    if (!is_numeric($product_id) || $product_id <= 0) {
+        \Log::warning("Invalid product_id format in buyNow: " . $product_id);
         return response()->json([
-            'isSuccess' => true,
-            'message' => 'Checkout preview loaded.',
-            'user_info' => [
-                'id' => $account->id,
-                'buyer_name' => $account->first_name . ' ' . $account->last_name,
-                'email' => $account->email,
-                'contact_number' => $account->phone_number,
-                'delivery_address' => $account->delivery_address,
-            ],
-            'product_info' => [
-                'id' => $product->id,
-                'name' => $product->product_name,
-                'price' => number_format($product->price, 2),
-                'unit' => $product->unit,
-                'quantity' => $quantity,
-                'stock_available' => $product->stocks,
-                'images' => $product->product_img,
-                'description' => $product->description ?? 'No description available',
-                'category' => $product->category ?? 'Uncategorized',
-                'sku' => $product->sku ?? null,
-                'weight' => $product->weight ?? null,
-                'dimensions' => $product->dimensions ?? null,
-            ],
-            'order_summary' => [
-                'payment_method' => $payment_method,
-                'subtotal' => number_format($subtotal, 2),
-                'quantity' => $quantity,
-                'total_amount' => number_format($subtotal, 2),
-            ],
-        ]);
+            'isSuccess' => false,
+            'message' => "Invalid product ID format: " . $product_id,
+        ], 400);
     }
+
+    // Fetch the product
+    $product = Product::find($product_id);
+    if (!$product) {
+        \Log::info("Product not found for product_id in buyNow: " . $product_id);
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Product not found.',
+        ], 404);
+    }
+
+    // Get the quantity from the request, default to 1
+    $quantity = $request->input('quantity', 1);
+    $quantity = max(1, min($quantity, $product->stocks));
+
+    // Store the quantity in cache for the user
+    $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
+    Cache::put($cacheKey, $quantity, now()->addMinutes(60));
+    \Log::info("Cached quantity in buyNow", [
+        'cache_key' => $cacheKey,
+        'quantity' => $quantity,
+    ]);
+
+    // Calculate total price
+    $total = $product->price * $quantity;
+
+    return response()->json([
+        'isSuccess' => true,
+        'message' => 'Checkout successful.',
+        'product' => [
+            'id' => $product->id,
+            'name' => $product->product_name,
+            'price' => number_format($product->price, 2),
+            'quantity' => $quantity,
+            'unit' => $product->unit,
+            'total' => number_format($total, 2),
+            'product_img' => $product->product_img,
+        ],
+        'buyer_info' => [
+            'name' => $account->first_name . ' ' . $account->last_name,
+            'contact_number' => $account->phone_number,
+            'delivery_address' => $account->delivery_address,
+        ],
+    ]);
+}
+    
+
+
+
+
+public function getCheckoutPreview(Request $request, $product_id)
+{
+    // Log the full request details
+    \Log::info("Checkout Preview Request", [
+        'product_id' => $product_id,
+        'quantity' => $request->input('quantity', 1),
+        'payment_method' => $request->input('payment_method', 'COD'),
+        'headers' => $request->headers->all(),
+    ]);
+
+    // Get the authenticated user
+    $account = $request->user();
+    if (!$account) {
+        \Log::warning("No authenticated user found in getCheckoutPreview");
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'No authenticated account found. Please log in.',
+        ], 401);
+    }
+
+    \Log::info("Authenticated user in getCheckoutPreview", [
+        'id' => $account->id,
+        'email' => $account->email,
+    ]);
+
+    // Validate product_id format
+    if (!is_numeric($product_id) || $product_id <= 0) {
+        \Log::warning("Invalid product_id format in getCheckoutPreview: " . $product_id);
+        return response()->json([
+            'isSuccess' => false,
+            'message' => "Invalid product ID format: " . $product_id,
+        ], 400);
+    }
+
+    // Fetch the product
+    $product = Product::find($product_id);
+    if (!$product) {
+        \Log::info("Product not found for product_id in getCheckoutPreview: " . $product_id);
+        return response()->json([
+            'isSuccess' => false,
+            'message' => "Product ID " . $product_id . " not found.",
+        ], 404);
+    }
+
+    // Get the quantity from the cache (set by buyNow), or request, default to 1
+    $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
+    $quantity = Cache::get($cacheKey, $request->input('quantity', 1));
+    $quantity = max(1, min($quantity, $product->stocks));
+    \Log::info("Retrieved quantity in getCheckoutPreview", [
+        'cache_key' => $cacheKey,
+        'quantity' => $quantity,
+    ]);
+
+    // Calculate subtotal
+    $subtotal = $product->price * $quantity;
+    $payment_method = $request->input('payment_method', 'COD');
+
+    return response()->json([
+        'isSuccess' => true,
+        'message' => 'Checkout preview loaded.',
+        'user_info' => [
+            'id' => $account->id,
+            'buyer_name' => $account->first_name . ' ' . $account->last_name,
+            'email' => $account->email,
+            'contact_number' => $account->phone_number,
+            'delivery_address' => $account->delivery_address,
+        ],
+        'product_info' => [
+            'id' => $product->id,
+            'name' => $product->product_name,
+            'price' => number_format($product->price, 2),
+            'unit' => $product->unit,
+            'quantity' => $quantity,
+            'stock_available' => $product->stocks,
+            'images' => $product->product_img,
+            'description' => $product->description ?? 'No description available',
+            'category' => $product->category ?? 'Uncategorized',
+            'sku' => $product->sku ?? null,
+            'weight' => $product->weight ?? null,
+            'dimensions' => $product->dimensions ?? null,
+        ],
+        'order_summary' => [
+            'payment_method' => $payment_method,
+            'subtotal' => number_format($subtotal, 2),
+            'quantity' => $quantity,
+            'total_amount' => number_format($subtotal, 2),
+        ],
+    ]);
+}
 
 
     
