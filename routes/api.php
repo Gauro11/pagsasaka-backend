@@ -163,7 +163,7 @@ Route::prefix('dropdown')->group(function () {
 });
 
 
-Route::middleware('auth:sanctum')->get('checkout-preview/{account_id}/{product_id}', [ProductController::class, 'getCheckoutPreview']);
+Route::middleware('auth:sanctum')->post('checkout-preview/{account_id}/{product_id}', [ProductController::class, 'getCheckoutPreview']);
 
 
 
