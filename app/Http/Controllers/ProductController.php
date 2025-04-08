@@ -781,11 +781,16 @@ class ProductController extends Controller
 
     public function getCheckoutPreview(Request $request, $account_id, $product_id)
     {
-        // Log incoming parameters for debugging
+        // Log request details
         \Log::info("Checkout Preview Request - account_id: {$account_id}, product_id: {$product_id}, payment_method: " . $request->input('payment_method', 'COD'));
+
+        // Check authenticated user
+        $authenticatedUser = $request->user();
+        \Log::info("Authenticated user ID: " . ($authenticatedUser ? $authenticatedUser->id : 'None'));
 
         $account = Account::find($account_id);
         if (!$account) {
+            \Log::info("Account not found for account_id: {$account_id}");
             return response()->json([
                 'isSuccess' => false,
                 'message' => "Account ID {$account_id} not found.",
@@ -794,6 +799,7 @@ class ProductController extends Controller
 
         $product = Product::find($product_id);
         if (!$product) {
+            \Log::info("Product not found for product_id: {$product_id}");
             return response()->json([
                 'isSuccess' => false,
                 'message' => "Product ID {$product_id} not found.",
