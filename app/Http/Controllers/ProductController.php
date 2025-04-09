@@ -726,7 +726,7 @@ class ProductController extends Controller
 
     
 
-    public function buyNow(Request $request, $product_id)
+    public function buyNow(Request $request, $id)
     {
         $account = $request->user(); // Authenticated user
     
@@ -737,7 +737,7 @@ class ProductController extends Controller
             ], 401);
         }
     
-        $product = Product::find($product_id);
+        $product = Product::find($id); // Here 'id' is the product ID
         if (!$product) {
             return response()->json([
                 'isSuccess' => false,
@@ -746,13 +746,13 @@ class ProductController extends Controller
         }
     
         // Get quantity from cache or default to 1
-        $cacheKey = 'purchase_' . $account->id . '_' . $product_id;
+        $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
         $quantity = Cache::get($cacheKey, 1);
     
-        // Prevent over-purchase
+        // Prevent exceeding stock
         $quantity = max(1, min($quantity, $product->stocks));
     
-        // Create or update cart
+        // Save to cart or update
         $cartItem = Cart::updateOrCreate(
             [
                 'account_id' => $account->id,
@@ -769,7 +769,7 @@ class ProductController extends Controller
         return response()->json([
             'isSuccess' => true,
             'message' => 'Checkout successful.',
-            'buy' => [
+            'product' => [
                 'id' => $product->id,
                 'name' => $product->product_name,
                 'price' => number_format($product->price, 2),
@@ -785,6 +785,7 @@ class ProductController extends Controller
             ],
         ]);
     }
+    
     
     
 

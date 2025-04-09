@@ -166,7 +166,7 @@ Route::prefix('dropdown')->group(function () {
 
 
 
-Route::middleware('auth:sanctum')->post('buynow/{product_id}', [ProductController::class, 'buyNow']);
+Route::middleware('auth:sanctum')->post('buynow/id}', [ProductController::class, 'buyNow']);
 Route::middleware('auth:sanctum')->post('checkout', [ProductController::class, 'getCheckoutPreview'])->name('checkout');
 // Redirect old route to new route
 Route::middleware('auth:sanctum')->post('checkout-preview', function () {
