@@ -964,6 +964,80 @@ class ProductController extends Controller
     }
 }
 
+
+
+public function getCartItemDetails(Request $request, $id)
+{
+    $user = Auth::user();
+
+    if (!$user) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'User not authenticated',
+        ], 401);
+    }
+
+    try {
+        // Check the user's ID and the cart item ID
+        Log::info('User ID: ' . $user->id);
+        Log::info('Requested Cart Item ID: ' . $id);
+
+        // Retrieve the specific cart item using the passed $id
+        $cartItem = Cart::where('account_id', $user->id)
+                        ->where('id', $id)
+                        ->first();
+
+        // Log if no cart item is found
+        if (!$cartItem) {
+            Log::warning('Cart item not found for User ID: ' . $user->id . ' with Cart ID: ' . $id);
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Cart item not found',
+            ], 404);
+        }
+
+        // Retrieve the product details associated with the cart item
+        $product = Product::find($cartItem->product_id);
+        if (!$product) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
+
+        // Prepare the detailed cart item data
+        $cartItemDetails = [
+            'id' => $cartItem->id,
+            'product_name' => $product->product_name,
+            'product_id' => $product->id,
+            'quantity' => $cartItem->quantity,
+            'unit' => $product->unit ?? 'unit',
+            'price' => number_format($cartItem->price, 2),  // Format price
+            'item_total' => number_format($cartItem->item_total, 2),  // Format item total
+            'product_img' => $product->product_img,
+            'product_description' => $product->description ?? 'No description available',
+            'available_stock' => $product->stocks,
+            'category' => $product->category->name ?? 'N/A',  // Assuming category relation exists
+            'shipping_address' => $user->delivery_address ?? 'N/A',
+            'order_notes' => $cartItem->notes ?? 'No notes available',  // Add any notes if needed
+        ];
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Cart item details retrieved successfully.',
+            'cart_item_details' => $cartItemDetails,
+        ], 200);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred while retrieving the cart item details.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
+
     
 
 
