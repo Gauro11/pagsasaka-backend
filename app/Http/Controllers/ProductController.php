@@ -769,7 +769,7 @@ class ProductController extends Controller
         return response()->json([
             'isSuccess' => true,
             'message' => 'Checkout successful.',
-            'product' => [
+            'buy' => [
                 'id' => $product->id,
                 'name' => $product->product_name,
                 'price' => number_format($product->price, 2),
