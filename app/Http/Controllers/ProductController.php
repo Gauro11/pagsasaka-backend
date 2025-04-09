@@ -728,63 +728,76 @@ class ProductController extends Controller
 
     public function buyNow(Request $request, $id)
     {
-        $account = $request->user(); // Authenticated user
+        $user = Auth::user();
     
-        if (!$account) {
+        if (!$user) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Unauthorized. Please log in.',
+                'message' => 'User not authenticated.',
             ], 401);
         }
     
-        $product = Product::find($id); // Here 'id' is the product ID
-        if (!$product) {
+        try {
+            $product = Product::find($id);
+            if (!$product) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Product not found.',
+                ], 404);
+            }
+    
+            // Get quantity from cache or default to 1
+            $cacheKey = 'purchase_' . $user->id . '_' . $product->id;
+            $quantity = Cache::get($cacheKey, 1);
+    
+            // Clamp quantity between 1 and product stock
+            $quantity = max(1, min($quantity, $product->stocks));
+    
+            // Calculate item total
+            $itemTotal = $product->price * $quantity;
+    
+            // Update or create cart item
+            $cartItem = Cart::updateOrCreate(
+                [
+                    'account_id' => $user->id,
+                    'product_id' => $product->id,
+                ],
+                [
+                    'price' => $product->price,
+                    'quantity' => $quantity,
+                    'item_total' => $itemTotal,
+                    'unit' => $product->unit,
+                ]
+            );
+    
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Product added to cart.',
+                'cart_item' => [
+                    'id' => $cartItem->id,
+                    'product_id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'quantity' => $quantity,
+                    'unit' => $product->unit,
+                    'price' => number_format($product->price, 2),
+                    'item_total' => number_format($itemTotal, 2),
+                    'product_img' => $product->product_img,
+                ],
+                'buyer_info' => [
+                    'name' => $user->first_name . ' ' . $user->last_name,
+                    'contact_number' => $user->phone_number,
+                    'delivery_address' => $user->delivery_address,
+                ],
+            ]);
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Product not found.',
-            ], 404);
+                'message' => 'An error occurred while processing buy now.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-    
-        // Get quantity from cache or default to 1
-        $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
-        $quantity = Cache::get($cacheKey, 1);
-    
-        // Prevent exceeding stock
-        $quantity = max(1, min($quantity, $product->stocks));
-    
-        // Save to cart or update
-        $cartItem = Cart::updateOrCreate(
-            [
-                'account_id' => $account->id,
-                'product_id' => $product->id,
-            ],
-            [
-                'price' => $product->price,
-                'quantity' => $quantity,
-            ]
-        );
-    
-        $total = $product->price * $quantity;
-    
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Checkout successful.',
-            'buy' => [
-                'id' => $product->id,
-                'name' => $product->product_name,
-                'price' => number_format($product->price, 2),
-                'quantity' => $quantity,
-                'unit' => $product->unit,
-                'total' => number_format($total, 2),
-                'product_img' => $product->product_img,
-            ],
-            'buyer_info' => [
-                'name' => $account->first_name . ' ' . $account->last_name,
-                'contact_number' => $account->phone_number,
-                'delivery_address' => $account->delivery_address,
-            ],
-        ]);
     }
+    
     
     
     

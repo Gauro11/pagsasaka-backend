@@ -150,6 +150,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('cart/{id}', [ProductController::class, 'addToCart']);
     Route::post('cart-list', [ProductController::class, 'getCartList']);                                                                
     Route::post('cart-remove/{id}', [ProductController::class, 'deleteFromCart']);
+    Route::post('buynow/{id}', [ProductController::class, 'buyNow']);
 });
 
 
@@ -166,7 +167,7 @@ Route::prefix('dropdown')->group(function () {
 
 
 
-Route::middleware('auth:sanctum')->post('buynow/{id}', [ProductController::class, 'buyNow']);
+
 Route::middleware('auth:sanctum')->post('checkout', [ProductController::class, 'getCheckoutPreview'])->name('checkout');
 // Redirect old route to new route
 Route::middleware('auth:sanctum')->post('checkout-preview', function () {
