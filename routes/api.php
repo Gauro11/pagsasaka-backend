@@ -166,7 +166,7 @@ Route::middleware('auth:sanctum')->post('buy-now/{product_id}', [ProductControll
 Route::middleware('auth:sanctum')->post('checkout-preview/{product_id}', [ProductController::class, 'getCheckoutPreview']);
 
 Route::middleware('auth:sanctum')->post('buynow/{id}', [ProductController::class, 'buyNow']);
-Route::middleware('auth:sanctum')->post('checkout/{id}', [ProductController::class, 'getCheckoutPreview']);
+Route::middleware('auth:sanctum')->post('checkout', [ProductController::class, 'getCheckoutPreview']); // Removed {id}
 
 
 
