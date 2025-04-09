@@ -726,6 +726,79 @@ class ProductController extends Controller
 
     
 
+    // public function buyNow(Request $request, $id)
+    // {
+    //     $user = Auth::user();
+    
+    //     if (!$user) {
+    //         return response()->json([
+    //             'isSuccess' => false,
+    //             'message' => 'User not authenticated.',
+    //         ], 401);
+    //     }
+    
+    //     try {
+    //         $product = Product::find($id);
+    //         if (!$product) {
+    //             return response()->json([
+    //                 'isSuccess' => false,
+    //                 'message' => 'Product not found.',
+    //             ], 404);
+    //         }
+    
+    //         // Get quantity from cache or default to 1
+    //         $cacheKey = 'purchase_' . $user->id . '_' . $product->id;
+    //         $quantity = Cache::get($cacheKey, 1);
+    
+    //         // Clamp quantity between 1 and product stock
+    //         $quantity = max(1, min($quantity, $product->stocks));
+    
+    //         // Calculate item total
+    //         $itemTotal = $product->price * $quantity;
+    
+    //         // Update or create cart item
+    //         $cartItem = Cart::updateOrCreate(
+    //             [
+    //                 'account_id' => $user->id,
+    //                 'product_id' => $product->id,
+    //             ],
+    //             [
+    //                 'price' => $product->price,
+    //                 'quantity' => $quantity,
+    //                 'item_total' => $itemTotal,
+    //                 'unit' => $product->unit,
+    //             ]
+    //         );
+    
+    //         return response()->json([
+    //             'isSuccess' => true,
+    //             'message' => 'Product added to cart.',
+    //             'cart_item' => [
+    //                 'id' => $cartItem->id,
+    //                 'product_id' => $product->id,
+    //                 'product_name' => $product->product_name,
+    //                 'quantity' => $quantity,
+    //                 'unit' => $product->unit,
+    //                 'price' => number_format($product->price, 2),
+    //                 'item_total' => number_format($itemTotal, 2),
+    //                 'product_img' => $product->product_img,
+    //             ],
+    //             'buyer_info' => [
+    //                 'name' => $user->first_name . ' ' . $user->last_name,
+    //                 'contact_number' => $user->phone_number,
+    //                 'delivery_address' => $user->delivery_address,
+    //             ],
+    //         ]);
+    //     } catch (Throwable $e) {
+    //         return response()->json([
+    //             'isSuccess' => false,
+    //             'message' => 'An error occurred while processing buy now.',
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
+
     public function buyNow(Request $request, $id)
     {
         $user = Auth::user();
@@ -733,153 +806,147 @@ class ProductController extends Controller
         if (!$user) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'User not authenticated.',
+                'message' => 'User not authenticated',
             ], 401);
         }
     
         try {
+            $validated = $request->validate([
+                'quantity' => 'required|integer|min:1',
+            ]);
+    
             $product = Product::find($id);
+    
             if (!$product) {
                 return response()->json([
                     'isSuccess' => false,
-                    'message' => 'Product not found.',
+                    'message' => 'Product not found',
                 ], 404);
             }
     
-            // Get quantity from cache or default to 1
+            if ($validated['quantity'] > $product->stocks) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Quantity exceeds available stock.',
+                ], 400);
+            }
+    
+            $itemTotal = $validated['quantity'] * $product->price;
+    
+            // Save quantity in the cache
             $cacheKey = 'purchase_' . $user->id . '_' . $product->id;
-            $quantity = Cache::get($cacheKey, 1);
-    
-            // Clamp quantity between 1 and product stock
-            $quantity = max(1, min($quantity, $product->stocks));
-    
-            // Calculate item total
-            $itemTotal = $product->price * $quantity;
-    
-            // Update or create cart item
-            $cartItem = Cart::updateOrCreate(
-                [
-                    'account_id' => $user->id,
-                    'product_id' => $product->id,
-                ],
-                [
-                    'price' => $product->price,
-                    'quantity' => $quantity,
-                    'item_total' => $itemTotal,
-                    'unit' => $product->unit,
-                ]
-            );
+            Cache::put($cacheKey, $validated['quantity'], now()->addMinutes(60)); // Set cache expiration (e.g., 60 minutes)
     
             return response()->json([
                 'isSuccess' => true,
-                'message' => 'Product added to cart.',
-                'cart_item' => [
-                    'id' => $cartItem->id,
+                'message' => 'Buy Now preview successful',
+                'order_summary' => [
                     'product_id' => $product->id,
                     'product_name' => $product->product_name,
-                    'quantity' => $quantity,
-                    'unit' => $product->unit,
+                    'quantity' => $validated['quantity'],
+                    'unit' => $product->unit ?? 'unit',
                     'price' => number_format($product->price, 2),
                     'item_total' => number_format($itemTotal, 2),
                     'product_img' => $product->product_img,
                 ],
-                'buyer_info' => [
+                'buyer' => [
                     'name' => $user->first_name . ' ' . $user->last_name,
-                    'contact_number' => $user->phone_number,
-                    'delivery_address' => $user->delivery_address,
-                ],
-            ]);
+                    'phone_number' => $user->phone_number,
+                    'address' => $user->delivery_address ?? 'N/A',
+                ]
+            ], 200);
         } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'An error occurred while processing buy now.',
+                'message' => 'An error occurred during Buy Now',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
     
-    
-    
-    
-
-
 
 
     public function getCheckoutPreview(Request $request)
-    {
-        Log::info("Checkout Preview Request", [
-            'product_id' => $request->input('product_id'),
-            'payment_method' => $request->input('payment_method', 'COD'),
-            'headers' => $request->headers->all(),
-        ]);
-    
-        $account = $request->user();
-        if (!$account) {
-            Log::warning("No authenticated user found in getCheckoutPreview");
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'No authenticated account found. Please log in.',
-            ], 401);
+{
+    $user = Auth::user();
+
+    if (!$user) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'User not authenticated',
+        ], 401);
+    }
+
+    try {
+        // Retrieve all cart items for the user
+        $cartItems = Cart::where('account_id', $user->id)->get();
+
+        $totalAmount = 0;
+        $cartData = [];
+
+        foreach ($cartItems as $item) {
+            $product = Product::find($item->product_id);
+
+            if ($product) {
+                // Retrieve quantity from cache
+                $cacheKey = 'purchase_' . $user->id . '_' . $product->id;
+                $quantity = Cache::get($cacheKey, $item->quantity);  // Default to cart quantity if not cached
+
+                // Ensure the quantity does not exceed stock
+                $quantity = max(1, min($quantity, $product->stocks));
+
+                // Calculate the total for this item
+                $itemTotal = $product->price * $quantity;
+                $totalAmount += $itemTotal;
+
+                // Prepare the item data for the response
+                $cartData[] = [
+                    'id' => $item->id,
+                    'product_name' => $product->product_name,
+                    'product_id' => $product->id,
+                    'quantity' => $quantity,
+                    'unit' => $product->unit ?? 'unit',
+                    'price' => number_format($product->price, 2),
+                    'item_total' => number_format($itemTotal, 2),
+                    'product_img' => $product->product_img,
+                ];
+            }
         }
-    
-        $validated = $request->validate([
-            'product_id' => 'required|integer|exists:products,id',
-        ]);
-    
-        $product_id = $validated['product_id'];
-    
-        $product = Product::find($product_id);
-        if (!$product) {
-            Log::info("Product not found for product_id in getCheckoutPreview: " . $product_id);
-            return response()->json([
-                'isSuccess' => false,
-                'message' => "Product ID " . $product_id . " not found.",
-            ], 404);
-        }
-    
-        $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
-        $quantity = Cache::get($cacheKey, 1);
-        $quantity = max(1, min($quantity, $product->stocks));
-        Log::info("Retrieved quantity in getCheckoutPreview", [
-            'cache_key' => $cacheKey,
-            'quantity' => $quantity,
-        ]);
-    
-        $payment_method = $request->input('payment_method', 'COD');
-        $subtotal = $product->price * $quantity;
-    
+
+        // Return a successful response with cart summary
         return response()->json([
             'isSuccess' => true,
-            'message' => 'Checkout preview loaded.',
-            'user_info' => [
-                'id' => $account->id,
-                'buyer_name' => $account->first_name . ' ' . $account->last_name,
-                'email' => $account->email,
-                'contact_number' => $account->phone_number,
-                'delivery_address' => $account->delivery_address,
-            ],
-            'product_info' => [
-                'id' => $product->id,
-                'name' => $product->product_name,
-                'price' => number_format($product->price, 2),
-                'unit' => $product->unit,
+            'message' => 'Checkout preview loaded successfully.',
+            'data' => [
+                'id' => $user->id,
+                'buyer_name' => $user->first_name . ' ' . $user->last_name,
+                'email' => $user->email,
+                'contact_number' => $user->phone_number,
                 'quantity' => $quantity,
-                'stock_available' => $product->stocks,
-                'images' => $product->product_img,
-                'description' => $product->description ?? 'No description available',
-                'category' => $product->category ?? 'Uncategorized',
-                'sku' => $product->sku ?? null,
-                'weight' => $product->weight ?? null,
-                'dimensions' => $product->dimensions ?? null,
+                'delivery_address' => $user->delivery_address ?? 'N/A',
+                'cart_info' => $cartData,
+                'order_summary' => [
+                    'subtotal' => number_format($totalAmount, 2),
+                    'total_amount' => number_format($totalAmount, 2),
+                ],
             ],
-            'order_summary' => [
-                'payment_method' => $payment_method,
-                'subtotal' => number_format($subtotal, 2),
-                'quantity' => $quantity,
-                'total_amount' => number_format($subtotal, 2),
-            ],
-        ]);
+        ], 200);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred during Checkout Preview',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
+    
+
+    
+    
+
+
+
 
 
     
