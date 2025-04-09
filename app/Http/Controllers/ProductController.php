@@ -728,7 +728,7 @@ class ProductController extends Controller
     public function buyNow(Request $request, $id)
     {
         \Log::info("Buy Now Request", [
-            'product_id' => $id, // Changed from $product_id to $id
+            'product_id' => $id,
             'quantity' => $request->input('quantity', 1),
             'headers' => $request->headers->all(),
         ]);
@@ -755,7 +755,7 @@ class ProductController extends Controller
             ], 400);
         }
     
-        $product = Product::find($id); // Changed from $product_id to $id
+        $product = Product::find($id);
         if (!$product) {
             \Log::info("Product not found for product_id in buyNow: " . $id);
             return response()->json([
@@ -767,6 +767,25 @@ class ProductController extends Controller
         $quantity = $request->input('quantity', 1);
         $quantity = max(1, min($quantity, $product->stocks));
     
+        // Add to cart
+        $cartItem = Cart::updateOrCreate(
+            [
+                'account_id' => $account->id,
+                'product_id' => $product->id,
+            ],
+            [
+                'price' => $product->price,
+                'quantity' => $quantity,
+            ]
+        );
+    
+        \Log::info("Added to cart in buyNow", [
+            'cart_item_id' => $cartItem->id,
+            'product_id' => $product->id,
+            'quantity' => $quantity,
+        ]);
+    
+        // Optionally, still cache the quantity for other purposes
         $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
         Cache::put($cacheKey, $quantity, now()->addMinutes(60));
         \Log::info("Cached quantity in buyNow", [
@@ -802,14 +821,12 @@ class ProductController extends Controller
 
     public function getCheckoutPreview(Request $request)
     {
-        // Log the full request details
         \Log::info("Checkout Preview Request", [
             'product_id' => $request->input('product_id'),
             'payment_method' => $request->input('payment_method', 'COD'),
             'headers' => $request->headers->all(),
         ]);
     
-        // Get the authenticated user
         $account = $request->user();
         if (!$account) {
             \Log::warning("No authenticated user found in getCheckoutPreview");
@@ -819,14 +836,12 @@ class ProductController extends Controller
             ], 401);
         }
     
-        // Validate request body
         $validated = $request->validate([
             'product_id' => 'required|integer|exists:products,id',
         ]);
     
         $product_id = $validated['product_id'];
     
-        // Fetch the product
         $product = Product::find($product_id);
         if (!$product) {
             \Log::info("Product not found for product_id in getCheckoutPreview: " . $product_id);
@@ -836,7 +851,6 @@ class ProductController extends Controller
             ], 404);
         }
     
-        // Get the quantity from the cache (set by buyNow), default to 1 if not found
         $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
         $quantity = Cache::get($cacheKey, 1);
         $quantity = max(1, min($quantity, $product->stocks));
@@ -845,10 +859,7 @@ class ProductController extends Controller
             'quantity' => $quantity,
         ]);
     
-        // Get the payment method from the request body
         $payment_method = $request->input('payment_method', 'COD');
-    
-        // Calculate subtotal
         $subtotal = $product->price * $quantity;
     
         return response()->json([
