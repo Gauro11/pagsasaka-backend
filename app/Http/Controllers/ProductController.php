@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Throwable;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
@@ -725,49 +726,33 @@ class ProductController extends Controller
 
     
 
-    public function buyNow(Request $request, $id)
+    public function buyNow(Request $request, $product_id)
     {
-        \Log::info("Buy Now Request", [
-            'product_id' => $id,
-            'quantity' => $request->input('quantity', 1),
-            'headers' => $request->headers->all(),
-        ]);
+        $account = $request->user(); // Authenticated user
     
-        $account = $request->user();
         if (!$account) {
-            \Log::warning("No authenticated user found in buyNow");
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'No authenticated account found. Please log in.',
+                'message' => 'Unauthorized. Please log in.',
             ], 401);
         }
     
-        \Log::info("Authenticated user in buyNow", [
-            'id' => $account->id,
-            'email' => $account->email,
-        ]);
-    
-        if (!is_numeric($id) || $id <= 0) {
-            \Log::warning("Invalid product_id format in buyNow: " . $id);
-            return response()->json([
-                'isSuccess' => false,
-                'message' => "Invalid product ID format: " . $id,
-            ], 400);
-        }
-    
-        $product = Product::find($id);
+        $product = Product::find($product_id);
         if (!$product) {
-            \Log::info("Product not found for product_id in buyNow: " . $id);
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Product not found.',
             ], 404);
         }
     
-        $quantity = $request->input('quantity', 1);
+        // Get quantity from cache or default to 1
+        $cacheKey = 'purchase_' . $account->id . '_' . $product_id;
+        $quantity = Cache::get($cacheKey, 1);
+    
+        // Prevent over-purchase
         $quantity = max(1, min($quantity, $product->stocks));
     
-        // Add to cart
+        // Create or update cart
         $cartItem = Cart::updateOrCreate(
             [
                 'account_id' => $account->id,
@@ -778,20 +763,6 @@ class ProductController extends Controller
                 'quantity' => $quantity,
             ]
         );
-    
-        \Log::info("Added to cart in buyNow", [
-            'cart_item_id' => $cartItem->id,
-            'product_id' => $product->id,
-            'quantity' => $quantity,
-        ]);
-    
-        // Optionally, still cache the quantity for other purposes
-        $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
-        Cache::put($cacheKey, $quantity, now()->addMinutes(60));
-        \Log::info("Cached quantity in buyNow", [
-            'cache_key' => $cacheKey,
-            'quantity' => $quantity,
-        ]);
     
         $total = $product->price * $quantity;
     
@@ -815,13 +786,14 @@ class ProductController extends Controller
         ]);
     }
     
+    
 
 
 
 
     public function getCheckoutPreview(Request $request)
     {
-        \Log::info("Checkout Preview Request", [
+        Log::info("Checkout Preview Request", [
             'product_id' => $request->input('product_id'),
             'payment_method' => $request->input('payment_method', 'COD'),
             'headers' => $request->headers->all(),
@@ -829,7 +801,7 @@ class ProductController extends Controller
     
         $account = $request->user();
         if (!$account) {
-            \Log::warning("No authenticated user found in getCheckoutPreview");
+            Log::warning("No authenticated user found in getCheckoutPreview");
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'No authenticated account found. Please log in.',
@@ -844,7 +816,7 @@ class ProductController extends Controller
     
         $product = Product::find($product_id);
         if (!$product) {
-            \Log::info("Product not found for product_id in getCheckoutPreview: " . $product_id);
+            Log::info("Product not found for product_id in getCheckoutPreview: " . $product_id);
             return response()->json([
                 'isSuccess' => false,
                 'message' => "Product ID " . $product_id . " not found.",
@@ -854,7 +826,7 @@ class ProductController extends Controller
         $cacheKey = 'purchase_' . $account->id . '_' . $product->id;
         $quantity = Cache::get($cacheKey, 1);
         $quantity = max(1, min($quantity, $product->stocks));
-        \Log::info("Retrieved quantity in getCheckoutPreview", [
+        Log::info("Retrieved quantity in getCheckoutPreview", [
             'cache_key' => $cacheKey,
             'quantity' => $quantity,
         ]);

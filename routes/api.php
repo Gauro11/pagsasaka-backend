@@ -164,12 +164,17 @@ Route::prefix('dropdown')->group(function () {
 
 
 
-Route::middleware('auth:sanctum')->post('buynow/{id}', [ProductController::class, 'buyNow']);
+
+
+Route::middleware('auth:sanctum')->post('buynow/{product_id}', [ProductController::class, 'buyNow']);
 Route::middleware('auth:sanctum')->post('checkout', [ProductController::class, 'getCheckoutPreview'])->name('checkout');
 // Redirect old route to new route
 Route::middleware('auth:sanctum')->post('checkout-preview', function () {
     return redirect()->route('checkout');
 });
+
+
+
 
 
 
@@ -213,9 +218,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/products/{product}/ratings', [RatingController::class, 'store'])->name('ratings.store');
-    Route::get('/ratings/{product}', [RatingController::class, 'index'])->name('ratings.index');
-    // New route for adding a seller's response
-    Route::post('/ratings/{rating}/respond', [RatingController::class, 'respond'])->name('ratings.respond');
+    Route::get('/products/{product}/ratings', [RatingController::class, 'index'])->name('ratings.index');
 });
 
 
