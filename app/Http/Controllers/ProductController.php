@@ -845,8 +845,8 @@ class ProductController extends Controller
             // Update existing cart item
             $cartItem->quantity = $newQuantity;
             $cartItem->item_total = $newQuantity * $product->price;
-            $cartItem->status = 'Incart'; // Set status to 'InCart'
-            $cartItem->save();
+            $cartItem->status = 'InCart'; // Ensure status is set to 'InCart'
+            $cartItem->save();  // Ensure the change is saved
         } else {
             // Create new cart item with status 'InCart'
             $cartItem = Cart::create([
@@ -856,7 +856,7 @@ class ProductController extends Controller
                 'unit' => $product->unit ?? 'unit',
                 'price' => $product->price,
                 'item_total' => $validated['quantity'] * $product->price,
-                'status' => 'Incart',  // Set status to 'InCart'
+                'status' => 'InCart',  // Set status to 'InCart'
             ]);
         }
 
@@ -890,6 +890,8 @@ class ProductController extends Controller
         ], 500);
     }
 }
+
+    
 
     
     public function checkoutItem(Request $request, $id)

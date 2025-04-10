@@ -28,6 +28,8 @@ class Cart extends Model
         'unit',
         'price',
         'item_total',
+        'status',
+
     ];
 
     /**
