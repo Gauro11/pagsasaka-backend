@@ -812,12 +812,10 @@ class ProductController extends Controller
         }
     
         try {
-            // Validate the quantity field
             $validated = $request->validate([
                 'quantity' => 'required|integer|min:1',
             ]);
     
-            // Find the product by ID
             $product = Product::find($id);
     
             if (!$product) {
@@ -827,28 +825,40 @@ class ProductController extends Controller
                 ], 404);
             }
     
-            // Check if the requested quantity is available in stock
-            if ($validated['quantity'] > $product->stocks) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Quantity exceeds available stock.',
-                ], 400);
+            // Check if product already exists in user's cart
+            $cartItem = Cart::where('account_id', $user->id)
+                            ->where('product_id', $product->id)
+                            ->first();
+    
+            if ($cartItem) {
+                // Calculate new total quantity
+                $newQuantity = $cartItem->quantity + $validated['quantity'];
+    
+                // Check if new quantity exceeds available stock
+                if ($newQuantity > $product->stocks) {
+                    return response()->json([
+                        'isSuccess' => false,
+                        'message' => 'Total quantity exceeds available stock.',
+                    ], 400);
+                }
+    
+                // Update existing cart item
+                $cartItem->quantity = $newQuantity;
+                $cartItem->item_total = $newQuantity * $product->price;
+                $cartItem->save();
+            } else {
+                // Create new cart item
+                $cartItem = Cart::create([
+                    'account_id' => $user->id,
+                    'product_id' => $product->id,
+                    'quantity' => $validated['quantity'],
+                    'unit' => $product->unit ?? 'unit',
+                    'price' => $product->price,
+                    'item_total' => $validated['quantity'] * $product->price,
+                ]);
             }
     
-            // Calculate the total price for this purchase
-            $itemTotal = $validated['quantity'] * $product->price;
-    
-            // Save the purchase to the cart table (instead of buy_now)
-            $cartItem = Cart::create([
-                'account_id' => $user->id,
-                'product_id' => $product->id,
-                'quantity' => $validated['quantity'],
-                'unit' => $product->unit ?? 'unit',
-                'price' => $product->price,
-                'item_total' => $itemTotal,
-            ]);
-    
-            // Optionally, deduct the purchased quantity from product stock
+            // Deduct purchased quantity from product stock
             $product->decrement('stocks', $validated['quantity']);
     
             return response()->json([
@@ -857,10 +867,10 @@ class ProductController extends Controller
                 'order_summary' => [
                     'product_id' => $product->id,
                     'product_name' => $product->product_name,
-                    'quantity' => $validated['quantity'],
+                    'quantity' => $cartItem->quantity,
                     'unit' => $product->unit ?? 'unit',
                     'price' => number_format($product->price, 2),
-                    'item_total' => number_format($itemTotal, 2),
+                    'item_total' => number_format($cartItem->item_total, 2),
                     'product_img' => $product->product_img,
                 ],
                 'buyer' => [
@@ -869,6 +879,7 @@ class ProductController extends Controller
                     'address' => $user->delivery_address ?? 'N/A',
                 ]
             ], 200);
+    
         } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
@@ -877,6 +888,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
+    
     
 
     
