@@ -889,7 +889,74 @@ class ProductController extends Controller
         }
     }
     
+    public function checkoutItem(Request $request, $id)
+{
+    $user = Auth::user();
+
+    if (!$user) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'User not authenticated.',
+        ], 401);
+    }
+
+    try {
+        // Retrieve the cart item
+        $cartItem = Cart::where('id', $id)
+                        ->where('account_id', $user->id)
+                        ->where('status', 'Incart')
+                        ->first();
+
+        if (!$cartItem) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Cart item not found or already checked out.',
+            ], 404);
+        }
+
+        // Retrieve the associated product details
+        $product = Product::find($cartItem->product_id);
+        if (!$product) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Product not found.',
+            ], 404);
+        }
+
+        // Update cart status to 'CheckedOut'
+        $cartItem->status = 'CheckedOut';
+        $cartItem->save();
+
+        // Calculate the total price for this item
+        $totalPrice = $cartItem->price * $cartItem->quantity;
+
+        // Return the response with additional details
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Item checked out successfully.',
+            'checkout_details' => [
+                'product_name' => $product->product_name,
+                'quantity' => $cartItem->quantity,
+                'unit' => $cartItem->unit,
+                'price_per_unit' => number_format($cartItem->price, 2),
+                'item_total' => number_format($cartItem->item_total, 2),
+                'total_price' => number_format($totalPrice, 2),
+                'product_img' => $product->product_img,
+                'shipping_address' => $user->delivery_address ?? 'N/A',
+            ],
+        ], 200);
+
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred during the checkout process.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
     
+
 
     
 
