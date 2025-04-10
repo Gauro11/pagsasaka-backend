@@ -961,7 +961,7 @@ class ProductController extends Controller
     
 
 
-    public function getCheckoutPreview(Request $request, $id)
+public function getCheckoutPreview(Request $request, $id)
 {
     $user = Auth::user();
 
@@ -995,9 +995,11 @@ class ProductController extends Controller
             ], 404);
         }
 
-        // Retrieve the quantity from the cart and ensure it does not exceed the stock
+        // Check if the quantity in the cart does not exceed stock
         $quantity = $cartItem->quantity;
-        $quantity = max(1, min($quantity, $product->stocks));
+        if ($quantity > $product->stocks) {
+            $quantity = $product->stocks; // Adjust quantity to available stock
+        }
 
         // Calculate the total price for this purchase
         $itemTotal = $product->price * $quantity;
@@ -1017,6 +1019,10 @@ class ProductController extends Controller
         // Calculate the total amount for the selected cart item
         $totalAmount = $itemTotal;
 
+        // You can also include shipping costs if needed
+        $shippingFee = 5.00; // Example shipping fee
+        $totalAmountWithShipping = $totalAmount + $shippingFee;
+
         // Return a successful response with the selected cart item summary
         return response()->json([
             'isSuccess' => true,
@@ -1030,7 +1036,8 @@ class ProductController extends Controller
                 'cart_info' => $cartData,
                 'order_summary' => [
                     'subtotal' => number_format($totalAmount, 2),
-                    'total_amount' => number_format($totalAmount, 2),
+                    'shipping_fee' => number_format($shippingFee, 2),
+                    'total_amount' => number_format($totalAmountWithShipping, 2),
                 ],
             ],
         ], 200);
@@ -1042,6 +1049,7 @@ class ProductController extends Controller
         ], 500);
     }
 }
+
 
 
 
