@@ -845,7 +845,7 @@ class ProductController extends Controller
             // Update existing cart item
             $cartItem->quantity = $newQuantity;
             $cartItem->item_total = $newQuantity * $product->price;
-            $cartItem->status = 'InCart'; // Set status to 'InCart'
+            $cartItem->status = 'Incart'; // Set status to 'InCart'
             $cartItem->save();
         } else {
             // Create new cart item with status 'InCart'
@@ -856,7 +856,7 @@ class ProductController extends Controller
                 'unit' => $product->unit ?? 'unit',
                 'price' => $product->price,
                 'item_total' => $validated['quantity'] * $product->price,
-                'status' => 'InCart',  // Set status to 'InCart'
+                'status' => 'Incart',  // Set status to 'InCart'
             ]);
         }
 
