@@ -974,16 +974,16 @@ public function getCheckoutPreview(Request $request, $id)
     }
 
     try {
-        // Retrieve the specific cart item based on the provided ID
+        // Retrieve the specific cart item based on the provided account_id and cart item id
         $cartItem = Cart::where('account_id', $user->id)
-                        ->where('id', $id)
-                        ->where('status', 'CheckedOut')
+                        ->where('id', $id)  // $id refers to the cart item id
+                        ->where('status', 'CheckedOut')  // Assuming 'CheckedOut' status means it's processed
                         ->first();
 
         Log::info('Cart Item Found:', ['cartItem' => $cartItem]);
 
         if (!$cartItem) {
-            Log::info('Cart item not found', ['user_id' => $user->id, 'cart_item_id' => $id]);
+            Log::info('Cart item not found', ['account_id' => $user->id, 'cart_id' => $id]);  // Logging the account_id and cart id
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Cart item not found.',
@@ -1040,7 +1040,7 @@ public function getCheckoutPreview(Request $request, $id)
             ],
         ], 200);
     } catch (Throwable $e) {
-    Log::error('Checkout Preview Error:', ['error' => $e->getMessage()]);
+        Log::error('Checkout Preview Error:', ['error' => $e->getMessage()]);
         return response()->json([
             'isSuccess' => false,
             'message' => 'An error occurred during Checkout Preview',
@@ -1048,6 +1048,7 @@ public function getCheckoutPreview(Request $request, $id)
         ], 500);
     }
 }
+
 
 
 
