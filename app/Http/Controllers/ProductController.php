@@ -801,93 +801,96 @@ class ProductController extends Controller
 
 
     public function buyNow(Request $request, $id)
-    {
-        $user = Auth::user();
-    
-        if (!$user) {
+{
+    $user = Auth::user();
+
+    if (!$user) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'User not authenticated',
+        ], 401);
+    }
+
+    try {
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $product = Product::find($id);
+
+        if (!$product) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'User not authenticated',
-            ], 401);
+                'message' => 'Product not found',
+            ], 404);
         }
-    
-        try {
-            $validated = $request->validate([
-                'quantity' => 'required|integer|min:1',
-            ]);
-    
-            $product = Product::find($id);
-    
-            if (!$product) {
+
+        // Check if product already exists in user's cart
+        $cartItem = Cart::where('account_id', $user->id)
+                        ->where('product_id', $product->id)
+                        ->first();
+
+        if ($cartItem) {
+            // Calculate new total quantity
+            $newQuantity = $cartItem->quantity + $validated['quantity'];
+
+            // Check if new quantity exceeds available stock
+            if ($newQuantity > $product->stocks) {
                 return response()->json([
                     'isSuccess' => false,
-                    'message' => 'Product not found',
-                ], 404);
+                    'message' => 'Total quantity exceeds available stock.',
+                ], 400);
             }
-    
-            // Check if product already exists in user's cart
-            $cartItem = Cart::where('account_id', $user->id)
-                            ->where('product_id', $product->id)
-                            ->first();
-    
-            if ($cartItem) {
-                // Calculate new total quantity
-                $newQuantity = $cartItem->quantity + $validated['quantity'];
-    
-                // Check if new quantity exceeds available stock
-                if ($newQuantity > $product->stocks) {
-                    return response()->json([
-                        'isSuccess' => false,
-                        'message' => 'Total quantity exceeds available stock.',
-                    ], 400);
-                }
-    
-                // Update existing cart item
-                $cartItem->quantity = $newQuantity;
-                $cartItem->item_total = $newQuantity * $product->price;
-                $cartItem->save();
-            } else {
-                // Create new cart item
-                $cartItem = Cart::create([
-                    'account_id' => $user->id,
-                    'product_id' => $product->id,
-                    'quantity' => $validated['quantity'],
-                    'unit' => $product->unit ?? 'unit',
-                    'price' => $product->price,
-                    'item_total' => $validated['quantity'] * $product->price,
-                ]);
-            }
-    
-            // Deduct purchased quantity from product stock
-            $product->decrement('stocks', $validated['quantity']);
-    
-            return response()->json([
-                'isSuccess' => true,
-                'message' => 'Product added to cart successfully.',
-                'order_summary' => [
-                    'product_id' => $product->id,
-                    'product_name' => $product->product_name,
-                    'quantity' => $cartItem->quantity,
-                    'unit' => $product->unit ?? 'unit',
-                    'price' => number_format($product->price, 2),
-                    'item_total' => number_format($cartItem->item_total, 2),
-                    'product_img' => $product->product_img,
-                ],
-                'buyer' => [
-                    'name' => $user->first_name . ' ' . $user->last_name,
-                    'phone_number' => $user->phone_number,
-                    'address' => $user->delivery_address ?? 'N/A',
-                ]
-            ], 200);
-    
-        } catch (Throwable $e) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'An error occurred during Buy Now',
-                'error' => $e->getMessage(),
-            ], 500);
+
+            // Update existing cart item
+            $cartItem->quantity = $newQuantity;
+            $cartItem->item_total = $newQuantity * $product->price;
+            $cartItem->status = 'InCart'; // Set status to 'InCart'
+            $cartItem->save();
+        } else {
+            // Create new cart item with status 'InCart'
+            $cartItem = Cart::create([
+                'account_id' => $user->id,
+                'product_id' => $product->id,
+                'quantity' => $validated['quantity'],
+                'unit' => $product->unit ?? 'unit',
+                'price' => $product->price,
+                'item_total' => $validated['quantity'] * $product->price,
+                'status' => 'InCart',  // Set status to 'InCart'
+            ]);
         }
+
+        // Deduct purchased quantity from product stock
+        $product->decrement('stocks', $validated['quantity']);
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Product added to cart successfully.',
+            'order_summary' => [
+                'product_id' => $product->id,
+                'product_name' => $product->product_name,
+                'quantity' => $cartItem->quantity,
+                'unit' => $product->unit ?? 'unit',
+                'price' => number_format($product->price, 2),
+                'item_total' => number_format($cartItem->item_total, 2),
+                'product_img' => $product->product_img,
+            ],
+            'buyer' => [
+                'name' => $user->first_name . ' ' . $user->last_name,
+                'phone_number' => $user->phone_number,
+                'address' => $user->delivery_address ?? 'N/A',
+            ]
+        ], 200);
+
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred during Buy Now',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
     
     public function checkoutItem(Request $request, $id)
 {
