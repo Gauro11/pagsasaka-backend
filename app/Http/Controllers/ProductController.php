@@ -894,11 +894,12 @@ class ProductController extends Controller
     
 
     
-    public function checkoutItem(Request $request, $id)
+public function checkoutItem(Request $request, $id)
 {
-    $user = Auth::user();
+    $account = Auth::user();
+    $accountId = $account->account_id ?? $account->id;
 
-    if (!$user) {
+    if (!$account) {
         return response()->json([
             'isSuccess' => false,
             'message' => 'User not authenticated.',
@@ -906,9 +907,8 @@ class ProductController extends Controller
     }
 
     try {
-        // Retrieve the cart item
         $cartItem = Cart::where('id', $id)
-                        ->where('account_id', $user->id)
+                        ->where('account_id', $accountId)
                         ->where('status', 'Incart')
                         ->first();
 
@@ -919,7 +919,6 @@ class ProductController extends Controller
             ], 404);
         }
 
-        // Retrieve the associated product details
         $product = Product::find($cartItem->product_id);
         if (!$product) {
             return response()->json([
@@ -928,18 +927,15 @@ class ProductController extends Controller
             ], 404);
         }
 
-        // Update cart status to 'CheckedOut'
         $cartItem->status = 'CheckedOut';
         $cartItem->save();
 
-        // Calculate the total price for this item
         $totalPrice = $cartItem->price * $cartItem->quantity;
 
-        // Return the response with additional details
         return response()->json([
             'isSuccess' => true,
             'message' => 'Item checked out successfully.',
-            'cart_id' => $cartItem->id, // 🟢 return this for preview API
+            'cart_id' => $cartItem->id,
             'checkout_details' => [
                 'product_name' => $product->product_name,
                 'quantity' => $cartItem->quantity,
@@ -948,7 +944,7 @@ class ProductController extends Controller
                 'item_total' => number_format($cartItem->item_total, 2),
                 'total_price' => number_format($totalPrice, 2),
                 'product_img' => $product->product_img,
-                'shipping_address' => $user->delivery_address ?? 'N/A',
+                'shipping_address' => $account->delivery_address ?? 'N/A',
             ],
         ], 200);
 
@@ -961,6 +957,7 @@ class ProductController extends Controller
     }
 }
 
+
     
 
 
@@ -969,9 +966,10 @@ class ProductController extends Controller
 
 public function getCheckoutPreview(Request $request, $id)
 {
-    $user = Auth::user();
+    $account = Auth::user();
+    $accountId = $account->account_id ?? $account->id;
 
-    if (!$user) {
+    if (!$account) {
         Log::info('User not authenticated');
         return response()->json([
             'isSuccess' => false,
@@ -980,23 +978,21 @@ public function getCheckoutPreview(Request $request, $id)
     }
 
     try {
-        // Retrieve the specific cart item based on the provided account_id and cart item id
-        $cartItem = Cart::where('account_id', $user->id)
-                        ->where('id', $id)  // $id refers to the cart item id
-                        ->where('status', 'CheckedOut')  // Assuming 'CheckedOut' status means it's processed
+        $cartItem = Cart::where('account_id', $accountId)
+                        ->where('id', $id)
+                        ->where('status', 'CheckedOut')
                         ->first();
 
         Log::info('Cart Item Found:', ['cartItem' => $cartItem]);
 
         if (!$cartItem) {
-            Log::info('Cart item not found', ['account_id' => $user->id, 'cart_id' => $id]);  // Logging the account_id and cart id
+            Log::info('Cart item not found', ['account_id' => $accountId, 'cart_id' => $id]);
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Cart item not found.',
             ], 404);
         }
 
-        // Retrieve the product associated with the cart item
         $product = Product::find($cartItem->product_id);
 
         if (!$product) {
@@ -1007,14 +1003,9 @@ public function getCheckoutPreview(Request $request, $id)
             ], 404);
         }
 
-        // Retrieve quantity and ensure it doesn't exceed stock
-        $quantity = $cartItem->quantity;
-        $quantity = max(1, min($quantity, $product->stocks));
-
-        // Calculate the total price for the cart item
+        $quantity = max(1, min($cartItem->quantity, $product->stocks));
         $itemTotal = $product->price * $quantity;
 
-        // Prepare the cart item data for the preview
         $cartData = [
             'id' => $cartItem->id,
             'product_name' => $product->product_name,
@@ -1026,22 +1017,19 @@ public function getCheckoutPreview(Request $request, $id)
             'product_img' => $product->product_img,
         ];
 
-        // Calculate total amount
-        $totalAmount = $itemTotal;
-
         return response()->json([
             'isSuccess' => true,
             'message' => 'Checkout preview loaded successfully.',
             'data' => [
-                'id' => $user->id,
-                'buyer_name' => $user->first_name . ' ' . $user->last_name,
-                'email' => $user->email,
-                'contact_number' => $user->phone_number,
-                'delivery_address' => $user->delivery_address ?? 'N/A',
+                'id' => $accountId,
+                'buyer_name' => $account->first_name . ' ' . $account->last_name,
+                'email' => $account->email,
+                'contact_number' => $account->phone_number,
+                'delivery_address' => $account->delivery_address ?? 'N/A',
                 'cart_info' => $cartData,
                 'order_summary' => [
-                    'subtotal' => number_format($totalAmount, 2),
-                    'total_amount' => number_format($totalAmount, 2),
+                    'subtotal' => number_format($itemTotal, 2),
+                    'total_amount' => number_format($itemTotal, 2),
                 ],
             ],
         ], 200);
@@ -1054,6 +1042,8 @@ public function getCheckoutPreview(Request $request, $id)
         ], 500);
     }
 }
+
+
 
 
 
