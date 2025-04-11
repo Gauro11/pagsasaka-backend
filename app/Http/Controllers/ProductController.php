@@ -966,46 +966,53 @@ public function checkoutItem(Request $request, $id)
 
 public function getCheckoutPreview(Request $request, $id)
 {
-    $account = Auth::user();
-    $accountId = $account->account_id ?? $account->id;
+    $user = Auth::user();
 
-    if (!$account) {
-        Log::info('User not authenticated');
+    if (!$user) {
         return response()->json([
-            'isSuccess' => false,
-            'message' => 'User not authenticated',
+            'data' => [
+                'isSuccess' => false,
+                'message' => 'User not authenticated.',
+            ]
         ], 401);
     }
 
     try {
-        $cartItem = Cart::where('account_id', $accountId)
-                        ->where('id', $id)
-                        ->where('status', 'CheckedOut')
+        // Retrieve the specific cart item based on the provided account_id and cart item id
+        $cartItem = Cart::where('account_id', $user->id)
+                        ->where('id', $id)  // $id refers to the cart item id
+                        ->where('status', 'CheckedOut')  // Assuming 'CheckedOut' status means it's processed
                         ->first();
 
-        Log::info('Cart Item Found:', ['cartItem' => $cartItem]);
-
         if (!$cartItem) {
-            Log::info('Cart item not found', ['account_id' => $accountId, 'cart_id' => $id]);
             return response()->json([
-                'isSuccess' => false,
-                'message' => 'Cart item not found.',
+                'data' => [
+                    'isSuccess' => false,
+                    'message' => 'Cart item not found.',
+                ]
             ], 404);
         }
 
+        // Retrieve the product associated with the cart item
         $product = Product::find($cartItem->product_id);
 
         if (!$product) {
-            Log::info('Product not found for cart item', ['product_id' => $cartItem->product_id]);
             return response()->json([
-                'isSuccess' => false,
-                'message' => 'Product not found.',
+                'data' => [
+                    'isSuccess' => false,
+                    'message' => 'Product not found.',
+                ]
             ], 404);
         }
 
-        $quantity = max(1, min($cartItem->quantity, $product->stocks));
+        // Retrieve quantity and ensure it doesn't exceed stock
+        $quantity = $cartItem->quantity;
+        $quantity = max(1, min($quantity, $product->stocks));
+
+        // Calculate the total price for the cart item
         $itemTotal = $product->price * $quantity;
 
+        // Prepare the cart item data for the preview
         $cartData = [
             'id' => $cartItem->id,
             'product_name' => $product->product_name,
@@ -1017,31 +1024,22 @@ public function getCheckoutPreview(Request $request, $id)
             'product_img' => $product->product_img,
         ];
 
+        // Return only the cart info inside 'data'
         return response()->json([
-            'isSuccess' => true,
-            'message' => 'Checkout preview loaded successfully.',
-            'data' => [
-                'id' => $accountId,
-                'buyer_name' => $account->first_name . ' ' . $account->last_name,
-                'email' => $account->email,
-                'contact_number' => $account->phone_number,
-                'delivery_address' => $account->delivery_address ?? 'N/A',
-                'cart_info' => $cartData,
-                'order_summary' => [
-                    'subtotal' => number_format($itemTotal, 2),
-                    'total_amount' => number_format($itemTotal, 2),
-                ],
-            ],
-        ], 200);
+            'data' => $cartData
+        ], 200); // 200 OK response with only cart_info
+
     } catch (Throwable $e) {
-        Log::error('Checkout Preview Error:', ['error' => $e->getMessage()]);
         return response()->json([
-            'isSuccess' => false,
-            'message' => 'An error occurred during Checkout Preview',
-            'error' => $e->getMessage(),
+            'data' => [
+                'isSuccess' => false,
+                'message' => 'An error occurred during Checkout Preview',
+                'error' => $e->getMessage(),
+            ]
         ], 500);
     }
 }
+
 
 
 
