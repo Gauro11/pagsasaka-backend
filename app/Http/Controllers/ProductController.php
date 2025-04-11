@@ -964,7 +964,7 @@ public function checkoutItem(Request $request, $id)
     
 
 
-public function getCheckoutPreview(Request $request)
+public function getCheckoutPreview(Request $request, $cart_id) // Now accepting cart_id as the parameter
 {
     $user = Auth::user();
 
@@ -978,9 +978,10 @@ public function getCheckoutPreview(Request $request)
     }
 
     try {
-        // Retrieve the cart item for the authenticated user (based on account_id)
+        // Retrieve the specific cart item based on the provided cart_id and the authenticated user (account_id)
         $cartItem = Cart::where('account_id', $user->id)
-                        ->where('status', 'CheckedOut')  // Assuming 'CheckedOut' status means it's processed
+                        ->where('id', $cart_id)  // Use cart_id passed in the request
+                        ->where('status', 'CheckedOut') // Only include checked-out items
                         ->first();
 
         if (!$cartItem) {
@@ -1011,7 +1012,7 @@ public function getCheckoutPreview(Request $request)
         // Calculate the total price for the cart item
         $itemTotal = $product->price * $quantity;
 
-        // Prepare the cart item data for the preview (no 'id' field)
+        // Prepare the cart item data for the preview
         $cartData = [
             'product_name' => $product->product_name,
             'product_id' => $product->id,
@@ -1037,6 +1038,7 @@ public function getCheckoutPreview(Request $request)
         ], 500);
     }
 }
+
 
 
 
