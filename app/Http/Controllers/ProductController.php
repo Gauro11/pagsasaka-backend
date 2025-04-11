@@ -1014,7 +1014,7 @@ public function getCheckoutPreview(Request $request, $id) // Now accepting cart_
 
         // Prepare the cart item data for the preview
         $cartData = [
-            'cart_id' => $cartItem->id, // Include the cart item ID here
+            'id' => $cartItem->id, // Include the cart item ID here
             'product_name' => $product->product_name,
             'product_id' => $product->id,
             'quantity' => $quantity,
@@ -1024,10 +1024,13 @@ public function getCheckoutPreview(Request $request, $id) // Now accepting cart_
             'product_img' => $product->product_img,
         ];
 
-        // Return only the cart info inside 'data'
+        // Return response with isSuccess true and cart_info
         return response()->json([
-            'data' => $cartData
-        ], 200); // 200 OK response with only cart_info
+         
+                'isSuccess' => true,
+                'cart_info' => $cartData
+            
+        ], 200);
 
     } catch (Throwable $e) {
         return response()->json([
@@ -1039,6 +1042,7 @@ public function getCheckoutPreview(Request $request, $id) // Now accepting cart_
         ], 500);
     }
 }
+
 
 
 
