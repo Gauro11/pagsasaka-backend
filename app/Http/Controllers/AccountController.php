@@ -218,59 +218,90 @@ class AccountController extends Controller
     }
     
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Update an existing user account.
-    public function updateAccount(Request $request, $id)
-    {
-        try {
-            $account = Account::findOrFail($id);
-            // Validation with custom error messages
-            $request->validate([
-                'first_name' => ['sometimes', 'string'],
-                'last_name' => ['sometimes', 'string'],
-                'middle_name' => ['sometimes', 'string'],
-                'email' => ['sometimes', 'string', 'email', Rule::unique('accounts')->ignore($account->id)],
-                'role' => ['sometimes', 'string'],
-                'org_log_id' => ['sometimes', 'numeric'],
-            ], [
-                'email.unique' => 'The email is already taken.',
-            ]);
+// Update an existing user account.
+public function updateAccount(Request $request, $id)
+{
+    try {
+        $account = Account::findOrFail($id);
 
-            $account->update([
-                'first_name' => $request->first_name,
-                'last_name' => $request->last_name,
-                'middle_name' => $request->middle_name,
-                'email' => $request->email,
-                'role' => $request->role,
-                'org_log_id' => $request->org_log_id,
-            ]);
+        // Validation with custom error messages
+        $request->validate([
+            'first_name' => ['sometimes', 'string', 'max:225'],
+            'last_name' => ['sometimes', 'string', 'max:225'],
+            'middle_name' => ['sometimes', 'string', 'max:225', 'nullable'],
+            'email' => ['sometimes', 'string', 'email', 'max:225', Rule::unique('accounts')->ignore($account->id)],
+            'role_id' => ['sometimes', 'numeric', 'exists:roles,id'], // Validate role_id against roles table
+            'phone_number' => ['sometimes', 'string', 'max:225', 'nullable'],
+            'security_answer' => ['sometimes', 'string', 'max:225', 'nullable'],
+            'avatar' => ['sometimes', 'string', 'max:225', 'nullable'], // Assuming avatar is a URL or path
+            'delivery_address' => ['sometimes', 'string', 'max:225', 'nullable'],
+            'password' => ['sometimes', 'string', 'min:8', 'confirmed'], // Add password validation
+        ], [
+            'email.unique' => 'The email is already taken.',
+            'role_id.exists' => 'The selected role does not exist.',
+            'password.min' => 'The password must be at least 8 characters.',
+            'password.confirmed' => 'The password confirmation does not match.',
+        ]);
 
+        // Prepare the data to update
+        $updateData = [
+            'first_name' => $request->input('first_name', $account->first_name),
+            'last_name' => $request->input('last_name', $account->last_name),
+            'middle_name' => $request->input('middle_name', $account->middle_name),
+            'email' => $request->input('email', $account->email),
+            'role_id' => $request->input('role_id', $account->role_id),
+            'phone_number' => $request->input('phone_number', $account->phone_number),
+            'security_answer' => $request->input('security_answer') ? Hash::make($request->security_answer) : $account->security_answer,
+            'avatar' => $request->input('avatar', $account->avatar),
+            'delivery_address' => $request->input('delivery_address', $account->delivery_address),
+            'password' => $request->input('password') ? Hash::make($request->password) : $account->password, // Hash the password if provided
+        ];
 
+        // Update the account
+        $account->update($updateData);
 
-            $response = [
-                'isSuccess' => true,
-                'message' => "Account successfully updated.",
-                'user' => [
-                    'id' => $account->id,
-                    'first_name' => $account->first_name,
-                    'middle_name' => $account->middle_name,
-                    'last_name' => $account->last_name,
-                    'org_log_id' => $account->org_log_id,
-                    'email' => $account->email,
-                    'role' => $account->role,
-                ],
-            ];
-            $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
-            return response()->json($response, 200);
-        } catch (ValidationException $e) {
-            $response = [
-                'isSuccess' => false,
-                'message' => "Failed to update account.",
-                'errors' => $e->errors()
-            ];
-            $this->logAPICalls('updateaccount', "", $request->all(), [$response]);
-            return response()->json($response, 500);
-        }
+        // Prepare the response
+        $response = [
+            'isSuccess' => true,
+            'message' => "Account successfully updated.",
+            'user' => [
+                'id' => $account->id,
+                'first_name' => $account->first_name,
+                'middle_name' => $account->middle_name,
+                'last_name' => $account->last_name,
+                'email' => $account->email,
+                'role_id' => $account->role_id,
+                'phone_number' => $account->phone_number,
+                'avatar' => $account->avatar,
+                'delivery_address' => $account->delivery_address,
+                'is_archived' => $account->is_archived,
+                'created_at' => $account->created_at,
+                'updated_at' => $account->updated_at,
+            ],
+        ];
+
+        $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
+        return response()->json($response, 200);
+    } catch (ValidationException $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => "Failed to update account due to validation errors.",
+            'errors' => $e->errors(),
+        ];
+        $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
+        return response()->json($response, 422);
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => "Failed to update account due to an unexpected error.",
+            'error' => $e->getMessage(),
+        ];
+        $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
+        return response()->json($response, 500);
     }
+}
+
+
 
     public function deactivateAccount($id)
     {
