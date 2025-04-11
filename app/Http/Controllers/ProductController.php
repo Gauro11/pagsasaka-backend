@@ -1014,6 +1014,7 @@ public function getCheckoutPreview(Request $request, $id) // Now accepting cart_
 
         // Prepare the cart item data for the preview
         $cartData = [
+            'cart_id' => $cartItem->id, // Include the cart item ID here
             'product_name' => $product->product_name,
             'product_id' => $product->id,
             'quantity' => $quantity,
