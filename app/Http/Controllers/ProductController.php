@@ -964,7 +964,7 @@ public function checkoutItem(Request $request, $id)
     
 
 
-public function getCheckoutPreview(Request $request, $id)
+public function getCheckoutPreview(Request $request)
 {
     $user = Auth::user();
 
@@ -980,7 +980,7 @@ public function getCheckoutPreview(Request $request, $id)
     try {
         // Retrieve the specific cart item based on the provided account_id and cart item id
         $cartItem = Cart::where('account_id', $user->id)
-                        ->where('id', $id)  // $id refers to the cart item id
+                        ->where('id', )  // $id refers to the cart item id
                         ->where('status', 'CheckedOut')  // Assuming 'CheckedOut' status means it's processed
                         ->first();
 
