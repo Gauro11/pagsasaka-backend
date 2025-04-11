@@ -964,10 +964,11 @@ public function checkoutItem(Request $request, $id)
     
 
 
-public function getCheckoutPreview(Request $request, $id) // Now accepting cart_id as the parameter
+public function getCheckoutPreview(Request $request, $id = null)
 {
     $user = Auth::user();
 
+    // Check if user is authenticated
     if (!$user) {
         return response()->json([
             'data' => [
@@ -978,10 +979,20 @@ public function getCheckoutPreview(Request $request, $id) // Now accepting cart_
     }
 
     try {
-        // Retrieve the specific cart item based on the provided cart_id and the authenticated user (account_id)
+        // Validate the $id parameter
+        if (!$id || !is_numeric($id)) {
+            return response()->json([
+                'data' => [
+                    'isSuccess' => false,
+                    'message' => 'Invalid or missing cart ID.',
+                ]
+            ], 400);
+        }
+
+        // Retrieve the specific cart item
         $cartItem = Cart::where('account_id', $user->id)
-                        ->where('id', $id)  // Use cart_id passed in the request
-                        ->where('status', 'CheckedOut') // Only include checked-out items
+                        ->where('id', $id)
+                        ->where('status', 'CheckedOut')
                         ->first();
 
         if (!$cartItem) {
@@ -993,7 +1004,7 @@ public function getCheckoutPreview(Request $request, $id) // Now accepting cart_
             ], 404);
         }
 
-        // Retrieve the product associated with the cart item
+        // Retrieve the product
         $product = Product::find($cartItem->product_id);
 
         if (!$product) {
@@ -1005,16 +1016,13 @@ public function getCheckoutPreview(Request $request, $id) // Now accepting cart_
             ], 404);
         }
 
-        // Retrieve quantity and ensure it doesn't exceed stock
-        $quantity = $cartItem->quantity;
-        $quantity = max(1, min($quantity, $product->stocks));
-
-        // Calculate the total price for the cart item
+        // Calculate quantity and total
+        $quantity = max(1, min($cartItem->quantity, $product->stocks));
         $itemTotal = $product->price * $quantity;
 
-        // Prepare the cart item data for the preview
+        // Prepare cart data
         $cartData = [
-            'id' => $cartItem->id, // Include the cart item ID here
+            'id' => $cartItem->id,
             'product_name' => $product->product_name,
             'product_id' => $product->id,
             'quantity' => $quantity,
@@ -1024,20 +1032,26 @@ public function getCheckoutPreview(Request $request, $id) // Now accepting cart_
             'product_img' => $product->product_img,
         ];
 
-        // Return response with isSuccess true and cart_info
+        // Return standardized success response
         return response()->json([
-         
+            'data' => [
                 'isSuccess' => true,
                 'cart_info' => $cartData
-            
+            ]
         ], 200);
 
     } catch (Throwable $e) {
+        // Log the error for debugging
+        \Log::error('Checkout Preview Error: ' . $e->getMessage(), [
+            'user_id' => $user->id ?? null,
+            'cart_id' => $id,
+        ]);
+
         return response()->json([
             'data' => [
                 'isSuccess' => false,
-                'message' => 'An error occurred during Checkout Preview',
-                'error' => $e->getMessage(),
+                'message' => 'An error occurred during checkout preview.',
+                'error' => $e->getMessage(), // Remove in production if sensitive
             ]
         ], 500);
     }
