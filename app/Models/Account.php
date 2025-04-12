@@ -34,4 +34,10 @@ class Account extends Authenticatable
     {
         return $this->hasMany(Rating::class);
     }
+
+    public function addresses()
+    {
+        return $this->hasMany(Address::class, 'account_id');
+    }
+    
 }

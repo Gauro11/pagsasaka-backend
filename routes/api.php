@@ -37,7 +37,7 @@ use App\Http\Controllers\ChatSessionController;
 use App\Http\Controllers\MessagesController;
 
 use App\Http\Controllers\RatingController;
-
+use App\Http\Controllers\AddressController;
 
 //connection//
 Route::options('/{any}', function (Request $request) {
@@ -226,6 +226,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products/{product}/ratings', [RatingController::class, 'index'])->name('ratings.index');
 });
 
+
+
+
+Route::prefix('addresses')->group(function () {
+    Route::get('/getaddress/{accountId}', [AddressController::class, 'index']);
+    Route::post('/addaddress/{accountId}', [AddressController::class, 'store']);
+    Route::put('/updateaddress/{accountId}/{addressId}', [AddressController::class, 'update']);
+    Route::delete('/delete/address/{accountId}/{addressId}', [AddressController::class, 'destroy']);
+});
 
 // other routes...
 /*
