@@ -224,26 +224,23 @@ public function updateAccount(Request $request, $id)
     try {
         $account = Account::findOrFail($id);
 
-        // Validation with custom error messages
+        // Validation with custom error messages (password removed)
         $request->validate([
             'first_name' => ['sometimes', 'string', 'max:225'],
             'last_name' => ['sometimes', 'string', 'max:225'],
             'middle_name' => ['sometimes', 'string', 'max:225', 'nullable'],
             'email' => ['sometimes', 'string', 'email', 'max:225', Rule::unique('accounts')->ignore($account->id)],
-            'role_id' => ['sometimes', 'numeric', 'exists:roles,id'], // Validate role_id against roles table
+            'role_id' => ['sometimes', 'numeric', 'exists:roles,id'],
             'phone_number' => ['sometimes', 'string', 'max:225', 'nullable'],
             'security_answer' => ['sometimes', 'string', 'max:225', 'nullable'],
-            'avatar' => ['sometimes', 'string', 'max:225', 'nullable'], // Assuming avatar is a URL or path
+            'avatar' => ['sometimes', 'string', 'max:225', 'nullable'],
             'delivery_address' => ['sometimes', 'string', 'max:225', 'nullable'],
-            'password' => ['sometimes', 'string', 'min:8', 'confirmed'], // Add password validation
         ], [
             'email.unique' => 'The email is already taken.',
             'role_id.exists' => 'The selected role does not exist.',
-            'password.min' => 'The password must be at least 8 characters.',
-            'password.confirmed' => 'The password confirmation does not match.',
         ]);
 
-        // Prepare the data to update
+        // Prepare the data to update (password removed)
         $updateData = [
             'first_name' => $request->input('first_name', $account->first_name),
             'last_name' => $request->input('last_name', $account->last_name),
@@ -254,7 +251,6 @@ public function updateAccount(Request $request, $id)
             'security_answer' => $request->input('security_answer') ? Hash::make($request->security_answer) : $account->security_answer,
             'avatar' => $request->input('avatar', $account->avatar),
             'delivery_address' => $request->input('delivery_address', $account->delivery_address),
-            'password' => $request->input('password') ? Hash::make($request->password) : $account->password, // Hash the password if provided
         ];
 
         // Update the account
@@ -300,6 +296,61 @@ public function updateAccount(Request $request, $id)
         return response()->json($response, 500);
     }
 }
+
+//change passwrod
+
+public function updatePassword(Request $request, $id)
+{
+    try {
+        $account = Account::findOrFail($id);
+
+        // Validation for password
+        $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'password.required' => 'The password field is required.',
+            'password.string' => 'The password must be a string.',
+            'password.min' => 'The password must be at least 8 characters.',
+            'password.confirmed' => 'The password confirmation does not match.',
+        ]);
+
+        // Update the password
+        $account->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        // Prepare the response
+        $response = [
+            'isSuccess' => true,
+            'message' => "Password successfully updated.",
+            'user' => [
+                'id' => $account->id,
+                'email' => $account->email,
+                'updated_at' => $account->updated_at,
+            ],
+        ];
+
+        $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
+        return response()->json($response, 200);
+    } catch (ValidationException $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => "Failed to update password due to validation errors.",
+            'errors' => $e->errors(),
+        ];
+        $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
+        return response()->json($response, 422);
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => "Failed to update password due to an unexpected error.",
+            'error' => $e->getMessage(),
+        ];
+        $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
+        return response()->json($response, 500);
+    }
+}
+
 
 
 

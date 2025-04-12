@@ -128,6 +128,7 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('account/add', 'register');
     Route::post('account/update/{id}', 'updateAccount');
     Route::post('account/deactivate/{id}', 'deactivateAccount');
+    Route::post('account/update-password/{id}', 'updatePassword');
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
