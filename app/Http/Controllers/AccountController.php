@@ -351,9 +351,6 @@ public function updatePassword(Request $request, $id)
     }
 }
 
-
-
-
     public function deactivateAccount($id)
     {
         try {
@@ -398,7 +395,6 @@ public function updatePassword(Request $request, $id)
         }
     }
     
-
     public function resetPasswordToDefault(Request $request)
     {
         try {
@@ -518,7 +514,6 @@ public function updatePassword(Request $request, $id)
             return response()->json($response, 500);
         }
     }
-
 
     public function getOrganizationLogs()
     {

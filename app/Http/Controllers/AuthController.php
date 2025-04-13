@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
+    
     public function login(Request $request)
 {
     try {
@@ -34,18 +35,16 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        // Check if the user exists in the accounts table
         $user = Account::where('email', $request->email)
-            ->with('role') // Eager load the role relationship
+            ->with('role')
             ->first();
 
-        // If not found in accounts, check in riders
         $isRider = false;
+
         if (!$user) {
             $user = Rider::where('email', $request->email)->first();
-            $isRider = true; // Flag to indicate rider login
+            $isRider = true;
 
-            // Prevent login if rider status is "Pending" or "Invalid"
             if ($user && in_array($user->status, ['Pending', 'Invalid'])) {
                 return response()->json([
                     'isSuccess' => false,
@@ -54,37 +53,33 @@ class AuthController extends Controller
             }
         }
 
-        // If user exists and password matches
         if ($user && Hash::check($request->password, $user->password)) {
             $token = $user->createToken('auth-token')->plainTextToken;
-
-            // Generate session code by calling insertSession
             $sessionCode = $this->insertSession($user->id);
+
             if (!$sessionCode) {
                 return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
             }
 
-            // Prepare response
+            // Hide password before response
+            $user->makeHidden(['password','security_id','security_answer','is_archived','created_at','updated_at','role']);
+
             $response = [
                 'isSuccess' => true,
                 'message' => 'Logged in successfully',
                 'token' => $token,
                 'session_code' => $sessionCode,
-                'user' => [
-                    'id' => $user->id,
-                    'first_name' => $user->first_name,
-                    'middle_name' => $user->middle_name ?? null,
-                    'last_name' => $user->last_name,
-                    'email' => $user->email,
-                ],
+                'user' => $user,
                 'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
                 'role_id' => $isRider ? 4 : ($user->role_id ?? null)
             ];
 
+            // Log API call without password
+            $this->logAPICalls('login', $request->email, $request->except('password','security_id','security_answer'), $response);
+
             return response()->json($response, 200);
         }
 
-        // Invalid credentials
         return response()->json([
             'isSuccess' => false,
             'message' => 'Invalid credentials.',
@@ -99,9 +94,6 @@ class AuthController extends Controller
     }
 }
 
-    
-    
-    
     // logout
     public function logout(Request $request)
     {
