@@ -1157,12 +1157,11 @@ class ProductController extends Controller
         }
     
         try {
-            // Fetch only cart items with status "CheckedOut"
-            $cartStatuses = Cart::where('account_id', $user->id)
+            $cartItems = Cart::where('account_id', $user->id)
                 ->where('status', 'CheckedOut')
                 ->get();
     
-            if ($cartStatuses->isEmpty()) {
+            if ($cartItems->isEmpty()) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'No checked out items found.',
@@ -1170,11 +1169,39 @@ class ProductController extends Controller
                 ], 404);
             }
     
+            $cartStatuses = [];
+    
+            // Combine user full name
+            $fullName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
+    
+            foreach ($cartItems as $cartItem) {
+                $product = Product::find($cartItem->product_id);
+    
+                if (!$product) {
+                    continue; // Skip if product was deleted
+                }
+    
+                $cartStatuses[] = [
+                    'id' => $cartItem->id,
+                    'product_name' => $product->product_name,
+                    'product_id' => $product->id,
+                    'quantity' => $cartItem->quantity,
+                    'unit' => $product->unit ?? 'unit',
+                    'price' => number_format($cartItem->price, 2),
+                    'item_total' => number_format($cartItem->item_total, 2),
+                    'product_img' => $product->product_img,
+                    'product_description' => $product->description ?? 'No description available',
+                    'shipping_address' => $user->delivery_address ?? 'N/A',
+                    'user_name' => $fullName,
+                ];
+            }
+    
             return response()->json([
                 'isSuccess' => true,
-                'message' => 'Checked out cart statuses retrieved successfully.',
+                'message' => 'Checked out cart items retrieved successfully.',
                 'cart_statuses' => $cartStatuses,
             ], 200);
+    
         } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
@@ -1182,7 +1209,7 @@ class ProductController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
-    }
+    }    
 
     //     public function checkout(Request $request)
     // {
