@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
-
+    
     public function login(Request $request)
     {
         try {
@@ -84,7 +84,7 @@ class AuthController extends Controller
                 'isSuccess' => false,
                 'message' => 'Invalid credentials.',
             ], 401);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Login failed.',
@@ -93,6 +93,9 @@ class AuthController extends Controller
         }
     }
 
+    
+    
+    
     // logout
     public function logout(Request $request)
     {
@@ -175,7 +178,7 @@ class AuthController extends Controller
             // Update profile fields
             $user->update($request->only(['first_name', 'last_name', 'middle_name', 'email']));
 
-
+          
 
             $response = [
                 'isSuccess' => true,
@@ -187,7 +190,7 @@ class AuthController extends Controller
                     'middle_name' => $user->middle_name,
                     'email' => $user->email,
                     'org_log_id' => $user->org_log_id,
-
+                    
                 ]
             ];
             $this->logAPICalls('profileUpdate', $user->id, $request->all(), $response);
