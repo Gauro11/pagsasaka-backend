@@ -1192,7 +1192,8 @@ class ProductController extends Controller
                     'product_img' => $product->product_img,
                     'product_description' => $product->description ?? 'No description available',
                     'shipping_address' => $user->delivery_address ?? 'N/A',
-                    'user_name' => $fullName,
+                    'name' => $fullName,
+                    'phone_number' => $user->phone_number,
                 ];
             }
     
