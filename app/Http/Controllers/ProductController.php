@@ -35,45 +35,45 @@ class ProductController extends Controller
                 'product_img.*' => 'max:2048',
                 'visibility' => 'required|in:Published,Scheduled',
             ]);
-    
+
             // Ensure the user is authenticated
             if (!auth()->check()) {
                 $response = [
                     'isSuccess' => false,
                     'message' => 'Unauthorized. Please log in to add a product.',
                 ];
-    
+
                 // Log the API call
                 $this->logAPICalls('addProduct', null, $request->all(), $response);
-    
+
                 return response()->json($response, 401);
             }
-    
+
             // Get the authenticated user's account ID
             $accountId = auth()->id();
-    
+
             // Handle image uploads
             $imagePaths = [];
             if ($request->hasFile('product_img')) {
                 foreach ($request->file('product_img') as $image) {
                     $directory = public_path('img/products');
                     $fileName = 'Product-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
-    
+
                     if (!file_exists($directory)) {
                         mkdir($directory, 0755, true);
                     }
-    
+
                     $image->move($directory, $fileName);
                     $imagePaths[] = asset('img/products/' . $fileName);
                 }
             }
-    
+
             // Save product
             $validated['product_img'] = $imagePaths; // Save as array
             $validated['account_id'] = $accountId;
-    
+
             $product = Product::create($validated);
-    
+
             $response = [
                 'isSuccess' => true,
                 'message' => 'Product successfully created.',
@@ -89,10 +89,10 @@ class ProductController extends Controller
                     'visibility' => $product->visibility,
                 ],
             ];
-    
+
             // Log the API call
             $this->logAPICalls('addProduct', $product->id, $request->all(), $response);
-    
+
             return response()->json($response, 200);
         } catch (Throwable $e) {
             $response = [
@@ -100,14 +100,14 @@ class ProductController extends Controller
                 'message' => 'Failed to create the product.',
                 'error' => $e->getMessage(),
             ];
-    
+
             // Log the API call
             $this->logAPICalls('addProduct', null, $request->all(), $response);
-    
+
             return response()->json($response, 500);
         }
     }
-    
+
 
     public function editProduct(Request $request, $id)
     {
@@ -365,7 +365,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
-    
+
     public function getProductsByAccountId(Request $request)
     {
         try {
@@ -565,40 +565,40 @@ class ProductController extends Controller
     public function addToCart(Request $request, $id)
     {
         $user = Auth::user();
-    
+
         if (!$user) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
             ], 401);
         }
-    
+
         try {
             $validated = $request->validate([
                 'quantity' => 'required|integer|min:1',
             ]);
-    
+
             $product = Product::find($id);
-    
+
             if (!$product) {
                 return response()->json(['isSuccess' => false, 'message' => 'Product not found'], 404);
             }
-    
+
             $cart = Cart::where('account_id', $user->id)
                 ->where('product_id', $product->id)
                 ->first();
-    
+
             if ($cart) {
                 // Update quantity and recalculate total
                 $newQuantity = $cart->quantity + $validated['quantity'];
-    
+
                 if ($newQuantity > $product->stocks) {
                     return response()->json([
                         'isSuccess' => false,
                         'message' => 'Updated quantity exceeds available stock.',
                     ], 400);
                 }
-    
+
                 $cart->quantity = $newQuantity;
                 $cart->item_total = $newQuantity * $product->price;
                 $cart->save();
@@ -612,7 +612,7 @@ class ProductController extends Controller
                     'item_total' => $validated['quantity'] * $product->price, // Store total without formatting
                 ]);
             }
-    
+
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Product updated in cart successfully',
@@ -635,29 +635,29 @@ class ProductController extends Controller
             ], 500);
         }
     }
-    
+
     public function getCartList()
     {
         $user = Auth::user();
-    
+
         if (!$user) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
             ], 401);
         }
-    
+
         try {
             $cartItems = Cart::where('account_id', $user->id)->get();
-    
+
             $totalAmount = 0;
             $cartData = [];
-    
+
             foreach ($cartItems as $item) {
                 $product = Product::find($item->product_id);
                 if ($product) {
                     $totalAmount += $item->item_total;
-    
+
                     $cartData[] = [
                         'id' => $item->id,
                         'product_name' => $product->product_name,
@@ -670,7 +670,7 @@ class ProductController extends Controller
                     ];
                 }
             }
-    
+
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Cart items retrieved successfully.',
@@ -725,19 +725,17 @@ class ProductController extends Controller
         }
     }
 
-    
-
     // public function buyNow(Request $request, $id)
     // {
     //     $user = Auth::user();
-    
+
     //     if (!$user) {
     //         return response()->json([
     //             'isSuccess' => false,
     //             'message' => 'User not authenticated.',
     //         ], 401);
     //     }
-    
+
     //     try {
     //         $product = Product::find($id);
     //         if (!$product) {
@@ -746,17 +744,17 @@ class ProductController extends Controller
     //                 'message' => 'Product not found.',
     //             ], 404);
     //         }
-    
+
     //         // Get quantity from cache or default to 1
     //         $cacheKey = 'purchase_' . $user->id . '_' . $product->id;
     //         $quantity = Cache::get($cacheKey, 1);
-    
+
     //         // Clamp quantity between 1 and product stock
     //         $quantity = max(1, min($quantity, $product->stocks));
-    
+
     //         // Calculate item total
     //         $itemTotal = $product->price * $quantity;
-    
+
     //         // Update or create cart item
     //         $cartItem = Cart::updateOrCreate(
     //             [
@@ -770,7 +768,7 @@ class ProductController extends Controller
     //                 'unit' => $product->unit,
     //             ]
     //         );
-    
+
     //         return response()->json([
     //             'isSuccess' => true,
     //             'message' => 'Product added to cart.',
@@ -799,11 +797,10 @@ class ProductController extends Controller
     //     }
     // }
 
-
     public function buyNow(Request $request, $id)
     {
         $user = Auth::user();
-    
+
         if (!$user) {
             Log::warning('BuyNow attempted without authentication', [
                 'ip' => $request->ip(),
@@ -815,14 +812,14 @@ class ProductController extends Controller
                 'message' => 'User not authenticated',
             ], 401);
         }
-    
+
         try {
             $validated = $request->validate([
                 'quantity' => 'required|integer|min:1',
             ]);
-    
+
             $product = Product::find($id);
-    
+
             if (!$product) {
                 Log::notice('Product not found in BuyNow', [
                     'product_id' => $id,
@@ -834,17 +831,14 @@ class ProductController extends Controller
                     'message' => 'Product not found',
                 ], 404);
             }
-    
-            // Check if product already exists in user's cart
+
             $cartItem = Cart::where('account_id', $user->id)
-                            ->where('product_id', $product->id)
-                            ->first();
-    
+                ->where('product_id', $product->id)
+                ->first();
+
             if ($cartItem) {
-                // Calculate new total quantity
                 $newQuantity = $cartItem->quantity + $validated['quantity'];
-    
-                // Check if new quantity exceeds available stock
+
                 if ($newQuantity > $product->stocks) {
                     Log::warning('Quantity exceeds stock in BuyNow', [
                         'user_id' => $user->id,
@@ -858,14 +852,12 @@ class ProductController extends Controller
                         'message' => 'Total quantity exceeds available stock.',
                     ], 400);
                 }
-    
-                // Update existing cart item
+
                 $cartItem->quantity = $newQuantity;
                 $cartItem->item_total = $newQuantity * $product->price;
                 $cartItem->status = 'InCart';
                 $cartItem->save();
             } else {
-                // Create new cart item with status 'InCart'
                 $cartItem = Cart::create([
                     'account_id' => $user->id,
                     'product_id' => $product->id,
@@ -876,23 +868,21 @@ class ProductController extends Controller
                     'status' => 'InCart',
                 ]);
             }
-    
-            // Deduct purchased quantity from product stock
+
             $product->decrement('stocks', $validated['quantity']);
     
             // Log successful BuyNow
-            Log::info('Product added to cart via BuyNow', [
+            \Log::info('Product added to cart via BuyNow', [
                 'user_id' => $user->id,
                 'cart_id' => $cartItem->id,
                 'product_id' => $product->id,
                 'quantity' => $validated['quantity'],
                 'endpoint' => $request->fullUrl(),
             ]);
-    
+
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Product added to cart successfully.',
-                'cart_id' => $cartItem->id,
                 'order_summary' => [
                     'product_id' => $product->id,
                     'product_name' => $product->product_name,
@@ -901,14 +891,12 @@ class ProductController extends Controller
                     'price' => number_format($product->price, 2),
                     'item_total' => number_format($cartItem->item_total, 2),
                     'product_img' => $product->product_img,
-                ],
-                'buyer' => [
                     'name' => $user->first_name . ' ' . $user->last_name,
                     'phone_number' => $user->phone_number,
                     'address' => $user->delivery_address ?? 'N/A',
+                    'cart_id' => $cartItem->id
                 ]
             ], 200);
-    
         } catch (Throwable $e) {
             Log::error('Error in BuyNow', [
                 'user_id' => $user->id ?? null,
@@ -920,19 +908,17 @@ class ProductController extends Controller
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'An error occurred during Buy Now',
+                'order_summary' => [],
                 'error' => app()->environment('production') ? null : $e->getMessage(),
             ], 500);
         }
     }
 
-    
-
-    
     public function checkoutItem(Request $request, $id)
     {
         $account = Auth::user();
         $accountId = $account->account_id ?? $account->id;
-    
+
         if (!$account) {
             Log::warning('CheckoutItem attempted without authentication', [
                 'ip' => $request->ip(),
@@ -944,7 +930,7 @@ class ProductController extends Controller
                 'message' => 'User not authenticated.',
             ], 401);
         }
-    
+
         try {
             // Validate cart_id
             if (!is_numeric($id) || $id <= 0) {
@@ -959,12 +945,12 @@ class ProductController extends Controller
                     'message' => 'Invalid or missing cart ID. Expected a valid numeric cart ID.',
                 ], 400);
             }
-    
+
             $cartItem = Cart::where('id', $id)
-                            ->where('account_id', $accountId)
-                            ->where('status', 'InCart')
-                            ->first();
-    
+                ->where('account_id', $accountId)
+                ->where('status', 'InCart')
+                ->first();
+
             if (!$cartItem) {
                 Log::notice('Cart item not found or already checked out in CheckoutItem', [
                     'user_id' => $accountId,
@@ -976,7 +962,7 @@ class ProductController extends Controller
                     'message' => 'Cart item not found or already checked out.',
                 ], 404);
             }
-    
+
             $product = Product::find($cartItem->product_id);
             if (!$product) {
                 Log::error('Product not found in CheckoutItem', [
@@ -990,19 +976,19 @@ class ProductController extends Controller
                     'message' => 'Product not found.',
                 ], 404);
             }
-    
+
             $cartItem->status = 'CheckedOut';
             $cartItem->save();
     
-            Log::info('Cart item checked out successfully', [
+            \Log::info('Cart item checked out successfully', [
                 'user_id' => $accountId,
                 'cart_id' => $id,
                 'product_id' => $product->id,
                 'endpoint' => $request->fullUrl(),
             ]);
-    
+
             $totalPrice = $cartItem->price * $cartItem->quantity;
-    
+
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Item checked out successfully.',
@@ -1018,7 +1004,6 @@ class ProductController extends Controller
                     'shipping_address' => $account->delivery_address ?? 'N/A',
                 ],
             ], 200);
-    
         } catch (Throwable $e) {
             Log::error('CheckoutItem error', [
                 'user_id' => $accountId ?? null,
@@ -1047,7 +1032,7 @@ class ProductController extends Controller
     $user = Auth::user();
 
     if (!$user) {
-        Log::warning('Checkout preview attempted without authentication', [
+        \Log::warning('Checkout preview attempted without authentication', [
             'ip' => $request->ip(),
             'cart_id' => $id,
             'endpoint' => $request->fullUrl(),
@@ -1062,7 +1047,7 @@ class ProductController extends Controller
 
     try {
         if (!is_numeric($id) || $id <= 0) {
-            Log::warning('Invalid or missing cart_id in checkout preview', [
+            \Log::warning('Invalid or missing cart_id in checkout preview', [
                 'user_id' => $user->id,
                 'cart_id' => $id,
                 'ip' => $request->ip(),
@@ -1076,7 +1061,7 @@ class ProductController extends Controller
             ], 400);
         }
 
-        Log::info('Fetching checkout preview', [
+        \Log::info('Fetching checkout preview', [
             'user_id' => $user->id,
             'cart_id' => $id,
             'endpoint' => $request->fullUrl(),
@@ -1088,23 +1073,21 @@ class ProductController extends Controller
                         ->first();
 
         if (!$cartItem) {
-            Log::notice('Cart item not found for checkout preview', [
+            \Log::notice('Cart item not found for checkout preview', [
                 'user_id' => $user->id,
                 'cart_id' => $id,
                 'endpoint' => $request->fullUrl(),
             ]);
             return response()->json([
-                'data' => [
-                    'isSuccess' => false,
-                    'message' => 'Cart item not found or not checked out. Ensure the cart ID is valid and the item is checked out.',
-                ]
+                'isSuccess' => false,
+                'message' => 'No valid cart items found for this user.',
             ], 404);
         }
 
         $product = Product::find($cartItem->product_id);
 
         if (!$product) {
-            Log::error('Product not found for cart item in checkout preview', [
+            \Log::error('Product not found for cart item in checkout preview', [
                 'user_id' => $user->id,
                 'cart_id' => $id,
                 'product_id' => $cartItem->product_id,
@@ -1132,21 +1115,19 @@ class ProductController extends Controller
             'product_img' => $product->product_img,
         ];
 
-        Log::info('Checkout preview fetched successfully', [
+        \Log::info('Checkout preview fetched successfully', [
             'user_id' => $user->id,
             'cart_id' => $id,
             'endpoint' => $request->fullUrl(),
         ]);
 
         return response()->json([
-            'data' => [
-                'isSuccess' => true,
-                'cart_info' => $cartData,
-            ]
+            'isSuccess' => true,
+            'cart_info' => $cartData,
         ], 200);
 
     } catch (Throwable $e) {
-        Log::error('Unexpected error in checkout preview', [
+        \Log::error('Unexpected error in checkout preview', [
             'user_id' => $user->id ?? null,
             'cart_id' => $id,
             'error' => $e->getMessage(),
@@ -1180,95 +1161,71 @@ public function getCartItemDetails(Request $request, $id)
 {
     $user = Auth::user();
 
-    if (!$user) {
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'User not authenticated',
-        ], 401);
-    }
-
-    try {
-        // Check the user's ID and the cart item ID
-        Log::info('User ID: ' . $user->id);
-        Log::info('Requested Cart Item ID: ' . $id);
-
-        // Retrieve the specific cart item using the passed $id
-        $cartItem = Cart::where('account_id', $user->id)
-                        ->where('id', $id)
-                        ->first();
-
-        // Log if no cart item is found
-        if (!$cartItem) {
-            Log::warning('Cart item not found for User ID: ' . $user->id . ' with Cart ID: ' . $id);
+        if (!$user) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Cart item not found',
-            ], 404);
+                'message' => 'User not authenticated',
+            ], 401);
         }
 
-        // Retrieve the product details associated with the cart item
-        $product = Product::find($cartItem->product_id);
-        if (!$product) {
+        try {
+            // Check the user's ID and the cart item ID
+            Log::info('User ID: ' . $user->id);
+            Log::info('Requested Cart Item ID: ' . $id);
+
+            // Retrieve the specific cart item using the passed $id
+            $cartItem = Cart::where('account_id', $user->id)
+                ->where('id', $id)
+                ->first();
+
+            // Log if no cart item is found
+            if (!$cartItem) {
+                Log::warning('Cart item not found for User ID: ' . $user->id . ' with Cart ID: ' . $id);
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Cart item not found',
+                ], 404);
+            }
+
+            // Retrieve the product details associated with the cart item
+            $product = Product::find($cartItem->product_id);
+            if (!$product) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Product not found',
+                ], 404);
+            }
+
+            // Prepare the detailed cart item data
+            $cartItemDetails = [
+                'id' => $cartItem->id,
+                'product_name' => $product->product_name,
+                'product_id' => $product->id,
+                'quantity' => $cartItem->quantity,
+                'unit' => $product->unit ?? 'unit',
+                'price' => number_format($cartItem->price, 2),  // Format price
+                'item_total' => number_format($cartItem->item_total, 2),  // Format item total
+                'product_img' => $product->product_img,
+                'product_description' => $product->description ?? 'No description available',
+                'available_stock' => $product->stocks,
+                'category' => $product->category->name ?? 'N/A',  // Assuming category relation exists
+                'shipping_address' => $user->delivery_address ?? 'N/A',
+                'order_notes' => $cartItem->notes ?? 'No notes available',  // Add any notes if needed
+            ];
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Cart item details retrieved successfully.',
+                'cart_item_details' => $cartItemDetails,
+            ], 200);
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Product not found',
-            ], 404);
+                'message' => 'An error occurred while retrieving the cart item details.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        // Prepare the detailed cart item data
-        $cartItemDetails = [
-            'id' => $cartItem->id,
-            'product_name' => $product->product_name,
-            'product_id' => $product->id,
-            'quantity' => $cartItem->quantity,
-            'unit' => $product->unit ?? 'unit',
-            'price' => number_format($cartItem->price, 2),  // Format price
-            'item_total' => number_format($cartItem->item_total, 2),  // Format item total
-            'product_img' => $product->product_img,
-            'product_description' => $product->description ?? 'No description available',
-            'available_stock' => $product->stocks,
-            'category' => $product->category->name ?? 'N/A',  // Assuming category relation exists
-            'shipping_address' => $user->delivery_address ?? 'N/A',
-            'order_notes' => $cartItem->notes ?? 'No notes available',  // Add any notes if needed
-        ];
-
-        return response()->json([
-            'isSuccess' => true,
-            'message' => 'Cart item details retrieved successfully.',
-            'cart_item_details' => $cartItemDetails,
-        ], 200);
-    } catch (Throwable $e) {
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'An error occurred while retrieving the cart item details.',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
-
-
-
-    
-
-
-    
-    
-
-    
-    
-
-
-
-
-
-    
-
-    
-
-
-
-    
-
 
     //     public function checkout(Request $request)
     // {

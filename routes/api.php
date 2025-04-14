@@ -153,7 +153,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('cart-list', [ProductController::class, 'getCartList']);                                                                
     Route::post('cart-remove/{id}', [ProductController::class, 'deleteFromCart']);
     Route::post('buynow/{id}', [ProductController::class, 'buyNow']);
-    Route::get('checkout/{id}', [ProductController::class, 'getCheckoutPreview']);
+    Route::post('checkout-preview', [ProductController::class, 'getCheckoutPreview']);
     Route::get('cart-item-details/{id}', [ProductController::class, 'getCartItemDetails']);
     Route::post('checkout/item/{id}', [ProductController::class, 'checkoutItem']);
 });
@@ -168,22 +168,10 @@ Route::prefix('dropdown')->group(function () {
     Route::get('category', [CategoryController::class, 'dropdownCategory']);
 });
 
-
-
-
-
-
-
 // Redirect old route to new route
 Route::middleware('auth:sanctum')->post('checkout-preview', function () {
     return redirect()->route('checkout');
 });
-
-
-
-
-
-
 
 // In routes/api.php payment
 Route::post('pay/{account_id}/{product_id}', [PaymentController::class, 'payment']);
@@ -205,8 +193,6 @@ Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebho
 
 Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
 
-
-
 Route::middleware('auth:sanctum')->group(function () {
     // Chat Sessions
     Route::get('/chat-sessions-lists', [ChatSessionController::class, 'index']); // fetch chatlist
@@ -227,13 +213,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products/{product}/ratings', [RatingController::class, 'index'])->name('ratings.index');
 });
 
-
-
-
-Route::prefix('addresses')->group(function () {
-    Route::get('/getaddress/{accountId}', [AddressController::class, 'index']);
-    Route::post('/addaddress/{accountId}', [AddressController::class, 'store']);
-    Route::put('/updateaddress/{accountId}/{addressId}', [AddressController::class, 'update']);
+Route::prefix('address')->group(function () {
+    Route::get('/get/{id}', [AddressController::class, 'index']);
+    Route::post('/add/{id}', [AddressController::class, 'store']);
+    Route::put('/update/{accountId}/{addressId}', [AddressController::class, 'update']);
     Route::delete('/delete/address/{accountId}/{addressId}', [AddressController::class, 'destroy']);
 });
 
