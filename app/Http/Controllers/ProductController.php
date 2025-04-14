@@ -1030,8 +1030,8 @@ class ProductController extends Controller
         }
 
         $request->validate([
-            'cart_ids' => 'required|array|min:1',
-            'cart_ids.*' => 'integer',
+            'cart_id' => 'required|array|min:1',
+            'cart_id.*' => 'integer',
         ]);
 
         $cartIds = $request->cart_ids;
