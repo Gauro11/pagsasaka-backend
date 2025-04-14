@@ -214,10 +214,10 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::prefix('address')->group(function () {
-    Route::get('/get/{id}', [AddressController::class, 'index']);
-    Route::post('/add/{id}', [AddressController::class, 'store']);
-    Route::put('/update/{accountId}/{addressId}', [AddressController::class, 'update']);
-    Route::delete('/delete/address/{accountId}/{addressId}', [AddressController::class, 'destroy']);
+    Route::get('get/{id}', [AddressController::class, 'index']);
+    Route::post('add/{id}', [AddressController::class, 'store']);
+    Route::put('update/{accountId}/{addressId}', [AddressController::class, 'update']);
+    Route::delete('delete/address/{accountId}/{addressId}', [AddressController::class, 'destroy']);
 });
 
 // other routes...

@@ -26,83 +26,73 @@ use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
-    
+
     public function login(Request $request)
-{
-    try {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+    {
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
 
-        // Check if the user exists in the accounts table
-        $user = Account::where('email', $request->email)
-            ->with('role') // Eager load the role relationship
-            ->first();
+            $user = Account::where('email', $request->email)
+                ->with('role')
+                ->first();
 
-        // If not found in accounts, check in riders
-        $isRider = false;
-        if (!$user) {
-            $user = Rider::where('email', $request->email)->first();
-            $isRider = true; // Flag to indicate rider login
+            $isRider = false;
 
-            // Prevent login if rider status is "Pending" or "Invalid"
-            if ($user && in_array($user->status, ['Pending', 'Invalid'])) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Your rider account is not allowed to log in. Current status: ' . $user->status,
-                ], 403);
-            }
-        }
+            if (!$user) {
+                $user = Rider::where('email', $request->email)->first();
+                $isRider = true;
 
-        // If user exists and password matches
-        if ($user && Hash::check($request->password, $user->password)) {
-            $token = $user->createToken('auth-token')->plainTextToken;
-
-            // Generate session code by calling insertSession
-            $sessionCode = $this->insertSession($user->id);
-            if (!$sessionCode) {
-                return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
+                if ($user && in_array($user->status, ['Pending', 'Invalid'])) {
+                    return response()->json([
+                        'isSuccess' => false,
+                        'message' => 'Your rider account is not allowed to log in. Current status: ' . $user->status,
+                    ], 403);
+                }
             }
 
-            // Prepare response
-            $response = [
-                'isSuccess' => true,
-                'message' => 'Logged in successfully',
-                'token' => $token,
-                'session_code' => $sessionCode,
-                'user' => [
-                    'id' => $user->id,
-                    'first_name' => $user->first_name,
-                    'middle_name' => $user->middle_name ?? null,
-                    'last_name' => $user->last_name,
-                    'email' => $user->email,
-                ],
-                'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
-                'role_id' => $isRider ? 4 : ($user->role_id ?? null)
-            ];
+            if ($user && Hash::check($request->password, $user->password)) {
+                $token = $user->createToken('auth-token')->plainTextToken;
+                $sessionCode = $this->insertSession($user->id);
 
-            return response()->json($response, 200);
+                if (!$sessionCode) {
+                    return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
+                }
+
+                // Hide password before response
+                $user->makeHidden(['password', 'security_id', 'security_answer', 'is_archived', 'created_at', 'updated_at', 'role']);
+
+                $response = [
+                    'isSuccess' => true,
+                    'message' => 'Logged in successfully',
+                    'token' => $token,
+                    'session_code' => $sessionCode,
+                    'user' => $user,
+                    'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
+                    'role_id' => $isRider ? 4 : ($user->role_id ?? null)
+                ];
+
+                // Log API call without password
+                $this->logAPICalls('login', $request->email, $request->except('password', 'security_id', 'security_answer'), $response);
+
+                return response()->json($response, 200);
+            }
+
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Invalid credentials.',
+            ], 401);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Login failed.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        // Invalid credentials
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'Invalid credentials.',
-        ], 401);
-
-    } catch (\Throwable $e) {
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'Login failed.',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
 
-    
-    
-    
     // logout
     public function logout(Request $request)
     {
@@ -185,7 +175,7 @@ class AuthController extends Controller
             // Update profile fields
             $user->update($request->only(['first_name', 'last_name', 'middle_name', 'email']));
 
-          
+
 
             $response = [
                 'isSuccess' => true,
@@ -197,7 +187,7 @@ class AuthController extends Controller
                     'middle_name' => $user->middle_name,
                     'email' => $user->email,
                     'org_log_id' => $user->org_log_id,
-                    
+
                 ]
             ];
             $this->logAPICalls('profileUpdate', $user->id, $request->all(), $response);
