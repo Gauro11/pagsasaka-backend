@@ -1145,6 +1145,45 @@ class ProductController extends Controller
         }
     }
 
+    public function getCartListStatus()
+    {
+        $user = Auth::user();
+    
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+    
+        try {
+            // Fetch only cart items with status "CheckedOut"
+            $cartStatuses = Cart::where('account_id', $user->id)
+                ->where('status', 'CheckedOut')
+                ->get();
+    
+            if ($cartStatuses->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No checked out items found.',
+                    'cart_statuses' => [],
+                ], 404);
+            }
+    
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Checked out cart statuses retrieved successfully.',
+                'cart_statuses' => $cartStatuses,
+            ], 200);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'An error occurred while retrieving cart statuses.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     //     public function checkout(Request $request)
     // {
     //     $user = Auth::user();

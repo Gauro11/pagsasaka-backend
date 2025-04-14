@@ -155,10 +155,9 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('buynow/{id}', [ProductController::class, 'buyNow']);
     Route::post('checkout-preview', [ProductController::class, 'getCheckoutPreview']);
     Route::get('cart-item-details/{id}', [ProductController::class, 'getCartItemDetails']);
+    Route::get('list-cart-status', [ProductController::class, 'getCartListStatus']);
     Route::post('checkout/item/{id}', [ProductController::class, 'checkoutItem']);
 });
-
-
 
 Route::post('list', [ProductController::class, 'getAllProductsList']);
 Route::post('product-list-id', [ProductController::class, 'getAllProductbyId']);
