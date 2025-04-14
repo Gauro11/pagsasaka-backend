@@ -805,7 +805,7 @@ class ProductController extends Controller
         $user = Auth::user();
     
         if (!$user) {
-            \Log::warning('BuyNow attempted without authentication', [
+            Log::warning('BuyNow attempted without authentication', [
                 'ip' => $request->ip(),
                 'product_id' => $id,
                 'endpoint' => $request->fullUrl(),
@@ -824,7 +824,7 @@ class ProductController extends Controller
             $product = Product::find($id);
     
             if (!$product) {
-                \Log::notice('Product not found in BuyNow', [
+                Log::notice('Product not found in BuyNow', [
                     'product_id' => $id,
                     'user_id' => $user->id,
                     'endpoint' => $request->fullUrl(),
@@ -846,7 +846,7 @@ class ProductController extends Controller
     
                 // Check if new quantity exceeds available stock
                 if ($newQuantity > $product->stocks) {
-                    \Log::warning('Quantity exceeds stock in BuyNow', [
+                    Log::warning('Quantity exceeds stock in BuyNow', [
                         'user_id' => $user->id,
                         'product_id' => $product->id,
                         'requested_quantity' => $newQuantity,
@@ -881,7 +881,7 @@ class ProductController extends Controller
             $product->decrement('stocks', $validated['quantity']);
     
             // Log successful BuyNow
-            \Log::info('Product added to cart via BuyNow', [
+            Log::info('Product added to cart via BuyNow', [
                 'user_id' => $user->id,
                 'cart_id' => $cartItem->id,
                 'product_id' => $product->id,
@@ -910,7 +910,7 @@ class ProductController extends Controller
             ], 200);
     
         } catch (Throwable $e) {
-            \Log::error('Error in BuyNow', [
+            Log::error('Error in BuyNow', [
                 'user_id' => $user->id ?? null,
                 'product_id' => $id,
                 'error' => $e->getMessage(),
@@ -934,7 +934,7 @@ class ProductController extends Controller
         $accountId = $account->account_id ?? $account->id;
     
         if (!$account) {
-            \Log::warning('CheckoutItem attempted without authentication', [
+            Log::warning('CheckoutItem attempted without authentication', [
                 'ip' => $request->ip(),
                 'cart_id' => $id,
                 'endpoint' => $request->fullUrl(),
@@ -948,7 +948,7 @@ class ProductController extends Controller
         try {
             // Validate cart_id
             if (!is_numeric($id) || $id <= 0) {
-                \Log::warning('Invalid or missing cart_id in CheckoutItem', [
+                Log::warning('Invalid or missing cart_id in CheckoutItem', [
                     'user_id' => $accountId,
                     'cart_id' => $id,
                     'ip' => $request->ip(),
@@ -966,7 +966,7 @@ class ProductController extends Controller
                             ->first();
     
             if (!$cartItem) {
-                \Log::notice('Cart item not found or already checked out in CheckoutItem', [
+                Log::notice('Cart item not found or already checked out in CheckoutItem', [
                     'user_id' => $accountId,
                     'cart_id' => $id,
                     'endpoint' => $request->fullUrl(),
@@ -979,7 +979,7 @@ class ProductController extends Controller
     
             $product = Product::find($cartItem->product_id);
             if (!$product) {
-                \Log::error('Product not found in CheckoutItem', [
+                Log::error('Product not found in CheckoutItem', [
                     'user_id' => $accountId,
                     'cart_id' => $id,
                     'product_id' => $cartItem->product_id,
@@ -994,7 +994,7 @@ class ProductController extends Controller
             $cartItem->status = 'CheckedOut';
             $cartItem->save();
     
-            \Log::info('Cart item checked out successfully', [
+            Log::info('Cart item checked out successfully', [
                 'user_id' => $accountId,
                 'cart_id' => $id,
                 'product_id' => $product->id,
@@ -1020,7 +1020,7 @@ class ProductController extends Controller
             ], 200);
     
         } catch (Throwable $e) {
-            \Log::error('CheckoutItem error', [
+            Log::error('CheckoutItem error', [
                 'user_id' => $accountId ?? null,
                 'cart_id' => $id,
                 'error' => $e->getMessage(),
@@ -1047,7 +1047,7 @@ class ProductController extends Controller
     $user = Auth::user();
 
     if (!$user) {
-        \Log::warning('Checkout preview attempted without authentication', [
+        Log::warning('Checkout preview attempted without authentication', [
             'ip' => $request->ip(),
             'cart_id' => $id,
             'endpoint' => $request->fullUrl(),
@@ -1062,7 +1062,7 @@ class ProductController extends Controller
 
     try {
         if (!is_numeric($id) || $id <= 0) {
-            \Log::warning('Invalid or missing cart_id in checkout preview', [
+            Log::warning('Invalid or missing cart_id in checkout preview', [
                 'user_id' => $user->id,
                 'cart_id' => $id,
                 'ip' => $request->ip(),
@@ -1076,7 +1076,7 @@ class ProductController extends Controller
             ], 400);
         }
 
-        \Log::info('Fetching checkout preview', [
+        Log::info('Fetching checkout preview', [
             'user_id' => $user->id,
             'cart_id' => $id,
             'endpoint' => $request->fullUrl(),
@@ -1088,7 +1088,7 @@ class ProductController extends Controller
                         ->first();
 
         if (!$cartItem) {
-            \Log::notice('Cart item not found for checkout preview', [
+            Log::notice('Cart item not found for checkout preview', [
                 'user_id' => $user->id,
                 'cart_id' => $id,
                 'endpoint' => $request->fullUrl(),
@@ -1104,7 +1104,7 @@ class ProductController extends Controller
         $product = Product::find($cartItem->product_id);
 
         if (!$product) {
-            \Log::error('Product not found for cart item in checkout preview', [
+            Log::error('Product not found for cart item in checkout preview', [
                 'user_id' => $user->id,
                 'cart_id' => $id,
                 'product_id' => $cartItem->product_id,
@@ -1132,7 +1132,7 @@ class ProductController extends Controller
             'product_img' => $product->product_img,
         ];
 
-        \Log::info('Checkout preview fetched successfully', [
+        Log::info('Checkout preview fetched successfully', [
             'user_id' => $user->id,
             'cart_id' => $id,
             'endpoint' => $request->fullUrl(),
@@ -1146,7 +1146,7 @@ class ProductController extends Controller
         ], 200);
 
     } catch (Throwable $e) {
-        \Log::error('Unexpected error in checkout preview', [
+        Log::error('Unexpected error in checkout preview', [
             'user_id' => $user->id ?? null,
             'cart_id' => $id,
             'error' => $e->getMessage(),
