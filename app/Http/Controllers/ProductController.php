@@ -990,8 +990,8 @@ class ProductController extends Controller
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Item checked out successfully.',
-                'cart_id' => $cartItem->id,
                 'checkout_details' => [
+                    'cart_id' => $cartItem->id,
                     'product_name' => $product->product_name,
                     'quantity' => $cartItem->quantity,
                     'unit' => $cartItem->unit,
