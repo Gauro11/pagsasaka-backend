@@ -990,8 +990,8 @@ class ProductController extends Controller
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Item checked out successfully.',
-                'cart_id' => $cartItem->id,
                 'checkout_details' => [
+                    'cart_id' => $cartItem->id,
                     'product_name' => $product->product_name,
                     'quantity' => $cartItem->quantity,
                     'unit' => $cartItem->unit,
@@ -1030,8 +1030,8 @@ class ProductController extends Controller
         }
 
         $request->validate([
-            'cart_ids' => 'required|array|min:1',
-            'cart_ids.*' => 'integer',
+            'cart_id' => 'required|array|min:1',
+            'cart_id.*' => 'integer',
         ]);
 
         $cartIds = $request->cart_ids;
