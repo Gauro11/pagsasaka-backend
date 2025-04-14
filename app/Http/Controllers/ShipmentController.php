@@ -901,6 +901,48 @@ public function approveRefundRequest($order_id)
 
 
 
+public function getPlacedOrders(Request $request)
+{
+    try {
+        $user = $request->user(); // Authenticated user
+
+        // Fetch only orders with status "processing" or equivalent (adjust if needed)
+        $orders = $user->orders()
+            ->where('status', 'Order Placed') // <-- Replace with your actual 'order placed' status if different
+            ->with(['product.account']) // Load product & farmer
+            ->get();
+
+        $placedProducts = $orders->map(function ($order) {
+            $product = $order->product;
+            $farmer = $product->account ?? null;
+
+            return [
+                'order_id' => $order->id,
+                'product_name' => $product->product_name ?? null,
+                'product_images' => $product->product_img ?? [],
+                'quantity' => $order->quantity,
+                'farmer_id' => $farmer->id ?? null,
+                'farmer_name' => $farmer 
+                    ? trim("{$farmer->first_name} {$farmer->middle_name} {$farmer->last_name}")
+                    : null,
+                'order_date' => $order->created_at->toDateString(),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'products_ordered' => $placedProducts
+        ]);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch placed orders.',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
 
 
     

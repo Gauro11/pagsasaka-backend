@@ -26,6 +26,14 @@ class Product extends Model
         'product_img' => 'array',
     ];
 
+    // In App\Models\Product.php
+
+public function account()
+{
+    return $this->belongsTo(Account::class, 'account_id');
+}
+
+
     public function orders()
     {
         return $this->hasMany(Order::class, 'product_id', 'id');

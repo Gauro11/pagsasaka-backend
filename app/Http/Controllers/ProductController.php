@@ -870,8 +870,9 @@ class ProductController extends Controller
             }
 
             $product->decrement('stocks', $validated['quantity']);
-
-            Log::info('Product added to cart via BuyNow', [
+    
+            // Log successful BuyNow
+            \Log::info('Product added to cart via BuyNow', [
                 'user_id' => $user->id,
                 'cart_id' => $cartItem->id,
                 'product_id' => $product->id,
@@ -978,8 +979,8 @@ class ProductController extends Controller
 
             $cartItem->status = 'CheckedOut';
             $cartItem->save();
-
-            Log::info('Cart item checked out successfully', [
+    
+            \Log::info('Cart item checked out successfully', [
                 'user_id' => $accountId,
                 'cart_id' => $id,
                 'product_id' => $product->id,
@@ -1019,66 +1020,146 @@ class ProductController extends Controller
         }
     }
 
-    public function getCheckoutPreview(Request $request)
-    {
-        $user = Auth::user();
+
     
-        if (!$user) {
-            return response()->json([
+
+
+    
+
+
+    public function getCheckoutPreview(Request $request, $id)
+{
+    $user = Auth::user();
+
+    if (!$user) {
+        \Log::warning('Checkout preview attempted without authentication', [
+            'ip' => $request->ip(),
+            'cart_id' => $id,
+            'endpoint' => $request->fullUrl(),
+        ]);
+        return response()->json([
+            'data' => [
                 'isSuccess' => false,
                 'message' => 'User not authenticated.',
-            ], 401);
+            ]
+        ], 401);
+    }
+
+    try {
+        if (!is_numeric($id) || $id <= 0) {
+            \Log::warning('Invalid or missing cart_id in checkout preview', [
+                'user_id' => $user->id,
+                'cart_id' => $id,
+                'ip' => $request->ip(),
+                'endpoint' => $request->fullUrl(),
+            ]);
+            return response()->json([
+                'data' => [
+                    'isSuccess' => false,
+                    'message' => 'Invalid or missing cart ID. Expected a valid numeric cart ID.',
+                ]
+            ], 400);
         }
-    
-        $request->validate([
-            'cart_ids' => 'required|array|min:1',
-            'cart_ids.*' => 'integer',
+
+        \Log::info('Fetching checkout preview', [
+            'user_id' => $user->id,
+            'cart_id' => $id,
+            'endpoint' => $request->fullUrl(),
         ]);
-    
-        $cartIds = $request->cart_ids;
-    
-        // Get cart items that belong to the authenticated user only
-        $cartItems = Cart::where('account_id', $user->id)
-            ->whereIn('id', $cartIds)
-            ->get();
-    
-        if ($cartItems->isEmpty()) {
+
+        $cartItem = Cart::where('account_id', $user->id)
+                        ->where('id', $id)
+                        ->where('status', 'CheckedOut')
+                        ->first();
+
+        if (!$cartItem) {
+            \Log::notice('Cart item not found for checkout preview', [
+                'user_id' => $user->id,
+                'cart_id' => $id,
+                'endpoint' => $request->fullUrl(),
+            ]);
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'No valid cart items found for this user.',
             ], 404);
         }
-    
-        $cartData = [];
-    
-        foreach ($cartItems as $item) {
-            $product = Product::find($item->product_id);
-    
-            if (!$product) {
-                continue; // skip if product was deleted
-            }
-    
-            $cartData[] = [
-                'id' => $item->id,
-                'product_name' => $product->product_name,
-                'product_id' => $product->id,
-                'quantity' => $item->quantity,
-                'unit' => $product->unit ?? 'unit',
-                'price' => number_format($product->price, 2),
-                'item_total' => number_format($item->quantity * $product->price, 2),
-                'product_img' => $product->product_img,
-            ];
+
+        $product = Product::find($cartItem->product_id);
+
+        if (!$product) {
+            \Log::error('Product not found for cart item in checkout preview', [
+                'user_id' => $user->id,
+                'cart_id' => $id,
+                'product_id' => $cartItem->product_id,
+                'endpoint' => $request->fullUrl(),
+            ]);
+            return response()->json([
+                'data' => [
+                    'isSuccess' => false,
+                    'message' => 'Product associated with this cart item no longer exists.',
+                ]
+            ], 404);
         }
-    
+
+        $quantity = max(1, min($cartItem->quantity, $product->stocks));
+        $itemTotal = $product->price * $quantity;
+
+        $cartData = [
+            'id' => $cartItem->id,
+            'product_name' => $product->product_name,
+            'product_id' => $product->id,
+            'quantity' => $quantity,
+            'unit' => $product->unit ?? 'unit',
+            'price' => number_format($product->price, 2),
+            'item_total' => number_format($itemTotal, 2),
+            'product_img' => $product->product_img,
+        ];
+
+        \Log::info('Checkout preview fetched successfully', [
+            'user_id' => $user->id,
+            'cart_id' => $id,
+            'endpoint' => $request->fullUrl(),
+        ]);
+
         return response()->json([
             'isSuccess' => true,
             'cart_info' => $cartData,
         ], 200);
+
+    } catch (Throwable $e) {
+        \Log::error('Unexpected error in checkout preview', [
+            'user_id' => $user->id ?? null,
+            'cart_id' => $id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'endpoint' => $request->fullUrl(),
+        ]);
+
+        return response()->json([
+            'data' => [
+                'isSuccess' => false,
+                'message' => 'An unexpected error occurred during checkout preview.',
+                'error' => app()->environment('production') ? null : $e->getMessage(),
+            ]
+        ], 500);
     }
-    
-    public function getCartItemDetails(Request $request, $id)
-    {
-        $user = Auth::user();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+public function getCartItemDetails(Request $request, $id)
+{
+    $user = Auth::user();
 
         if (!$user) {
             return response()->json([

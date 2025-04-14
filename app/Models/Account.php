@@ -25,6 +25,14 @@ class Account extends Authenticatable
         'avatar',
     ];
 
+    // In App\Models\Account.php
+
+public function orders()
+{
+    return $this->hasMany(Order::class, 'account_id', 'id');
+}
+
+
     public function role()
     {
         return $this->belongsTo(Role::class, 'role_id', 'id');
