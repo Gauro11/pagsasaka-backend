@@ -191,6 +191,10 @@ Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebho
 Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::post('pay', [PaymentController::class, 'payment']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
     // Chat Sessions
     Route::get('/chat-sessions-lists', [ChatSessionController::class, 'index']); // fetch chatlist
     Route::post('/chatnow', [ChatSessionController::class, 'store']); // start new chat
