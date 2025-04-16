@@ -133,8 +133,6 @@ Route::controller(AccountController::class)->group(function () {
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
-
-
 Route::prefix('category')->group(function () {
 
     Route::post('create', [CategoryController::class, 'createCategory']);
@@ -212,11 +210,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products/{product}/ratings', [RatingController::class, 'index'])->name('ratings.index');
 });
 
-Route::prefix('address')->group(function () {
-    Route::get('get/{id}', [AddressController::class, 'index']);
-    Route::post('add/{id}', [AddressController::class, 'store']);
-    Route::put('update/{accountId}/{addressId}', [AddressController::class, 'update']);
-    Route::delete('delete/address/{accountId}/{addressId}', [AddressController::class, 'destroy']);
+Route::prefix('billing-address')->middleware('auth:sanctum')->group(function () {
+    Route::post('add', [AccountController::class, 'addBillingAddress']);
+    Route::post('edit', [AccountController::class, 'editBillingAddress']);
+    Route::post('remove', [AccountController::class, 'removeBillingAddress']);
+    Route::get('get', [AccountController::class, 'listBillingAddress']);
 });
 
 // other routes...
