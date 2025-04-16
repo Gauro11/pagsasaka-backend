@@ -230,8 +230,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::prefix('billing-address')->middleware('auth:sanctum')->group(function () {
     Route::post('add', [AccountController::class, 'addBillingAddress']);
-    Route::post('edit', [AccountController::class, 'editBillingAddress']);
-    Route::post('remove', [AccountController::class, 'removeBillingAddress']);
+    Route::post('edit/{id}', [AccountController::class, 'editBillingAddress']);
+    Route::post('remove/{id}', [AccountController::class, 'removeBillingAddress']);
     Route::get('get', [AccountController::class, 'listBillingAddress']);
 });
 

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Throwable;
 
 class AccountController extends Controller
@@ -578,19 +579,19 @@ class AccountController extends Controller
         }
     }
 
-    public function editBillingAddress(Request $request)
+    public function editBillingAddress(Request $request, $id)
     {
         $user = Auth::user();
-
+    
         if (!$user) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
             ], 401);
         }
-
+    
         try {
-            $validatedData = $request->validate([
+            $validated = $request->validate([
                 'address_line1' => 'required|string|max:255',
                 'address_line2' => 'nullable|string|max:255',
                 'city' => 'required|string|max:100',
@@ -598,38 +599,43 @@ class AccountController extends Controller
                 'postal_code' => 'required|string|max:20',
                 'country' => 'required|string|max:100',
             ]);
-
-            $account = Account::where('id', $user->id)->first();
-
-            if (!$account) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Account not found for the user.',
-                ], 404);
-            }
-
-            $account->update($validatedData);
-
-            // Limit the response to specific fields
-            $billingAddress = $account->only([
-                'id',
-                'first_name',
-                'middle_name',
-                'last_name',
-                'address_line1',
-                'address_line2',
-                'city',
-                'province',
-                'postal_code',
-                'country',
-            ]);
-
+    
+            // Get the record ensuring the user owns it
+            $billingAddress = Account::where('id', $id)
+                ->firstOrFail();
+    
+            $billingAddress->update($validated);
+    
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Billing address updated successfully.',
-                'billing_address' => $billingAddress,
+                'billing_address' => [
+                    'id' => $billingAddress->id,
+                    'first_name' => $billingAddress->first_name,
+                    'middle_name' => $billingAddress->middle_name,
+                    'last_name' => $billingAddress->last_name,
+                    'phone_number' => $billingAddress->phone_number,
+                    'address_line1' => $billingAddress->address_line1,
+                    'address_line2' => $billingAddress->address_line2,
+                    'city' => $billingAddress->city,
+                    'province' => $billingAddress->province,
+                    'postal_code' => $billingAddress->postal_code,
+                    'country' => $billingAddress->country,
+                ],
             ], 200);
-        } catch (\Throwable $e) {
+    
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Billing address not found for this user.',
+            ], 404);
+        } catch (ValidationException $v) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Validation failed.',
+                'errors' => $v->errors(),
+            ], 422);
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'An error occurred while updating the billing address.',
@@ -638,29 +644,24 @@ class AccountController extends Controller
         }
     }
 
-    public function removeBillingAddress(Request $request)
+    public function removeBillingAddress(Request $request, $id)
     {
         $user = Auth::user();
-
+    
         if (!$user) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
             ], 401);
         }
-
+    
         try {
-            $account = Account::where('id', $user->id)->first();
-
-            if (!$account) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Account not found for the user.',
-                ], 404);
-            }
-
-            // Nullify billing address fields
-            $account->update([
+            // Find the account record that belongs to this user
+            $billingAddress = Account::where('id', $id)
+                ->firstOrFail();
+    
+            // Clear out billing address fields (if you're not deleting the row)
+            $billingAddress->update([
                 'address_line1' => '',
                 'address_line2' => '',
                 'city' => '',
@@ -668,13 +669,17 @@ class AccountController extends Controller
                 'postal_code' => '',
                 'country' => '',
             ]);
-            
-
+    
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Billing address removed successfully.',
             ], 200);
-        } catch (\Throwable $e) {
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Billing address not found for this user.',
+            ], 404);
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'An error occurred while removing the billing address.',
@@ -682,6 +687,7 @@ class AccountController extends Controller
             ], 500);
         }
     }
+    
 
     public function listBillingAddress()
     {
