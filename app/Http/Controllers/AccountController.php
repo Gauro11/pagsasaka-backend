@@ -686,29 +686,30 @@ class AccountController extends Controller
     public function listBillingAddress()
     {
         $user = Auth::user();
-
+    
         if (!$user) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'User not authenticated',
             ], 401);
         }
-
+    
         try {
             $account = Account::where('id', $user->id)->first();
-
+    
             if (!$account) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'Account not found for the user.',
                 ], 404);
             }
-
+    
             $billingAddress = $account->only([
                 'id',
                 'first_name',
                 'middle_name',
                 'last_name',
+                'phone_number',
                 'address_line1',
                 'address_line2',
                 'city',
@@ -716,7 +717,7 @@ class AccountController extends Controller
                 'postal_code',
                 'country',
             ]);
-
+    
             return response()->json([
                 'isSuccess' => true,
                 'billing_address' => $billingAddress,
@@ -729,6 +730,7 @@ class AccountController extends Controller
             ], 500);
         }
     }
+    
 
     // Log all API calls.
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
