@@ -188,11 +188,25 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebhook']);
 
+
+
+
+
+
+// final payment cod and gcash and maya gateway
 Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('pay', [PaymentController::class, 'payment']);
 });
+
+
+
+
+
+
+
+
 
 Route::middleware('auth:sanctum')->group(function () {
     // Chat Sessions

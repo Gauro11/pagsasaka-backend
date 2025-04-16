@@ -22,7 +22,7 @@ class CODOrderController extends Controller
             'items' => 'required|array',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
-            'buyer_address' => 'required|string',
+            
         ]);
     
         if (!auth()->check()) {
@@ -62,7 +62,7 @@ class CODOrderController extends Controller
                     'product_id' => $product->id,
                     'quantity' => $item['quantity'],
                     'total_amount' => $totalAmount,
-                    'ship_to' => $request->buyer_address,
+                    'ship_to' => '',
                     'status' => 'Order placed',
                     'delivery_proof' => '', // Ensure a default value is set
                 ]);
