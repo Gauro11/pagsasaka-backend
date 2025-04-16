@@ -16,12 +16,6 @@ use Exception;
 
 class PaymentController extends Controller
 {
-    /**
-     * Process payment for multiple items for authenticated user
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function payment(Request $request)
 {
     if (!Auth::check()) {
@@ -104,6 +98,16 @@ class PaymentController extends Controller
 
         $fullName = trim("{$account->first_name} {$account->last_name}");
 
+        // ✅ Format phone number
+        $rawPhone = $account->phone_number;
+        if (preg_match('/^09\d{9}$/', $rawPhone)) {
+            $phone = '+63' . substr($rawPhone, 1);
+        } elseif (preg_match('/^\+63\d{10}$/', $rawPhone)) {
+            $phone = $rawPhone;
+        } else {
+            $phone = null;
+        }
+
         $data = [
             'data' => [
                 'attributes' => [
@@ -117,6 +121,11 @@ class PaymentController extends Controller
                         'items' => $ordersData,
                         'full_name' => $fullName,
                         'total_amount' => number_format($totalAmount, 2, '.', ''),
+                    ],
+                    'billing' => [
+                        'name' => $fullName,
+                        'email' => $account->email,
+                        'phone' => $phone,
                     ],
                 ],
             ],
@@ -138,7 +147,7 @@ class PaymentController extends Controller
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Failed to create payment session.',
-                'paymongo_response' => $responseData, // Optional: helpful for frontend debugging
+                'paymongo_response' => $responseData,
             ], 400);
         }
 
@@ -149,12 +158,11 @@ class PaymentController extends Controller
                 'account_id' => $account->id,
                 'product_id' => $orderData['product_id'],
                 'rider_id' => null,
-                'ship_to' => 'To be filled', // default value to prevent SQL error
+                'ship_to' => 'To be filled',
                 'quantity' => $orderData['quantity'],
                 'total_amount' => $orderData['total_amount'],
                 'status' => 'Order placed',
             ]);
-            
         }
 
         DB::commit();
