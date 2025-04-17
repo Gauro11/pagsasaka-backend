@@ -8,7 +8,6 @@ use App\Models\CollegeOffice;
 use App\Models\OrganizationalLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Throwable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -17,124 +16,127 @@ use App\Mail\OTPMail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Throwable;
 
 class AccountController extends Controller
 {
 
     // Create a new user account.pagsasaka
     public function register(Request $request)
-{
-    DB::beginTransaction(); // Start a transaction
-
-    try {
-        // Validate input
-        $validator = Validator::make($request->all(), [
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'middle_name' => 'nullable|string|max:255',
-            'email' => 'required|email|unique:accounts,email',
-            'password' => 'required|string|min:8|confirmed', // Password is required
-            'role' => 'required|exists:roles,id', // Ensure the role ID exists in the roles table
-            'security_question_id' => 'required|exists:questions,id', // Ensure the selected security question exists
-            'security_answer' => 'required|string|max:255', // Ensure the answer is provided
-        ]);
-
-        if ($validator->fails()) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Validation failed.',
-                'errors' => $validator->errors(),
-            ];
-            $this->logAPICalls('register', '', $request->all(), $response);
-            return response()->json($response, 422);
-        }
-
-        // Generate OTP
-        $otp = rand(100000, 999999);
-
-        // Create account
-        $user = Account::create([
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'middle_name' => $request->middle_name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password), // Save the user-provided password
-            'role_id' => $request->role, // Save the role ID directly
-            'security_id' => $request->security_question_id, // Save the selected security question ID
-            'security_answer' => Hash::make($request->security_answer), // Hash and save the answer for security
-            'status' => 'A', // Set default active status
-        ]);
-        $user->load('role');
-
-        // Save OTP in the database
-        DB::table('otps')->insert([
-            'email' => $user->email,
-            'otp' => $otp,
-            'created_at' => now(),
-            'expires_at' => now()->addMinutes(10), // Set OTP expiration time
-        ]);
-
-        // Send OTP via email
-        $htmlContent = "<p>Your OTP is: <strong>$otp</strong></p>";
-        $subject = "Your OTP Code";
-        $email = $user->email;
+    {
+        DB::beginTransaction(); // Start a transaction
 
         try {
-            Mail::send([], [], function ($message) use ($email, $htmlContent, $subject) {
-                $message->to($email)
-                    ->subject($subject)
-                    ->setBody($htmlContent, 'text/html');
-            });
-        } catch (Throwable $e) {
-            // Log the error for debugging
-            Log::error('Error sending email in register method: ' . $e->getMessage(), [
-                'email' => $email,
-                'otp' => $otp,
+            // Validate input
+            $validator = Validator::make($request->all(), [
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'middle_name' => 'nullable|string|max:255',
+                'email' => 'required|email|unique:accounts,email',
+                'password' => 'required|string|min:8|confirmed', // Password is required
+                'role' => 'required|exists:roles,id', // Ensure the role ID exists in the roles table
+                'security_question_id' => 'required|exists:questions,id', // Ensure the selected security question exists
+                'security_answer' => 'required|string|max:255', // Ensure the answer is provided
             ]);
 
-            throw $e; // Re-throw the exception to trigger the outer catch
-        }
+            if ($validator->fails()) {
+                $response = [
+                    'isSuccess' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ];
+                $this->logAPICalls('register', '', $request->all(), $response);
+                return response()->json($response, 422);
+            }
 
-        DB::commit(); // Commit the transaction if everything succeeds
+            // Generate OTP
+            $otp = rand(100000, 999999);
 
-        $response = [
-            'isSuccess' => true,
-            'message' => 'Account registered successfully. An OTP has been sent to your email.',
-            'user' => [
-                'id' => $user->id,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'middle_name' => $user->middle_name,
+            // Create account
+            $user = Account::create([
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'middle_name' => $request->middle_name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password), // Save the user-provided password
+                'role_id' => $request->role, // Save the role ID directly
+                'security_id' => $request->security_question_id, // Save the selected security question ID
+                'security_answer' => Hash::make($request->security_answer), // Hash and save the answer for security
+                'status' => 'A', // Set default active status
+            ]);
+            $user->load('role');
+
+            // Save OTP in the database
+            DB::table('otps')->insert([
                 'email' => $user->email,
-                'role_id' => $user->role_id, // Return the role ID in the response
-                'role_name' => $user->role ? $user->role->role : null,
-                'created_at' => $user->created_at,
-                'updated_at' => $user->updated_at,
-            ],
-        ];
+                'otp' => $otp,
+                'created_at' => now(),
+                'expires_at' => now()->addMinutes(10), // Set OTP expiration time
+            ]);
 
-        $this->logAPICalls('register', $user->email, $request->except(['password', 'password_confirmation']), $response);
+            // Send OTP via email
+            $htmlContent = "<p>Your OTP is: <strong>$otp</strong></p>";
+            $subject = "Your OTP Code";
+            $email = $user->email;
 
-        return response()->json($response, 201);
-    } catch (Throwable $e) {
-        DB::rollBack(); // Rollback the transaction on error
+            try {
+                Mail::send([], [], function ($message) use ($email, $htmlContent, $subject) {
+                    $message->to($email)
+                        ->subject($subject)
+                        ->setBody($htmlContent, 'text/html');
+                });
+            } catch (Throwable $e) {
+                // Log the error for debugging
+                Log::error('Error sending email in register method: ' . $e->getMessage(), [
+                    'email' => $email,
+                    'otp' => $otp,
+                ]);
 
-        // Log the error for debugging
-        Log::error('Error in register method: ' . $e->getMessage(), [
-            'request_data' => $request->all(),
-        ]);
+                throw $e; // Re-throw the exception to trigger the outer catch
+            }
 
-        $response = [
-            'isSuccess' => false,
-            'message' => 'An error occurred during registration.',
-            'error' => $e->getMessage(),
-        ];
+            DB::commit(); // Commit the transaction if everything succeeds
 
-        $this->logAPICalls('register', $request->email ?? 'unknown', $request->all(), $response);
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Account registered successfully. An OTP has been sent to your email.',
+                'user' => [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'middle_name' => $user->middle_name,
+                    'email' => $user->email,
+                    'role_id' => $user->role_id, // Return the role ID in the response
+                    'role_name' => $user->role ? $user->role->role : null,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ],
+            ];
 
-        return response()->json($response, 500);
+            $this->logAPICalls('register', $user->email, $request->except(['password', 'password_confirmation']), $response);
+
+            return response()->json($response, 201);
+        } catch (Throwable $e) {
+            DB::rollBack(); // Rollback the transaction on error
+
+            // Log the error for debugging
+            Log::error('Error in register method: ' . $e->getMessage(), [
+                'request_data' => $request->all(),
+            ]);
+
+            $response = [
+                'isSuccess' => false,
+                'message' => 'An error occurred during registration.',
+                'error' => $e->getMessage(),
+            ];
+
+            $this->logAPICalls('register', $request->email ?? 'unknown', $request->all(), $response);
+
+            return response()->json($response, 500);
+        }
     }
-}
 
 
 
@@ -143,7 +145,7 @@ class AccountController extends Controller
         $validator = Validator::make($request->all(), [
             'otp' => 'required|digits:6',
         ]);
-    
+
         if ($validator->fails()) {
             $response = [
                 'isSuccess' => false,
@@ -153,13 +155,13 @@ class AccountController extends Controller
             $this->logAPICalls('verifyOTP', "", $request->all(), $response);
             return response()->json($response, 422);
         }
-    
+
         try {
             // Fetch the latest OTP record from the database
             $otpRecord = DB::table('otps')
                 ->orderBy('created_at', 'desc') // Fetch the most recent OTP
                 ->first();
-    
+
             // Check if OTP record exists
             if (!$otpRecord) {
                 $response = [
@@ -169,7 +171,7 @@ class AccountController extends Controller
                 $this->logAPICalls('verifyOTP', "", $request->all(), $response);
                 return response()->json($response, 404);
             }
-    
+
             // Validate the provided OTP
             if ($otpRecord->otp != $request->otp) {
                 $response = [
@@ -179,7 +181,7 @@ class AccountController extends Controller
                 $this->logAPICalls('verifyOTP', "", $request->all(), $response);
                 return response()->json($response, 400);
             }
-    
+
             // Check if the OTP has expired
             if (now()->greaterThan($otpRecord->expires_at)) {
                 $response = [
@@ -189,198 +191,198 @@ class AccountController extends Controller
                 $this->logAPICalls('verifyOTP', "", $request->all(), $response);
                 return response()->json($response, 400);
             }
-    
+
             // Mark OTP as used or delete it (optional)
             DB::table('otps')->where('id', $otpRecord->id)->delete();
-    
+
             $response = [
                 'isSuccess' => true,
                 'message' => 'OTP verified successfully.',
             ];
             $this->logAPICalls('verifyOTP', "", $request->all(), $response);
-    
+
             return response()->json($response, 200);
         } catch (Throwable $e) {
             Log::error('Error verifying OTP: ' . $e->getMessage(), [
                 'request_data' => $request->all(),
             ]);
-    
+
             $response = [
                 'isSuccess' => false,
                 'message' => 'An error occurred during OTP verification.',
                 'error' => $e->getMessage(),
             ];
-    
+
             $this->logAPICalls('verifyOTP', "", $request->all(), $response);
-    
+
             return response()->json($response, 500);
         }
     }
-    
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Update an existing user account.
-public function updateAccount(Request $request, $id)
-{
-    try {
-        $account = Account::findOrFail($id);
 
-        // Validation with custom error messages (password removed)
-        $request->validate([
-            'first_name' => ['sometimes', 'string', 'max:225'],
-            'last_name' => ['sometimes', 'string', 'max:225'],
-            'middle_name' => ['sometimes', 'string', 'max:225', 'nullable'],
-            'email' => ['sometimes', 'string', 'email', 'max:225', Rule::unique('accounts')->ignore($account->id)],
-            'role_id' => ['sometimes', 'numeric', 'exists:roles,id'],
-            'phone_number' => ['sometimes', 'string', 'max:225', 'nullable'],
-            'security_answer' => ['sometimes', 'string', 'max:225', 'nullable'],
-            'avatar' => ['sometimes', 'string', 'max:225', 'nullable'],
-            'delivery_address' => ['sometimes', 'string', 'max:225', 'nullable'],
-        ], [
-            'email.unique' => 'The email is already taken.',
-            'role_id.exists' => 'The selected role does not exist.',
-        ]);
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Update an existing user account.
+    public function updateAccount(Request $request, $id)
+    {
+        try {
+            $account = Account::findOrFail($id);
 
-        // Prepare the data to update (password removed)
-        $updateData = [
-            'first_name' => $request->input('first_name', $account->first_name),
-            'last_name' => $request->input('last_name', $account->last_name),
-            'middle_name' => $request->input('middle_name', $account->middle_name),
-            'email' => $request->input('email', $account->email),
-            'role_id' => $request->input('role_id', $account->role_id),
-            'phone_number' => $request->input('phone_number', $account->phone_number),
-            'security_answer' => $request->input('security_answer') ? Hash::make($request->security_answer) : $account->security_answer,
-            'avatar' => $request->input('avatar', $account->avatar),
-            'delivery_address' => $request->input('delivery_address', $account->delivery_address),
-        ];
+            // Validation with custom error messages (password removed)
+            $request->validate([
+                'first_name' => ['sometimes', 'string', 'max:225'],
+                'last_name' => ['sometimes', 'string', 'max:225'],
+                'middle_name' => ['sometimes', 'string', 'max:225', 'nullable'],
+                'email' => ['sometimes', 'string', 'email', 'max:225', Rule::unique('accounts')->ignore($account->id)],
+                'role_id' => ['sometimes', 'numeric', 'exists:roles,id'],
+                'phone_number' => ['sometimes', 'string', 'max:225', 'nullable'],
+                'security_answer' => ['sometimes', 'string', 'max:225', 'nullable'],
+                'avatar' => ['sometimes', 'string', 'max:225', 'nullable'],
+                'delivery_address' => ['sometimes', 'string', 'max:225', 'nullable'],
+            ], [
+                'email.unique' => 'The email is already taken.',
+                'role_id.exists' => 'The selected role does not exist.',
+            ]);
 
-        // Update the account
-        $account->update($updateData);
+            // Prepare the data to update (password removed)
+            $updateData = [
+                'first_name' => $request->input('first_name', $account->first_name),
+                'last_name' => $request->input('last_name', $account->last_name),
+                'middle_name' => $request->input('middle_name', $account->middle_name),
+                'email' => $request->input('email', $account->email),
+                'role_id' => $request->input('role_id', $account->role_id),
+                'phone_number' => $request->input('phone_number', $account->phone_number),
+                'security_answer' => $request->input('security_answer') ? Hash::make($request->security_answer) : $account->security_answer,
+                'avatar' => $request->input('avatar', $account->avatar),
+                'delivery_address' => $request->input('delivery_address', $account->delivery_address),
+            ];
 
-        // Prepare the response
-        $response = [
-            'isSuccess' => true,
-            'message' => "Account successfully updated.",
-            'user' => [
-                'id' => $account->id,
-                'first_name' => $account->first_name,
-                'middle_name' => $account->middle_name,
-                'last_name' => $account->last_name,
-                'email' => $account->email,
-                'role_id' => $account->role_id,
-                'phone_number' => $account->phone_number,
-                'avatar' => $account->avatar,
-                'delivery_address' => $account->delivery_address,
-                'is_archived' => $account->is_archived,
-                'created_at' => $account->created_at,
-                'updated_at' => $account->updated_at,
-            ],
-        ];
+            // Update the account
+            $account->update($updateData);
 
-        $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
-        return response()->json($response, 200);
-    } catch (ValidationException $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => "Failed to update account due to validation errors.",
-            'errors' => $e->errors(),
-        ];
-        $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
-        return response()->json($response, 422);
-    } catch (Throwable $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => "Failed to update account due to an unexpected error.",
-            'error' => $e->getMessage(),
-        ];
-        $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
-        return response()->json($response, 500);
+            // Prepare the response
+            $response = [
+                'isSuccess' => true,
+                'message' => "Account successfully updated.",
+                'user' => [
+                    'id' => $account->id,
+                    'first_name' => $account->first_name,
+                    'middle_name' => $account->middle_name,
+                    'last_name' => $account->last_name,
+                    'email' => $account->email,
+                    'role_id' => $account->role_id,
+                    'phone_number' => $account->phone_number,
+                    'avatar' => $account->avatar,
+                    'delivery_address' => $account->delivery_address,
+                    'is_archived' => $account->is_archived,
+                    'created_at' => $account->created_at,
+                    'updated_at' => $account->updated_at,
+                ],
+            ];
+
+            $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
+            return response()->json($response, 200);
+        } catch (ValidationException $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => "Failed to update account due to validation errors.",
+                'errors' => $e->errors(),
+            ];
+            $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
+            return response()->json($response, 422);
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => "Failed to update account due to an unexpected error.",
+                'error' => $e->getMessage(),
+            ];
+            $this->logAPICalls('updateaccount', $id, $request->all(), [$response]);
+            return response()->json($response, 500);
+        }
     }
-}
 
-//change passwrod
+    //change passwrod
 
-public function updatePassword(Request $request, $id)
-{
-    try {
-        $account = Account::findOrFail($id);
+    public function updatePassword(Request $request, $id)
+    {
+        try {
+            $account = Account::findOrFail($id);
 
-        // Validation for password
-        $request->validate([
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ], [
-            'password.required' => 'The password field is required.',
-            'password.string' => 'The password must be a string.',
-            'password.min' => 'The password must be at least 8 characters.',
-            'password.confirmed' => 'The password confirmation does not match.',
-        ]);
+            // Validation for password
+            $request->validate([
+                'password' => ['required', 'string', 'min:8', 'confirmed'],
+            ], [
+                'password.required' => 'The password field is required.',
+                'password.string' => 'The password must be a string.',
+                'password.min' => 'The password must be at least 8 characters.',
+                'password.confirmed' => 'The password confirmation does not match.',
+            ]);
 
-        // Update the password
-        $account->update([
-            'password' => Hash::make($request->password),
-        ]);
+            // Update the password
+            $account->update([
+                'password' => Hash::make($request->password),
+            ]);
 
-        // Prepare the response
-        $response = [
-            'isSuccess' => true,
-            'message' => "Password successfully updated.",
-            'user' => [
-                'id' => $account->id,
-                'email' => $account->email,
-                'updated_at' => $account->updated_at,
-            ],
-        ];
+            // Prepare the response
+            $response = [
+                'isSuccess' => true,
+                'message' => "Password successfully updated.",
+                'user' => [
+                    'id' => $account->id,
+                    'email' => $account->email,
+                    'updated_at' => $account->updated_at,
+                ],
+            ];
 
-        $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
-        return response()->json($response, 200);
-    } catch (ValidationException $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => "Failed to update password due to validation errors.",
-            'errors' => $e->errors(),
-        ];
-        $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
-        return response()->json($response, 422);
-    } catch (Throwable $e) {
-        $response = [
-            'isSuccess' => false,
-            'message' => "Failed to update password due to an unexpected error.",
-            'error' => $e->getMessage(),
-        ];
-        $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
-        return response()->json($response, 500);
+            $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
+            return response()->json($response, 200);
+        } catch (ValidationException $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => "Failed to update password due to validation errors.",
+                'errors' => $e->errors(),
+            ];
+            $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
+            return response()->json($response, 422);
+        } catch (Throwable $e) {
+            $response = [
+                'isSuccess' => false,
+                'message' => "Failed to update password due to an unexpected error.",
+                'error' => $e->getMessage(),
+            ];
+            $this->logAPICalls('updatepassword', $id, $request->all(), [$response]);
+            return response()->json($response, 500);
+        }
     }
-}
 
     public function deactivateAccount($id)
     {
         try {
             // Find the account by ID
             $account = Account::findOrFail($id);
-    
+
             // Check if the account is not already archived
             if ($account->is_archived === 0) {
                 // Update is_archived to 1 (archive the account)
                 $account->update(['is_archived' => 1]);
-    
+
                 $response = [
                     'isSuccess' => true,
                     'message' => 'Account has been archived successfully.',
                     'account' => $account
                 ];
-    
+
                 $this->logAPICalls('changeStatusToInactive', $account->id, [], $response);
-    
+
                 return response()->json($response, 200);
             }
-    
+
             // If the account is already archived
             $response = [
                 'isSuccess' => false,
                 'message' => 'Account is already archived.'
             ];
-    
+
             $this->logAPICalls('changeStatusToInactive', $id, [], $response);
-    
+
             return response()->json($response, 400);
         } catch (Throwable $e) {
             $response = [
@@ -388,13 +390,13 @@ public function updatePassword(Request $request, $id)
                 'message' => 'Failed to archive the account.',
                 'error' => $e->getMessage()
             ];
-    
+
             $this->logAPICalls('changeStatusToInactive', $id, [], $response);
-    
+
             return response()->json($response, 500);
         }
     }
-    
+
     public function resetPasswordToDefault(Request $request)
     {
         try {
@@ -515,25 +517,226 @@ public function updatePassword(Request $request, $id)
         }
     }
 
-    public function getOrganizationLogs()
+    public function addBillingAddress(Request $request)
     {
-        try {
-            $organizationLogs = OrganizationalLog::select('id', 'name')->get();
+        $user = Auth::user();
 
-            $response = [
-                'isSuccess' => true,
-                'data' => $organizationLogs
-            ];
-            return response()->json($response, 200);
-        } catch (Throwable $e) {
-            $response = [
+        if (!$user) {
+            return response()->json([
                 'isSuccess' => false,
-                'message' => 'Failed to fetch organization logs.',
-                'error' => $e->getMessage()
-            ];
-            return response()->json($response, 500);
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        try {
+            $validatedData = $request->validate([
+                'address_line1' => 'required|string|max:255',
+                'address_line2' => 'nullable|string|max:255',
+                'city' => 'required|string|max:100',
+                'province' => 'required|string|max:100',
+                'postal_code' => 'required|string|max:20',
+                'country' => 'required|string|max:100',
+            ]);
+
+            // Fetch the user's existing account
+            $account = Account::where('id', $user->id)->first();
+
+            if (!$account) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Account not found for the user.',
+                ], 404);
+            }
+
+            // Update the billing address info in the account
+            $account->update($validatedData);
+
+            // Return only selected fields
+            $billingAddress = $account->only([
+                'id',
+                'first_name',
+                'middle_name',
+                'last_name',
+                'address_line1',
+                'address_line2',
+                'city',
+                'province',
+                'postal_code',
+                'country',
+            ]);
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Billing address created successfully.',
+                'billing_address' => $billingAddress,
+            ], 201);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'An error occurred while creating the billing address.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
+
+    public function editBillingAddress(Request $request, $id)
+    {
+        $user = Auth::user();
+    
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+    
+        try {
+            $validated = $request->validate([
+                'address_line1' => 'required|string|max:255',
+                'address_line2' => 'nullable|string|max:255',
+                'city' => 'required|string|max:100',
+                'province' => 'required|string|max:100',
+                'postal_code' => 'required|string|max:20',
+                'country' => 'required|string|max:100',
+            ]);
+    
+            // Get the record ensuring the user owns it
+            $billingAddress = Account::where('id', $id)
+                ->firstOrFail();
+    
+            $billingAddress->update($validated);
+    
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Billing address updated successfully.',
+                'billing_address' => [
+                    'id' => $billingAddress->id,
+                    'first_name' => $billingAddress->first_name,
+                    'middle_name' => $billingAddress->middle_name,
+                    'last_name' => $billingAddress->last_name,
+                    'phone_number' => $billingAddress->phone_number,
+                    'address_line1' => $billingAddress->address_line1,
+                    'address_line2' => $billingAddress->address_line2,
+                    'city' => $billingAddress->city,
+                    'province' => $billingAddress->province,
+                    'postal_code' => $billingAddress->postal_code,
+                    'country' => $billingAddress->country,
+                ],
+            ], 200);
+    
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Billing address not found for this user.',
+            ], 404);
+        } catch (ValidationException $v) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Validation failed.',
+                'errors' => $v->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'An error occurred while updating the billing address.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function removeBillingAddress(Request $request, $id)
+    {
+        $user = Auth::user();
+    
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+    
+        try {
+            // Find the account record that belongs to this user
+            $billingAddress = Account::where('id', $id)
+                ->firstOrFail();
+    
+            // Clear out billing address fields (if you're not deleting the row)
+            $billingAddress->update([
+                'address_line1' => '',
+                'address_line2' => '',
+                'city' => '',
+                'province' => '',
+                'postal_code' => '',
+                'country' => '',
+            ]);
+    
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Billing address removed successfully.',
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Billing address not found for this user.',
+            ], 404);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'An error occurred while removing the billing address.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+
+    public function listBillingAddress()
+    {
+        $user = Auth::user();
+    
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+    
+        try {
+            $account = Account::where('id', $user->id)->first();
+    
+            if (!$account) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Account not found for the user.',
+                ], 404);
+            }
+    
+            $billingAddress = $account->only([
+                'id',
+                'first_name',
+                'middle_name',
+                'last_name',
+                'phone_number',
+                'address_line1',
+                'address_line2',
+                'city',
+                'province',
+                'postal_code',
+                'country',
+            ]);
+    
+            return response()->json([
+                'isSuccess' => true,
+                'billing_address' => $billingAddress,
+            ], 200);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'An error occurred while fetching the billing address.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
 
     // Log all API calls.
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
@@ -556,5 +759,5 @@ public function updatePassword(Request $request, $id)
         }
         return true; // Indicate success
     }
-
 }
+

@@ -138,8 +138,6 @@ Route::controller(AccountController::class)->group(function () {
 });
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
-
-
 Route::prefix('category')->group(function () {
 
     Route::post('create', [CategoryController::class, 'createCategory']);
@@ -160,10 +158,9 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('buynow/{id}', [ProductController::class, 'buyNow']);
     Route::post('checkout-preview', [ProductController::class, 'getCheckoutPreview']);
     Route::get('cart-item-details/{id}', [ProductController::class, 'getCartItemDetails']);
+    Route::get('list-cart-status', [ProductController::class, 'getCartListStatus']);
     Route::post('checkout/item/{id}', [ProductController::class, 'checkoutItem']);
 });
-
-
 
 Route::post('list', [ProductController::class, 'getAllProductsList']);
 Route::post('product-list-id', [ProductController::class, 'getAllProductbyId']);
@@ -196,7 +193,25 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebhook']);
 
+
+
+
+
+
+// final payment cod and gcash and maya gateway
 Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('pay', [PaymentController::class, 'payment']);
+});
+
+
+
+
+
+
+
+
 
 Route::middleware('auth:sanctum')->group(function () {
     // Chat Sessions
@@ -218,11 +233,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products/{product}/ratings', [RatingController::class, 'index'])->name('ratings.index');
 });
 
-Route::prefix('address')->group(function () {
-    Route::get('get/{id}', [AddressController::class, 'index']);
-    Route::post('add/{id}', [AddressController::class, 'store']);
-    Route::put('update/{accountId}/{addressId}', [AddressController::class, 'update']);
-    Route::delete('delete/address/{accountId}/{addressId}', [AddressController::class, 'destroy']);
+Route::prefix('billing-address')->middleware('auth:sanctum')->group(function () {
+    Route::post('add', [AccountController::class, 'addBillingAddress']);
+    Route::post('edit/{id}', [AccountController::class, 'editBillingAddress']);
+    Route::post('remove/{id}', [AccountController::class, 'removeBillingAddress']);
+    Route::get('get', [AccountController::class, 'listBillingAddress']);
 });
 
 // other routes...
