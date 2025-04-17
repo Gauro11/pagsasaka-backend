@@ -478,6 +478,32 @@ class ProductController extends Controller
         }
     }
 
+
+    //seller dashboard
+    public function getAllProducts(Request $request)
+    {
+        try {
+            // Get the authenticated farmer's ID
+            $farmerId = Auth::id();
+
+            // Fetch all products belonging to the farmer
+            $products = Product::where('farmer_id', $farmerId)->get();
+
+            // Return the total count of products
+            return response()->json([
+                'success' => true,
+                'allProducts' => $products->count(),
+                'products' => $products
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch products',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     // public function buyProduct(Request $request, $product_id)
     // {
     //     $user = Auth::user();

@@ -340,3 +340,9 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
 //     Route::post('history', 'history');
 
 // });
+
+
+//seller dasboard 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/products/all', [ProductController::class, 'getAllProducts']);
+});
