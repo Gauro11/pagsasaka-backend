@@ -1145,6 +1145,30 @@ class ProductController extends Controller
         }
     }
 
+    public function getMyPublishedProducts()
+{
+    $account = Auth::user(); // Get the currently authenticated user
+
+    if (!$account) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Unauthorized',
+        ], 401);
+    }
+
+    $products = Product::where('account_id', $account->id)
+        ->where('visibility', 'Published')
+        ->where('is_archived', 0)
+        ->select('id', 'product_name', 'price', 'stocks', 'product_img') // Replace with actual image column
+        ->get();
+
+    return response()->json([
+        'isSuccess' => true,
+        'products' => $products,
+    ]);
+}
+
+
     //     public function checkout(Request $request)
     // {
     //     $user = Auth::user();
