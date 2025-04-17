@@ -102,8 +102,8 @@ class PaymentController extends Controller
         // ✅ Format phone number
         $rawPhone = $account->phone_number;
         if (preg_match('/^09\d{9}$/', $rawPhone)) {
-            $phone = '+63' . substr($rawPhone, 1);
-        } elseif (preg_match('/^\+63\d{10}$/', $rawPhone)) {
+            $phone = '' . substr($rawPhone, 1);
+        } elseif (preg_match('/^\\d{10}$/', $rawPhone)) {
             $phone = $rawPhone;
         } else {
             $phone = null;
