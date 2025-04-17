@@ -483,22 +483,33 @@ class ProductController extends Controller
     public function getFarmerProductCount(Request $request)
     {
         try {
-            // Get the authenticated farmer's ID
-            $farmerId = Auth::id();
-            \Log::info('Farmer ID: ' . $farmerId);
+            // Get the authenticated user
+            $farmer = Auth::user();
+            \Log::info('Authenticated User ID: ' . ($farmer ? $farmer->id : 'null'));
 
-            if (!$farmerId) {
+            if (!$farmer) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'User not authenticated',
                 ], 401);
             }
 
+            // Check if the user is a farmer using the role relationship
+            $role = $farmer->role;
+            if (!$role || $role->role !== 'Farmer') { // Use the 'role' column from the Role model
+                \Log::info('User role: ' . ($role ? $role->role : 'not found'));
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'User is not a farmer',
+                    'totalProducts' => 0,
+                ], 403);
+            }
+
             // Get the total count of the farmer's products
-            $totalProducts = Product::where('account_id', $farmerId)
+            $totalProducts = Product::where('account_id', $farmer->id)
                 ->where('is_archived', '0')
                 ->count();
-            \Log::info('Total products for farmer: ' . $totalProducts);
+            \Log::info('Total products for farmer ID ' . $farmer->id . ': ' . $totalProducts);
 
             // Return the total count
             return response()->json([
