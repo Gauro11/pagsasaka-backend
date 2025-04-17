@@ -59,12 +59,14 @@ class CODOrderController extends Controller
             $totalAmount = $product->price * $item['quantity'];
             $totalOverall += $totalAmount;
 
+            $deliveryAddress = $account->delivery_address ?? 'No address provided';
+
             $order = Order::create([
                 'account_id' => $userId,
                 'product_id' => $product->id,
                 'quantity' => $item['quantity'],
                 'total_amount' => $totalAmount,
-                'ship_to' => '',
+                'ship_to' => $deliveryAddress,
                 'status' => 'Order placed',
                 'delivery_proof' => '',
             ]);
