@@ -114,7 +114,7 @@ class PaymentController extends Controller
                 'attributes' => [
                     'line_items' => $lineItems,
                     'payment_method_types' => ['gcash', 'paymaya'],
-                    'success_url' => url('/market'),
+                    'success_url' => url('https://pagsasaka.bpc-bsis4d.com/market'),
                     'cancel_url' => url('/cancel'),
                     'description' => 'Payment for multiple products',
                     'metadata' => [
