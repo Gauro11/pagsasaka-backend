@@ -343,6 +343,4 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
 
 
 //seller dasboard 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/products/all', [ProductController::class, 'getAllProducts']);
-});
+Route::middleware('auth:sanctum')->get('farmer-product-count', [ProductController::class, 'getFarmerProductCount']);

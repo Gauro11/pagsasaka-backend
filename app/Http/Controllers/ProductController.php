@@ -480,26 +480,38 @@ class ProductController extends Controller
 
 
     //seller dashboard
-    public function getAllProducts(Request $request)
+    public function getFarmerProductCount(Request $request)
     {
         try {
             // Get the authenticated farmer's ID
             $farmerId = Auth::id();
+            \Log::info('Farmer ID: ' . $farmerId);
 
-            // Fetch all products belonging to the farmer
-            $products = Product::where('farmer_id', $farmerId)->get();
+            if (!$farmerId) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
 
-            // Return the total count of products
+            // Get the total count of the farmer's products
+            $totalProducts = Product::where('account_id', $farmerId)
+                ->where('is_archived', '0')
+                ->count();
+            \Log::info('Total products for farmer: ' . $totalProducts);
+
+            // Return the total count
             return response()->json([
-                'success' => true,
-                'allProducts' => $products->count(),
-                'products' => $products
+                'isSuccess' => true,
+                'message' => 'Product count retrieved successfully.',
+                'totalProducts' => $totalProducts,
             ], 200);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \Log::error('Error fetching product count: ' . $e->getMessage());
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch products',
-                'error' => $e->getMessage()
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve product count.',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
