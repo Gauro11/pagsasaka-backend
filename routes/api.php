@@ -30,7 +30,7 @@ use App\Http\Controllers\SalesController;
 use App\Http\Controllers\RiderController;
 
 
-use App\Http\Controllers\CODOrderController;
+use App\Http\Controllers\CodOrderController;
 
 
 use App\Http\Controllers\ChatSessionController;
@@ -200,7 +200,7 @@ Route::post('/paymongo/webhook', [PaymentController::class, 'handlePaymongoWebho
 
 // final payment cod and gcash and maya gateway
 // Route::post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
-Route::middleware('auth:sanctum')->post('/orders/cod', [CODOrderController::class, 'createCODOrder']);
+Route::middleware('auth:sanctum')->post('/orders/cod', [CodOrderController::class, 'createCODOrder']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('pay', [PaymentController::class, 'payment']);
