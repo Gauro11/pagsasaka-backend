@@ -485,7 +485,7 @@ class ProductController extends Controller
         try {
             // Get the authenticated user
             $farmer = Auth::user();
-            \Log::info('Authenticated User ID: ' . ($farmer ? $farmer->id : 'null'));
+            Log::info('Authenticated User ID: ' . ($farmer ? $farmer->id : 'null'));
 
             if (!$farmer) {
                 return response()->json([
@@ -497,7 +497,7 @@ class ProductController extends Controller
             // Check if the user is a farmer using the role relationship
             $role = $farmer->role;
             if (!$role || $role->role !== 'Farmer') { // Use the 'role' column from the Role model
-                \Log::info('User role: ' . ($role ? $role->role : 'not found'));
+                Log::info('User role: ' . ($role ? $role->role : 'not found'));
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'User is not a farmer',
@@ -509,7 +509,7 @@ class ProductController extends Controller
             $totalProducts = Product::where('account_id', $farmer->id)
                 ->where('is_archived', '0')
                 ->count();
-            \Log::info('Total products for farmer ID ' . $farmer->id . ': ' . $totalProducts);
+            Log::info('Total products for farmer ID ' . $farmer->id . ': ' . $totalProducts);
 
             // Return the total count
             return response()->json([
@@ -518,7 +518,7 @@ class ProductController extends Controller
                 'totalProducts' => $totalProducts,
             ], 200);
         } catch (\Throwable $e) {
-            \Log::error('Error fetching product count: ' . $e->getMessage());
+            Log::error('Error fetching product count: ' . $e->getMessage());
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Failed to retrieve product count.',

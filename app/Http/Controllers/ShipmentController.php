@@ -906,9 +906,9 @@ public function getPlacedOrders(Request $request)
     try {
         $user = $request->user(); // Authenticated user
 
-        // Fetch only orders with status "processing" or equivalent (adjust if needed)
+        // Fetch orders with status "Order Placed"
         $orders = $user->orders()
-            ->where('status', 'Order Placed') // <-- Replace with your actual 'order placed' status if different
+            ->where('status', 'Order Placed')
             ->with(['product.account']) // Load product & farmer
             ->get();
 
@@ -921,6 +921,7 @@ public function getPlacedOrders(Request $request)
                 'product_name' => $product->product_name ?? null,
                 'product_images' => $product->product_img ?? [],
                 'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount, // ✅ Total included here
                 'farmer_id' => $farmer->id ?? null,
                 'farmer_name' => $farmer 
                     ? trim("{$farmer->first_name} {$farmer->middle_name} {$farmer->last_name}")
@@ -941,7 +942,6 @@ public function getPlacedOrders(Request $request)
         ], 500);
     }
 }
-
 
 
 
