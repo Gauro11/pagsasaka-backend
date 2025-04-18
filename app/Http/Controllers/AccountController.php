@@ -39,7 +39,7 @@ class AccountController extends Controller
             'role' => 'required|exists:roles,id',
             'security_question_id' => 'required|exists:questions,id',
             'security_answer' => 'required|string|max:255',
-            'phone_number' => 'required|string|max:20',
+            'phone_number' => 'required|string|max:11',
             'delivery_address' => 'required|string|max:500',
         ]);
 
