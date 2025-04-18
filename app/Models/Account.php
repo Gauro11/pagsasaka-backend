@@ -25,7 +25,7 @@ class Account extends Authenticatable
         'avatar',
         'delivery_address',
         'address_info',
-        
+
     ];
 
     // In App\Models\Account.php

@@ -575,68 +575,6 @@ class AccountController extends Controller
         }
     }
 
-    public function addBillingAddress(Request $request)
-    {
-        $user = Auth::user();
-
-        if (!$user) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'User not authenticated',
-            ], 401);
-        }
-
-        try {
-            $validatedData = $request->validate([
-                'address_line1' => 'required|string|max:255',
-                'address_line2' => 'nullable|string|max:255',
-                'city' => 'required|string|max:100',
-                'province' => 'required|string|max:100',
-                'postal_code' => 'required|string|max:20',
-                'country' => 'required|string|max:100',
-            ]);
-
-            // Fetch the user's existing account
-            $account = Account::where('id', $user->id)->first();
-
-            if (!$account) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Account not found for the user.',
-                ], 404);
-            }
-
-            // Update the billing address info in the account
-            $account->update($validatedData);
-
-            // Return only selected fields
-            $billingAddress = $account->only([
-                'id',
-                'first_name',
-                'middle_name',
-                'last_name',
-                'address_line1',
-                'address_line2',
-                'city',
-                'province',
-                'postal_code',
-                'country',
-            ]);
-
-            return response()->json([
-                'isSuccess' => true,
-                'message' => 'Billing address created successfully.',
-                'billing_address' => $billingAddress,
-            ], 201);
-        } catch (Throwable $e) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'An error occurred while creating the billing address.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
     public function editBillingAddress(Request $request, $id)
     {
         $user = Auth::user();
@@ -650,12 +588,8 @@ class AccountController extends Controller
     
         try {
             $validated = $request->validate([
-                'address_line1' => 'required|string|max:255',
-                'address_line2' => 'nullable|string|max:255',
-                'city' => 'required|string|max:100',
-                'province' => 'required|string|max:100',
-                'postal_code' => 'required|string|max:20',
-                'country' => 'required|string|max:100',
+                'delivery_address' => 'required|string|max:255',
+                'address_info' => 'nullable|string|max:255',
             ]);
     
             // Get the record ensuring the user owns it
@@ -673,12 +607,8 @@ class AccountController extends Controller
                     'middle_name' => $billingAddress->middle_name,
                     'last_name' => $billingAddress->last_name,
                     'phone_number' => $billingAddress->phone_number,
-                    'address_line1' => $billingAddress->address_line1,
-                    'address_line2' => $billingAddress->address_line2,
-                    'city' => $billingAddress->city,
-                    'province' => $billingAddress->province,
-                    'postal_code' => $billingAddress->postal_code,
-                    'country' => $billingAddress->country,
+                    'delivery_address' => $billingAddress->delivery_address,
+                    'address_info' => $billingAddress->address_info,
                 ],
             ], 200);
     
@@ -701,51 +631,6 @@ class AccountController extends Controller
             ], 500);
         }
     }
-
-    public function removeBillingAddress(Request $request, $id)
-    {
-        $user = Auth::user();
-    
-        if (!$user) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'User not authenticated',
-            ], 401);
-        }
-    
-        try {
-            // Find the account record that belongs to this user
-            $billingAddress = Account::where('id', $id)
-                ->firstOrFail();
-    
-            // Clear out billing address fields (if you're not deleting the row)
-            $billingAddress->update([
-                'address_line1' => '',
-                'address_line2' => '',
-                'city' => '',
-                'province' => '',
-                'postal_code' => '',
-                'country' => '',
-            ]);
-    
-            return response()->json([
-                'isSuccess' => true,
-                'message' => 'Billing address removed successfully.',
-            ], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Billing address not found for this user.',
-            ], 404);
-        } catch (Throwable $e) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'An error occurred while removing the billing address.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-    
 
     public function listBillingAddress()
     {
@@ -770,16 +655,13 @@ class AccountController extends Controller
     
             $billingAddress = $account->only([
                 'id',
+                'avatar',
                 'first_name',
                 'middle_name',
                 'last_name',
                 'phone_number',
-                'address_line1',
-                'address_line2',
-                'city',
-                'province',
-                'postal_code',
-                'country',
+                'delivery_address',
+                'address_info',
             ]);
     
             return response()->json([
@@ -795,7 +677,6 @@ class AccountController extends Controller
         }
     }
     
-
     // Log all API calls.
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {

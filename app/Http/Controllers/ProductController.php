@@ -370,46 +370,58 @@ class ProductController extends Controller
     {
         try {
             // Ensure the user is authenticated
-            if (!auth()->check()) {
+            $user = auth()->user();
+            if (!$user) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'Unauthorized. Please log in to view products.',
                 ], 401);
             }
-
-            // Get the authenticated user's account ID
-            $accountId = auth()->id();
-
-            // Get optional query parameters
-            $searchTerm = $request->input('search', null); // Optional search term
-            $perPage = $request->input('per_page', 10); // Items per page (default: 10)
-
+    
+            $accountId = $user->id;
+    
+            // Optional query parameters
+            $searchTerm = $request->input('search');
+            $perPage = $request->input('per_page', 10);
+    
             // Build the query
-            $query = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'unit', 'product_img', 'category_id', 'visibility', 'is_archived')
-                ->where('account_id', $accountId)
-                ->where('is_archived', '0') // Assuming we only want active products
-                ->when($searchTerm, function ($query, $searchTerm) {
-                    return $query->where(function ($activeQuery) use ($searchTerm) {
-                        $activeQuery->where('product_name', 'like', '%' . $searchTerm . '%')
-                            ->orWhere('description', 'like', '%' . $searchTerm . '%');
-                    });
+            $query = Product::select(
+                'id', 'product_name', 'description', 'price', 'stocks', 'unit',
+                'product_img', 'category_id', 'visibility', 'is_archived'
+            )
+            ->where('account_id', $accountId)
+            ->where('is_archived', '0')
+            ->when($searchTerm, function ($query, $searchTerm) {
+                return $query->where(function ($subQuery) use ($searchTerm) {
+                    $subQuery->where('product_name', 'like', '%' . $searchTerm . '%')
+                             ->orWhere('description', 'like', '%' . $searchTerm . '%');
                 });
-
-            // Paginate results
-            $result = $query->paginate($perPage);
-
-            // Check if results are empty
-            if ($result->isEmpty()) {
+            });
+    
+            // Paginate the results
+            $products = $query->paginate($perPage);
+    
+            if ($products->isEmpty()) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'No products found for your account matching the criteria.',
                 ], 404);
             }
-
+    
+            // Prepare seller info
+            $fullName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
+            $avatar = $user->avatar ?? null; // Get avatar if available
+            $totalProducts = Product::where('account_id', $accountId)
+                ->where('is_archived', '0')
+                ->count();
+    
             // Format the products
-            $formattedProducts = $result->getCollection()->transform(function ($product) {
+            $formattedProducts = $products->getCollection()->transform(function ($product) use ($fullName, $totalProducts, $avatar) {
                 return [
                     'id' => $product->id,
+                    'avatar' => $avatar,
+                    'name' => $fullName,
+                    'total_products' => $totalProducts,
                     'product_name' => $product->product_name,
                     'description' => $product->description,
                     'price' => number_format($product->price, 2),
@@ -421,19 +433,20 @@ class ProductController extends Controller
                     'is_archived' => $product->is_archived == 0,
                 ];
             });
-
-            // Return the response
+    
+            // Final response
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Products retrieved successfully.',
                 'products' => $formattedProducts,
                 'pagination' => [
-                    'total' => $result->total(),
-                    'per_page' => $result->perPage(),
-                    'current_page' => $result->currentPage(),
-                    'last_page' => $result->lastPage(),
+                    'total' => $products->total(),
+                    'per_page' => $products->perPage(),
+                    'current_page' => $products->currentPage(),
+                    'last_page' => $products->lastPage(),
                 ],
             ], 200);
+    
         } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
@@ -442,7 +455,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
+    
     public function deleteProduct($id)
     {
         try {
