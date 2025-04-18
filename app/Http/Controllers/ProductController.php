@@ -1286,6 +1286,8 @@ public function getMyPublishedProducts()
 }
 
 
+
+
     //     public function checkout(Request $request)
     // {
     //     $user = Auth::user();
