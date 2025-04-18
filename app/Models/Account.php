@@ -23,12 +23,9 @@ class Account extends Authenticatable
         'phone_number',
         'is_archived',
         'avatar',
-        'address_line1',
-        'address_line2',
-        'city',
-        'province',
-        'postal_code',
-        'country',
+        'delivery_address',
+        'address_info',
+
     ];
 
     // In App\Models\Account.php
