@@ -136,6 +136,8 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('account/deactivate/{id}', 'deactivateAccount');
     Route::post('account/update-password/{id}', 'updatePassword');
 });
+Route::middleware('auth:sanctum')->post('avatar', [AccountController::class, 'updateAvatar']);
+
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 
 Route::prefix('category')->group(function () {
