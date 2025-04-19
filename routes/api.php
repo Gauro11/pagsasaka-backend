@@ -65,7 +65,7 @@ Route::middleware('auth:sanctum')->post('refundapprove/{order_id}', [ShipmentCon
 
 
 Route::middleware('auth:sanctum')->get('my-placed-orders', [ShipmentController::class, 'getPlacedOrders']);
-
+Route::middleware('auth:sanctum')->get('toship-orders', [ShipmentController::class, 'getWaitingForCourierOrders']);
 
 Route::middleware('auth:sanctum')->get('my-products', [ProductController::class, 'getMyPublishedProducts']);
 

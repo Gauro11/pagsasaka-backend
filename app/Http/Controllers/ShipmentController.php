@@ -945,6 +945,52 @@ public function getPlacedOrders(Request $request)
 
 
 
+public function getWaitingForCourierOrders(Request $request)
+{
+    try {
+        $user = $request->user(); // Authenticated user
+
+        // Fetch orders with status "Waiting for Courier"
+        $orders = $user->orders()
+            ->where('status', 'Waiting for Courier')
+            ->with(['product.account']) // Load product & farmer
+            ->get();
+
+        $waitingOrders = $orders->map(function ($order) {
+            $product = $order->product;
+            $farmer = $product->account ?? null;
+
+            return [
+                'order_id' => $order->id,
+                'product_name' => $product->product_name ?? null,
+                'product_images' => $product->product_img ?? [],
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'farmer_id' => $farmer->id ?? null,
+                'farmer_name' => $farmer 
+                    ? trim("{$farmer->first_name} {$farmer->middle_name} {$farmer->last_name}")
+                    : null,
+                'order_date' => $order->created_at->toDateString(),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'waiting_for_courier' => $waitingOrders
+        ]);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch waiting for courier orders.',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+
+
+
     
 
 
