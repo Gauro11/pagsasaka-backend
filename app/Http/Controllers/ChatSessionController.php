@@ -148,7 +148,7 @@ class ChatSessionController extends Controller
     }
 }
 
-    public function store(Request $request)
+public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'user2_id' => 'required|exists:accounts,id|not_in:' . Auth::id(),
@@ -157,6 +157,7 @@ class ChatSessionController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
+                'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
         }
@@ -188,10 +189,15 @@ class ChatSessionController extends Controller
         })->first();
 
         if ($existingSession) {
+            $chatPartner = Account::find($existingSession->user1_id == $user->id ? $existingSession->user2_id : $existingSession->user1_id);
             return response()->json([
                 'success' => true,
                 'message' => 'Chat session already exists',
-                'data' => $existingSession
+                'data' => [
+                    'id' => $existingSession->id,
+                    'chat_partner_name' => $chatPartner->first_name . ' ' . $chatPartner->last_name,
+                    'chat_partner_avatar' => $chatPartner->avatar,
+                ]
             ], 200);
         }
 
@@ -200,10 +206,16 @@ class ChatSessionController extends Controller
             'user2_id' => $request->user2_id,
         ]);
 
+        $chatPartner = Account::find($request->user2_id);
+
         return response()->json([
             'success' => true,
             'message' => 'Chat session created successfully',
-            'data' => $chatSession
+            'data' => [
+                'id' => $chatSession->id,
+                'chat_partner_name' => $chatPartner->first_name . ' ' . $chatPartner->last_name,
+                'chat_partner_avatar' => $chatPartner->avatar,
+            ]
         ], 201);
     }
 
