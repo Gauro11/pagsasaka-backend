@@ -34,17 +34,17 @@ class AuthController extends Controller
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
-
+    
             $user = Account::where('email', $request->email)
                 ->with('role')
                 ->first();
-
+    
             $isRider = false;
-
+    
             if (!$user) {
                 $user = Rider::where('email', $request->email)->first();
                 $isRider = true;
-
+    
                 if ($user && in_array($user->status, ['Pending', 'Invalid'])) {
                     return response()->json([
                         'isSuccess' => false,
@@ -52,18 +52,26 @@ class AuthController extends Controller
                     ], 403);
                 }
             }
-
+    
             if ($user && Hash::check($request->password, $user->password)) {
                 $token = $user->createToken('auth-token')->plainTextToken;
                 $sessionCode = $this->insertSession($user->id);
-
+    
                 if (!$sessionCode) {
                     return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
                 }
-
-                // Hide password before response
-                $user->makeHidden(['password', 'security_id', 'security_answer', 'is_archived', 'created_at', 'updated_at', 'role']);
-
+    
+                // Unhide avatar and hide sensitive fields
+                $user->makeHidden([
+                    'password',
+                    'security_id',
+                    'security_answer',
+                    'is_archived',
+                    'created_at',
+                    'updated_at',
+                    'role'
+                ])->makeVisible(['avatar']);
+    
                 $response = [
                     'isSuccess' => true,
                     'message' => 'Logged in successfully',
@@ -73,13 +81,13 @@ class AuthController extends Controller
                     'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
                     'role_id' => $isRider ? 4 : ($user->role_id ?? null)
                 ];
-
-                // Log API call without password
+    
+                // Log API call (exclude sensitive input fields)
                 $this->logAPICalls('login', $request->email, $request->except('password', 'security_id', 'security_answer'), $response);
-
+    
                 return response()->json($response, 200);
             }
-
+    
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Invalid credentials.',
@@ -92,6 +100,7 @@ class AuthController extends Controller
             ], 500);
         }
     }
+    
 
     
     

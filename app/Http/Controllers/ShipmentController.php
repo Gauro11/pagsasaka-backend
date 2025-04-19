@@ -991,6 +991,51 @@ public function getWaitingForCourierOrders(Request $request)
 }
 
 
+public function orderIntransitStatus(Request $request)
+{
+    try {
+        $user = $request->user(); // Authenticated user
+
+        // Fetch orders with status "In Transit"
+        $orders = $user->orders()
+            ->where('status', 'In transit')
+            ->with(['product.account']) // Load product & farmer
+            ->get();
+
+        $inTransitOrders = $orders->map(function ($order) {
+            $product = $order->product;
+            $farmer = $product->account ?? null;
+
+            return [
+                'order_id' => $order->id,
+                'product_name' => $product->product_name ?? null,
+                'product_images' => $product->product_img ?? [],
+                'unit' => $product->unit ?? null,
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'farmer_id' => $farmer->id ?? null,
+                'farmer_name' => $farmer 
+                    ? trim("{$farmer->first_name} {$farmer->middle_name} {$farmer->last_name}")
+                    : null,
+                'order_date' => $order->created_at->toDateString(),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'in_transit_orders' => $inTransitOrders
+        ]);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch in transit orders.',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+
 
 
 
