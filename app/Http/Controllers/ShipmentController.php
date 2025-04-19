@@ -920,8 +920,9 @@ public function getPlacedOrders(Request $request)
                 'order_id' => $order->id,
                 'product_name' => $product->product_name ?? null,
                 'product_images' => $product->product_img ?? [],
+                'unit' => $product->unit ?? null, // 👈 include unit from products table
                 'quantity' => $order->quantity,
-                'total_amount' => $order->total_amount, // ✅ Total included here
+                'total_amount' => $order->total_amount,
                 'farmer_id' => $farmer->id ?? null,
                 'farmer_name' => $farmer 
                     ? trim("{$farmer->first_name} {$farmer->middle_name} {$farmer->last_name}")
@@ -945,6 +946,7 @@ public function getPlacedOrders(Request $request)
 
 
 
+
 public function getWaitingForCourierOrders(Request $request)
 {
     try {
@@ -964,6 +966,7 @@ public function getWaitingForCourierOrders(Request $request)
                 'order_id' => $order->id,
                 'product_name' => $product->product_name ?? null,
                 'product_images' => $product->product_img ?? [],
+                'unit' => $product->unit ?? null, // 👈 add unit here
                 'quantity' => $order->quantity,
                 'total_amount' => $order->total_amount,
                 'farmer_id' => $farmer->id ?? null,
@@ -986,6 +989,7 @@ public function getWaitingForCourierOrders(Request $request)
         ], 500);
     }
 }
+
 
 
 
