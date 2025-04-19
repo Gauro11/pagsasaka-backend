@@ -152,7 +152,7 @@ Route::prefix('category')->group(function () {
 Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::post('add', [ProductController::class, 'addProduct']);
     Route::post('edit/{id}', [ProductController::class, 'editProduct']);
-    Route::post('account', [ProductController::class, 'getProductsByAccountId']);
+    Route::post('shop/{id}', [ProductController::class, 'viewShop']);
     Route::post('delete/{id}', [ProductController::class, 'deleteProduct']);
     Route::post('cart/{id}', [ProductController::class, 'addToCart']);
     Route::post('cart-list', [ProductController::class, 'getCartList']);                                                                
