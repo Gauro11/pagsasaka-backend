@@ -344,19 +344,55 @@ class ProductController extends Controller
     {
         try {
             $product = Product::find($id);
-
+    
             if (!$product) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'Product not found.',
                 ], 404);
             }
-
+    
+            // Fetch the seller account using account_id
+            $sellerAccount = Account::find($product->account_id);
+    
+            $sellerName = null;
+            $sellerAvatar = null;
+    
+            if ($sellerAccount) {
+                $sellerName = trim("{$sellerAccount->first_name} {$sellerAccount->middle_name} {$sellerAccount->last_name}");
+                $sellerAvatar = $sellerAccount->avatar; 
+            }
+    
+            // Count only non-archived products for this seller
+            $totalProducts = Product::where('account_id', $product->account_id)
+                ->where('is_archived', 0)
+                ->count();
+    
+            $responseProduct = [
+                'id' => $product->id,
+                'category_id' => $product->category_id,
+                'product_name' => $product->product_name,
+                'description' => $product->description,
+                'price' => number_format($product->price, 2),
+                'stocks' => $product->stocks,
+                'unit' => $product->unit,
+                'product_img' => $product->product_img,
+                'visibility' => $product->visibility,
+                'account_id' => $product->account_id,
+                'seller_name' => $sellerName,
+                'seller_avatar' => $sellerAvatar,
+                'total_products' => $totalProducts,
+                'is_archived' => $product->is_archived,
+                'created_at' => $product->created_at,
+                'updated_at' => $product->updated_at,
+            ];
+    
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Product retrieved successfully.',
-                'product' => [$product],
+                'product' => [$responseProduct],
             ], 200);
+    
         } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
@@ -365,63 +401,37 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
-    public function getProductsByAccountId(Request $request)
+    
+    public function viewShop($accountId, Request $request)
     {
         try {
-            // Ensure the user is authenticated
-            $user = auth()->user();
-            if (!$user) {
+            $seller = Account::select('id', 'first_name', 'middle_name', 'last_name', 'avatar')
+                ->where('id', $accountId)
+                ->first();
+    
+            if (!$seller) {
                 return response()->json([
                     'isSuccess' => false,
-                    'message' => 'Unauthorized. Please log in to view products.',
-                ], 401);
-            }
-    
-            $accountId = $user->id;
-    
-            // Optional query parameters
-            $searchTerm = $request->input('search');
-            $perPage = $request->input('per_page', 10);
-    
-            // Build the query
-            $query = Product::select(
-                'id', 'product_name', 'description', 'price', 'stocks', 'unit',
-                'product_img', 'category_id', 'visibility', 'is_archived'
-            )
-            ->where('account_id', $accountId)
-            ->where('is_archived', '0')
-            ->when($searchTerm, function ($query, $searchTerm) {
-                return $query->where(function ($subQuery) use ($searchTerm) {
-                    $subQuery->where('product_name', 'like', '%' . $searchTerm . '%')
-                             ->orWhere('description', 'like', '%' . $searchTerm . '%');
-                });
-            });
-    
-            // Paginate the results
-            $products = $query->paginate($perPage);
-    
-            if ($products->isEmpty()) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'No products found for your account matching the criteria.',
+                    'message' => 'Seller not found.',
                 ], 404);
             }
     
-            // Prepare seller info
-            $fullName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
-            $avatar = $user->avatar ?? null; // Get avatar if available
+            $fullName = trim("{$seller->first_name} {$seller->middle_name} {$seller->last_name}");
+            $avatar = $seller->avatar;
+    
             $totalProducts = Product::where('account_id', $accountId)
                 ->where('is_archived', '0')
                 ->count();
     
-            // Format the products
-            $formattedProducts = $products->getCollection()->transform(function ($product) use ($fullName, $totalProducts, $avatar) {
+            $perPage = $request->input('per_page', 10);
+            $products = Product::select('id', 'product_name', 'description', 'price', 'stocks', 'unit', 'product_img', 'category_id', 'visibility', 'is_archived')
+                ->where('account_id', $accountId)
+                ->where('is_archived', '0')
+                ->paginate($perPage);
+    
+            $formattedProducts = $products->getCollection()->transform(function ($product) {
                 return [
                     'id' => $product->id,
-                    'avatar' => $avatar,
-                    'name' => $fullName,
-                    'total_products' => $totalProducts,
                     'product_name' => $product->product_name,
                     'description' => $product->description,
                     'price' => number_format($product->price, 2),
@@ -434,10 +444,14 @@ class ProductController extends Controller
                 ];
             });
     
-            // Final response
             return response()->json([
                 'isSuccess' => true,
-                'message' => 'Products retrieved successfully.',
+                'message' => 'Shop products retrieved successfully.',
+                'seller' => [
+                    'name' => $fullName,
+                    'avatar' => $avatar,
+                    'total_products' => $totalProducts,
+                ],
                 'products' => $formattedProducts,
                 'pagination' => [
                     'total' => $products->total(),
@@ -450,7 +464,7 @@ class ProductController extends Controller
         } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Failed to retrieve products.',
+                'message' => 'Failed to fetch shop products.',
                 'error' => $e->getMessage(),
             ], 500);
         }
