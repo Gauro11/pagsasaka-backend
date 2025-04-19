@@ -401,6 +401,96 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function getProductsByAccountId(Request $request)
+    {
+        try {
+            // Ensure the user is authenticated
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Unauthorized. Please log in to view products.',
+                ], 401);
+            }
+    
+            $accountId = $user->id;
+    
+            // Optional query parameters
+            $searchTerm = $request->input('search');
+            $perPage = $request->input('per_page', 10);
+    
+            // Build the query
+            $query = Product::select(
+                'id', 'product_name', 'description', 'price', 'stocks', 'unit',
+                'product_img', 'category_id', 'visibility', 'is_archived'
+            )
+            ->where('account_id', $accountId)
+            ->where('is_archived', '0')
+            ->when($searchTerm, function ($query, $searchTerm) {
+                return $query->where(function ($subQuery) use ($searchTerm) {
+                    $subQuery->where('product_name', 'like', '%' . $searchTerm . '%')
+                             ->orWhere('description', 'like', '%' . $searchTerm . '%');
+                });
+            });
+    
+            // Paginate the results
+            $products = $query->paginate($perPage);
+    
+            if ($products->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No products found for your account matching the criteria.',
+                ], 404);
+            }
+    
+            // Prepare seller info
+            $fullName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
+            $avatar = $user->avatar ?? null; // Get avatar if available
+            $totalProducts = Product::where('account_id', $accountId)
+                ->where('is_archived', '0')
+                ->count();
+    
+            // Format the products
+            $formattedProducts = $products->getCollection()->transform(function ($product) use ($fullName, $totalProducts, $avatar) {
+                return [
+                    'id' => $product->id,
+                    'avatar' => $avatar,
+                    'name' => $fullName,
+                    'total_products' => $totalProducts,
+                    'product_name' => $product->product_name,
+                    'description' => $product->description,
+                    'price' => number_format($product->price, 2),
+                    'stocks' => $product->stocks,
+                    'unit' => $product->unit,
+                    'product_img' => $product->product_img,
+                    'category_id' => $product->category_id,
+                    'visibility' => $product->visibility,
+                    'is_archived' => $product->is_archived == 0,
+                ];
+            });
+    
+            // Final response
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Products retrieved successfully.',
+                'products' => $formattedProducts,
+                'pagination' => [
+                    'total' => $products->total(),
+                    'per_page' => $products->perPage(),
+                    'current_page' => $products->currentPage(),
+                    'last_page' => $products->lastPage(),
+                ],
+            ], 200);
+    
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve products.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
     
     public function viewShop($accountId, Request $request)
     {
