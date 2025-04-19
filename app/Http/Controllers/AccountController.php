@@ -26,49 +26,50 @@ class AccountController extends Controller
     // Create a new user account.pagsasaka
 
     public function updateAvatar(Request $request)
-{
-    $account = auth()->user(); // assuming you're using token-based auth like Sanctum
-
-    // Validate the avatar upload
-    $request->validate([
-        'avatar' => 'required|image|mimes:jpg,jpeg,png|max:2048',
-    ]);
-
-    try {
-        if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
-            // Generate unique filename
-            $fileName = 'Avatar-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('avatar')->getClientOriginalExtension();
-
-            // Store in public/avatars (storage/app/public/avatars)
-            $request->file('avatar')->storeAs('public/avatars', $fileName);
-
-            // Get the full public URL
-            $fileUrl = url('storage/avatars/' . $fileName);
-
-            // Save to database
-            DB::table('accounts')->where('id', $account->id)->update([
-                'avatar' => $fileUrl, // Save plain URL
-            ]);
-
-            return response()->json([
-                'isSuccess' => true,
-                'message' => 'Avatar uploaded successfully.',
-                'avatar_url' => $fileUrl,
-            ]);
-        } else {
+    {
+        $account = auth()->user(); // assuming you're using token-based auth like Sanctum
+    
+        // Validate the avatar upload
+        $request->validate([
+            'avatar' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+    
+        try {
+            if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
+                // Generate unique filename
+                $fileName = 'Avatar-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('avatar')->getClientOriginalExtension();
+    
+                // Store in avatars folder (will go to storage/app/avatars)
+                $path = $request->file('avatar')->storeAs('avatars', $fileName);
+    
+                // Make sure the file is accessible via URL (assuming you have a symbolic link with `php artisan storage:link`)
+                $fileUrl = asset('storage/' . $path); // accessible via storage/avatars/filename.ext
+    
+                // Save to database
+                DB::table('accounts')->where('id', $account->id)->update([
+                    'avatar' => $fileUrl, // Save clean URL
+                ]);
+    
+                return response()->json([
+                    'isSuccess' => true,
+                    'message' => 'Avatar uploaded successfully.',
+                    'avatar_url' => $fileUrl,
+                ]);
+            } else {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Invalid avatar file. Please try again.',
+                ], 400);
+            }
+        } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Invalid avatar file. Please try again.',
-            ], 400);
+                'message' => 'Failed to upload avatar.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-    } catch (Throwable $e) {
-        return response()->json([
-            'isSuccess' => false,
-            'message' => 'Failed to upload avatar.',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
+    
 
     
 
