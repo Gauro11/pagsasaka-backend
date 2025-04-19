@@ -26,50 +26,50 @@ class AccountController extends Controller
     // Create a new user account.pagsasaka
 
     public function updateAvatar(Request $request)
-    {
-        $account = auth()->user(); // assuming you're using token-based auth like Sanctum
-    
-        // Validate the avatar upload
-        $request->validate([
-            'avatar' => 'required|image|mimes:jpg,jpeg,png|max:2048',
-        ]);
-    
-        try {
-            if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
-                // File upload logic
-                $fileName = 'Avatar-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('avatar')->getClientOriginalExtension();
-                $path = $request->file('avatar')->storeAs('public/avatars', $fileName);
-    
-                // Generate the URL
-                $fileUrl = asset('storage/avatars/' . $fileName);
-    
-                // Format the file path as requested
-                $formattedPath = json_encode([[], $fileUrl]);
-    
-                // Save to database using the correct ID column
-                DB::table('accounts')->where('id', $account->id)->update([
-                    'avatar' => $formattedPath, // Store the formatted path as a JSON string
-                ]);
-    
-                return response()->json([
-                    'isSuccess' => true,
-                    'message' => 'Avatar uploaded successfully.',
-                    'avatar_url' => $fileUrl, // Return the file URL
-                ]);
-            } else {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Invalid avatar file. Please try again.',
-                ], 400);
-            }
-        } catch (Throwable $e) {
+{
+    $account = auth()->user(); // assuming you're using token-based auth like Sanctum
+
+    // Validate the avatar upload
+    $request->validate([
+        'avatar' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+    ]);
+
+    try {
+        if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
+            // Generate unique filename
+            $fileName = 'Avatar-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('avatar')->getClientOriginalExtension();
+
+            // Store in public/avatars (storage/app/public/avatars)
+            $request->file('avatar')->storeAs('public/avatars', $fileName);
+
+            // Get the full public URL
+            $fileUrl = url('storage/avatars/' . $fileName);
+
+            // Save to database
+            DB::table('accounts')->where('id', $account->id)->update([
+                'avatar' => $fileUrl, // Save plain URL
+            ]);
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Avatar uploaded successfully.',
+                'avatar_url' => $fileUrl,
+            ]);
+        } else {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Failed to upload avatar.',
-                'error' => $e->getMessage(),
-            ], 500);
+                'message' => 'Invalid avatar file. Please try again.',
+            ], 400);
         }
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to upload avatar.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
     
 
 
