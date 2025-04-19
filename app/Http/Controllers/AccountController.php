@@ -36,25 +36,24 @@ class AccountController extends Controller
     
         try {
             if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
-                // File upload logic
+                // Generate unique filename
                 $fileName = 'Avatar-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('avatar')->getClientOriginalExtension();
-                $path = $request->file('avatar')->storeAs('public/avatars', $fileName);
     
-                // Generate the URL
-                $fileUrl = asset('storage/avatars/' . $fileName);
+                // Store in avatars folder (will go to storage/app/avatars)
+                $path = $request->file('avatar')->storeAs('avatars', $fileName);
     
-                // Format the file path as requested
-                $formattedPath = json_encode([[], $fileUrl]);
+                // Make sure the file is accessible via URL (assuming you have a symbolic link with `php artisan storage:link`)
+                $fileUrl = asset('storage/' . $path); // accessible via storage/avatars/filename.ext
     
-                // Save to database using the correct ID column
+                // Save to database
                 DB::table('accounts')->where('id', $account->id)->update([
-                    'avatar' => $formattedPath, // Store the formatted path as a JSON string
+                    'avatar' => $fileUrl, // Save clean URL
                 ]);
     
                 return response()->json([
                     'isSuccess' => true,
                     'message' => 'Avatar uploaded successfully.',
-                    'avatar_url' => $fileUrl, // Return the file URL
+                    'avatar_url' => $fileUrl,
                 ]);
             } else {
                 return response()->json([
@@ -70,6 +69,8 @@ class AccountController extends Controller
             ], 500);
         }
     }
+    
+
     
 
 
