@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Http;
@@ -12,12 +13,12 @@ use Illuminate\Http\Request;
 use App\Models\Account;
 use App\Models\Product;
 use App\Models\Order;
-use App\Models\Cart; // Make sure this is at the top if not already
+use App\Models\Cart;
+use App\Models\Payout;
 use Exception;
 
 class PaymentController extends Controller
 {
-    
     public function payment(Request $request)
     {
         if (!Auth::check()) {
@@ -26,16 +27,16 @@ class PaymentController extends Controller
                 'message' => 'Authentication required. Please log in.',
             ], 401);
         }
-    
+
         DB::beginTransaction();
-    
+
         try {
             $validator = Validator::make($request->all(), [
                 'items' => 'required|array|min:1',
                 'items.*.product_id' => 'required|integer|exists:products,id',
                 'items.*.quantity' => 'required|integer|min:1',
             ]);
-    
+
             if ($validator->fails()) {
                 return response()->json([
                     'isSuccess' => false,
@@ -43,7 +44,7 @@ class PaymentController extends Controller
                     'errors' => $validator->errors(),
                 ], 422);
             }
-    
+
             $account = Account::find(Auth::id());
             if (!$account) {
                 DB::rollBack();
@@ -52,12 +53,12 @@ class PaymentController extends Controller
                     'message' => 'Account not found for authenticated user.',
                 ], 404);
             }
-    
+
             $items = $request->input('items');
             $lineItems = [];
             $totalAmount = 0;
             $ordersData = [];
-    
+
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
                 if (!$product) {
@@ -67,7 +68,7 @@ class PaymentController extends Controller
                         'message' => "Product ID {$item['product_id']} not found.",
                     ], 404);
                 }
-    
+
                 $quantity = min((int)$item['quantity'], $product->stocks);
                 if ($quantity <= 0 || $product->visibility !== 'Published' || $product->is_archived == 1) {
                     DB::rollBack();
@@ -76,13 +77,13 @@ class PaymentController extends Controller
                         'message' => "Product {$product->product_name} is not available for purchase.",
                     ], 400);
                 }
-    
+
                 $subtotal = $product->price * $quantity;
                 $totalAmount += $subtotal;
-    
+
                 $product->stocks -= $quantity;
                 $product->save();
-    
+
                 $lineItems[] = [
                     'currency' => 'PHP',
                     'amount' => (int)($product->price * 100),
@@ -90,16 +91,16 @@ class PaymentController extends Controller
                     'name' => $product->product_name,
                     'quantity' => $quantity,
                 ];
-    
+
                 $ordersData[] = [
                     'product_id' => $product->id,
                     'quantity' => $quantity,
                     'total_amount' => number_format($subtotal, 2, '.', ''),
                 ];
             }
-    
+
             $fullName = trim("{$account->first_name} {$account->last_name}");
-    
+
             $rawPhone = $account->phone_number;
             if (preg_match('/^09\d{9}$/', $rawPhone)) {
                 $phone = '' . substr($rawPhone, 1);
@@ -108,7 +109,7 @@ class PaymentController extends Controller
             } else {
                 $phone = null;
             }
-    
+
             $data = [
                 'data' => [
                     'attributes' => [
@@ -116,7 +117,6 @@ class PaymentController extends Controller
                         'payment_method_types' => ['gcash', 'paymaya'],
                         'success_url' => url('https://pagsasaka.bpc-bsis4d.com/market'),
                         'cancel_url' => url('/cancel'),
-                        
                         'metadata' => [
                             'account_id' => $account->id,
                             'items' => $ordersData,
@@ -131,17 +131,17 @@ class PaymentController extends Controller
                     ],
                 ],
             ];
-    
+
             Log::info("Sending PayMongo API Request", ['request' => $data]);
-    
+
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
                 'Authorization' => 'Basic ' . base64_encode(env('PAYMONGO_SECRET_KEY') . ':'),
             ])->post('https://api.paymongo.com/v1/checkout_sessions', $data);
-    
+
             $responseData = $response->json();
-    
+
             if ($response->failed() || !isset($responseData['data']['attributes']['checkout_url'])) {
                 Log::error("PayMongo error", ['response' => $responseData]);
                 DB::rollBack();
@@ -151,11 +151,11 @@ class PaymentController extends Controller
                     'paymongo_response' => $responseData,
                 ], 400);
             }
-    
+
             Session::put('checkout_session_id', $responseData['data']['id']);
-    
+
             $deliveryAddress = $account->delivery_address ?? 'No address provided';
-    
+
             foreach ($ordersData as $orderData) {
                 Order::create([
                     'account_id' => $account->id,
@@ -165,10 +165,10 @@ class PaymentController extends Controller
                     'quantity' => $orderData['quantity'],
                     'total_amount' => $orderData['total_amount'],
                     'status' => 'Order placed',
+                    'payment_method' => 'E-Wallet', // Add payment method
                 ]);
             }
-    
-            // ✅ Only delete cart items with status "CheckedOut"
+
             foreach ($ordersData as $orderData) {
                 DB::table('carts')
                     ->where('account_id', $account->id)
@@ -176,27 +176,27 @@ class PaymentController extends Controller
                     ->where('status', 'CheckedOut')
                     ->delete();
             }
-    
+
             DB::commit();
-    
+
             $emailBody = "Hello {$fullName},\n\n";
             $emailBody .= "Thank you for your purchase! Here's your receipt:\n\n";
-    
+
             foreach ($ordersData as $item) {
                 $product = Product::find($item['product_id']);
                 $productName = $product ? $product->product_name : 'Unknown Product';
                 $emailBody .= "{$item['quantity']}x {$productName} - ₱{$item['total_amount']}\n";
             }
-    
+
             $emailBody .= "\nDelivery Address: {$deliveryAddress}";
             $emailBody .= "\nTotal Amount Paid: ₱" . number_format($totalAmount, 2, '.', '');
             $emailBody .= "\n\nIf you have any questions, feel free to contact our support.\n\nBest regards,\nYour Store Team";
-    
+
             Mail::raw($emailBody, function ($message) use ($account, $fullName) {
                 $message->to($account->email, $fullName)
                         ->subject('Your Payment Receipt');
             });
-    
+
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Payment session created successfully.',
@@ -214,9 +214,212 @@ class PaymentController extends Controller
             ], 500);
         }
     }
-    
-    
 
-    
+    // Fetch payment history for the seller
+    public function getPaymentHistory(Request $request)
+    {
+        if (!Auth::check()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Authentication required. Please log in.',
+            ], 401);
+        }
 
+        $accountId = Auth::id();
+
+        $orders = Order::where('account_id', $accountId)
+            ->with('product')
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'date' => $order->created_at->format('m/d/Y'),
+                    'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
+                    'payment_method' => $order->payment_method ?? 'Unknown',
+                    'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
+                ];
+            });
+
+        return response()->json([
+            'isSuccess' => true,
+            'transactions' => $orders,
+        ]);
+    }
+
+    // Check if seller is eligible for payout and get total sales
+    public function checkPayoutEligibility(Request $request)
+    {
+        if (!Auth::check()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Authentication required. Please log in.',
+            ], 401);
+        }
+
+        $accountId = Auth::id();
+        $totalSales = Order::where('account_id', $accountId)
+            ->sum('total_amount');
+
+        $eligible = $totalSales >= 500;
+
+        return response()->json([
+            'isSuccess' => true,
+            'eligible' => $eligible,
+            'totalSales' => number_format($totalSales, 2, '.', ''),
+        ]);
+    }
+
+    // Request a payout and schedule it
+    public function requestPayout(Request $request)
+    {
+        if (!Auth::check()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Authentication required. Please log in.',
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'scheduled_date' => 'required|date|after_or_equal:today',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $accountId = Auth::id();
+        $totalSales = Order::where('account_id', $accountId)
+            ->sum('total_amount');
+
+        if ($totalSales < 500) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Total sales must be at least ₱500 to request a payout.',
+            ], 400);
+        }
+
+        $scheduledDate = $request->input('scheduled_date');
+        $maxSlotsPerDay = 10; // Maximum payouts per day
+
+        // Check how many payouts are scheduled on the requested date
+        $existingPayouts = Payout::where('scheduled_date', $scheduledDate)
+            ->count();
+
+        if ($existingPayouts >= $maxSlotsPerDay) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No available slots on the selected date.',
+            ], 400);
+        }
+
+        // Calculate queue number (1-based index for the day)
+        $queueNumber = $existingPayouts + 1;
+
+        // Create the payout request
+        $payout = Payout::create([
+            'account_id' => $accountId,
+            'amount' => $totalSales,
+            'scheduled_date' => $scheduledDate,
+            'queue_number' => $queueNumber,
+            'status' => 'Pending',
+        ]);
+
+        // Reset sales (for simplicity, we can archive orders or mark them as paid out in a real app)
+        Order::where('account_id', $accountId)->update(['status' => 'Paid Out']);
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Payout requested successfully.',
+            'payout' => [
+                'scheduled_date' => $payout->scheduled_date,
+                'queue_number' => $payout->queue_number,
+                'amount' => number_format($payout->amount, 2, '.', ''),
+            ],
+        ]);
+    }
+
+    // Get available slots for a given date
+    public function getAvailableSlots(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date|after_or_equal:today',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $date = $request->input('date');
+        $maxSlotsPerDay = 10;
+
+        $existingPayouts = Payout::where('scheduled_date', $date)
+            ->count();
+
+        $availableSlots = max(0, $maxSlotsPerDay - $existingPayouts);
+
+        return response()->json([
+            'isSuccess' => true,
+            'available_slots' => $availableSlots,
+        ]);
+    }
+
+    // Export payment history to CSV
+    public function exportPaymentHistoryToCSV(Request $request)
+    {
+        if (!Auth::check()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Authentication required. Please log in.',
+            ], 401);
+        }
+
+        $accountId = Auth::id();
+
+        $orders = Order::where('account_id', $accountId)
+            ->with('product')
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'date' => $order->created_at->format('m/d/Y'),
+                    'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
+                    'payment_method' => $order->payment_method ?? 'Unknown',
+                    'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
+                ];
+            });
+
+        $csvFileName = 'payment_history_' . now()->format('Ymd_His') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"$csvFileName\"",
+        ];
+
+        $handle = fopen('php://output', 'w');
+        fputcsv($handle, ['Date', 'Product Name', 'Payment Method', 'Amount']);
+
+        foreach ($orders as $order) {
+            fputcsv($handle, [
+                $order['date'],
+                $order['product_name'],
+                $order['payment_method'],
+                $order['amount'],
+            ]);
+        }
+
+        fclose($handle);
+
+        return response()->stream(
+            function () use ($handle) {
+                // Stream already handled
+            },
+            200,
+            $headers
+        );
+    }
 }

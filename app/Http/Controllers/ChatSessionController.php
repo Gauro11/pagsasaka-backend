@@ -148,64 +148,51 @@ class ChatSessionController extends Controller
     }
 }
 
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'user2_id' => 'required|exists:accounts,id|not_in:' . Auth::id(),
-        ]);
+public function store(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'user2_id' => 'required|exists:accounts,id',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'errors' => $validator->errors()
+        ], 422);
+    }
 
-        $userId = Auth::id();
+    $user1_id = Auth::id();
+    $user2_id = $request->user2_id;
 
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not authenticated',
-            ], 401);
-        }
+    // Check if chat session already exists
+    $existingChat = ChatSession::where(function($query) use ($user1_id, $user2_id) {
+        $query->where('user1_id', $user1_id)
+              ->where('user2_id', $user2_id);
+    })->orWhere(function($query) use ($user1_id, $user2_id) {
+        $query->where('user1_id', $user2_id)
+              ->where('user2_id', $user1_id);
+    })->first();
 
-        $user = Account::find($userId);
-
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found in accounts table',
-            ], 404);
-        }
-
-        $existingSession = ChatSession::where(function ($query) use ($user, $request) {
-            $query->where('user1_id', $user->id)
-                  ->where('user2_id', $request->user2_id);
-        })->orWhere(function ($query) use ($user, $request) {
-            $query->where('user1_id', $request->user2_id)
-                  ->where('user2_id', $user->id);
-        })->first();
-
-        if ($existingSession) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Chat session already exists',
-                'data' => $existingSession
-            ], 200);
-        }
-
-        $chatSession = ChatSession::create([
-            'user1_id' => $user->id,
-            'user2_id' => $request->user2_id,
-        ]);
-
+    if ($existingChat) {
         return response()->json([
             'success' => true,
-            'message' => 'Chat session created successfully',
-            'data' => $chatSession
-        ], 201);
+            'message' => 'Chat session already exists',
+            'data' => $existingChat
+        ]);
     }
+
+    // Create new chat session
+    $chatSession = ChatSession::create([
+        'user1_id' => $user1_id,
+        'user2_id' => $user2_id,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Chat session created successfully',
+        'data' => $chatSession
+    ], 201);
+}
 
     public function destroy($id)
 {
