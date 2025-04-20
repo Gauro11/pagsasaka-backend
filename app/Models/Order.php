@@ -22,7 +22,8 @@ class Order extends Model
         'refund_reason',
         'delivery_proof',
         'created_at',
-        'updated_at'
+        'updated_at',
+        'payment_method',
     ];
 
     

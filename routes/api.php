@@ -349,3 +349,14 @@ Route::middleware(['auth:sanctum', 'session.expiry'])->group(function () {
 
 //seller dasboard 
 Route::middleware('auth:sanctum')->get('farmer-product-count', [ProductController::class, 'getFarmerProductCount']);
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/payment', [PaymentController::class, 'payment']);
+    Route::post('/cod-order', [CODOrderController::class, 'createCODOrder']);
+    Route::get('/payment-history', [PaymentController::class, 'getPaymentHistory']);
+    Route::get('/payout-eligibility', [PaymentController::class, 'checkPayoutEligibility']);
+    Route::post('/request-payout', [PaymentController::class, 'requestPayout']);
+    Route::get('/available-slots', [PaymentController::class, 'getAvailableSlots']);
+    Route::get('/export-payment-history', [PaymentController::class, 'exportPaymentHistoryToCSV']);
+});
