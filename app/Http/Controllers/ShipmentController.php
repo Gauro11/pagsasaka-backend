@@ -21,70 +21,69 @@ class ShipmentController extends Controller
     // Function to get a list of orders
     //shipment
     public function getOrders(Request $request)
-    {
-        try {
-            $user = Auth::user();
-            if (!$user) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'User not authenticated',
-                ];
-                $this->logAPICalls('getOrders', "", $request->all(), [$response]);
-                return response()->json($response, 500);
-            }
-    
-            if ($user->role_id !== 2) {
-                $response = [
-                    'isSuccess' => false,
-                    'message' => 'Access denied. Only Farmers can retrieve orders.',
-                ];
-                $this->logAPICalls('getOrders', $user->id, $request->all(), [$response]);
-                return response()->json($response, 403);
-            }
-    
-            // Retrieve orders for products owned by the logged-in farmer with status 'Order placed'
-            $orders = Order::with('product')
-                ->whereHas('product', function ($query) use ($user) {
-                    $query->where('account_id', $user->id); // The farmer owns the product
-                })
-                ->where('status', 'Order placed') // Only orders with 'Order placed' status
-                ->when($request->has('product_id'), function ($query) use ($request) {
-                    $query->where('product_id', $request->product_id);
-                })
-                ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
-                ->orderBy('created_at', 'desc')
-                ->paginate($request->get('paginate', 10));
-    
-            // Transform response
-            $orders->getCollection()->transform(function ($order) {
-                return [
-                    'id' => $order->id,
-                    'account_id' => $order->account_id,
-                    'product_id' => $order->product_id,
-                    'product_name' => $order->product ? $order->product->product_name : 'N/A',
-                    'ship_to' => $order->ship_to,
-                    'quantity' => $order->quantity,
-                    'total_amount' => $order->total_amount,
-                    'status' => $order->status,
-                    'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
-                    'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
-                ];
-            });
-    
-            return response()->json([
-                'isSuccess' => true,
-                'message' => 'Orders retrieved successfully.',
-                'orders' => $orders,
-            ], 200);
-    
-        } catch (Throwable $e) {
-            return response()->json([
+{
+    try {
+        $user = Auth::user();
+        if (!$user) {
+            $response = [
                 'isSuccess' => false,
-                'message' => 'An error occurred while retrieving orders.',
-                'error' => $e->getMessage(),
-            ], 500);
+                'message' => 'User not authenticated',
+            ];
+            $this->logAPICalls('getOrders', "", $request->all(), [$response]);
+            return response()->json($response, 500);
         }
+
+        if ($user->role_id !== 2) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Access denied. Only Farmers can retrieve orders.',
+            ];
+            $this->logAPICalls('getOrders', $user->id, $request->all(), [$response]);
+            return response()->json($response, 403);
+        }
+
+        // Retrieve all orders for products owned by the logged-in farmer (no status filter)
+        $orders = Order::with('product')
+            ->whereHas('product', function ($query) use ($user) {
+                $query->where('account_id', $user->id); // Filter by farmer ownership
+            })
+            ->when($request->has('product_id'), function ($query) use ($request) {
+                $query->where('product_id', $request->product_id);
+            })
+            ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->get('paginate', 10));
+
+        $orders->getCollection()->transform(function ($order) {
+            return [
+                'id' => $order->id,
+                'account_id' => $order->account_id,
+                'product_id' => $order->product_id,
+                'product_name' => $order->product ? $order->product->product_name : 'N/A',
+                'ship_to' => $order->ship_to,
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'status' => $order->status,
+                'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
+                'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Orders retrieved successfully.',
+            'orders' => $orders,
+        ], 200);
+
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred while retrieving orders.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
     
     
 
