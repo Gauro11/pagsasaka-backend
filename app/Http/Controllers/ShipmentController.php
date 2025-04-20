@@ -185,10 +185,6 @@ class ShipmentController extends Controller
     
     
 
-
-
-
-
      //order received//
      public function confirmOrderReceived(Request $request, $id)
      {
@@ -471,11 +467,7 @@ class ShipmentController extends Controller
             'error'     => $e->getMessage(),
         ], 500);
     }
-}
-
-     
-
-     
+     }
 
      
 
@@ -608,14 +600,10 @@ class ShipmentController extends Controller
             'error' => $e->getMessage(),
         ], 500);
     }
-}
+     }
 
      
      
-     
-     
-
-
 
     public function getCancelledOrders(Request $request)
     {
@@ -900,7 +888,7 @@ public function approveRefundRequest($order_id)
 }
 
 
-
+//to pay
 public function getPlacedOrders(Request $request)
 {
     try {
@@ -946,7 +934,7 @@ public function getPlacedOrders(Request $request)
 
 
 
-
+//too ship
 public function getWaitingForCourierOrders(Request $request)
 {
     try {
@@ -990,7 +978,7 @@ public function getWaitingForCourierOrders(Request $request)
     }
 }
 
-
+//too recieved
 public function orderIntransitStatus(Request $request)
 {
     try {
@@ -1033,6 +1021,141 @@ public function orderIntransitStatus(Request $request)
         ], 500);
     }
 }
+
+//complete
+public function orderDeliveredStatus(Request $request)
+{
+    try {
+        $user = $request->user(); // Authenticated user
+
+        // Fetch orders with status "Order Delivered"
+        $orders = $user->orders()
+            ->where('status', 'Order Delivered')
+            ->with(['product.account']) // Load product & farmer
+            ->get();
+
+        $deliveredOrders = $orders->map(function ($order) {
+            $product = $order->product;
+            $farmer = $product->account ?? null;
+
+            return [
+                'order_id' => $order->id,
+                'product_name' => $product->product_name ?? null,
+                'product_images' => $product->product_img ?? [],
+                'unit' => $product->unit ?? null,
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'farmer_id' => $farmer->id ?? null,
+                'farmer_name' => $farmer 
+                    ? trim("{$farmer->first_name} {$farmer->middle_name} {$farmer->last_name}")
+                    : null,
+                'order_date' => $order->created_at->toDateString(),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'delivered_orders' => $deliveredOrders
+        ]);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch delivered orders.',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+//cancelled
+public function cancelledStatus(Request $request)
+{
+    try {
+        $user = $request->user(); // Authenticated user
+
+        // Fetch orders with status "Order Delivered"
+        $orders = $user->orders()
+            ->where('status', 'Cancelled')
+            ->with(['product.account']) // Load product & farmer
+            ->get();
+
+        $deliveredOrders = $orders->map(function ($order) {
+            $product = $order->product;
+            $farmer = $product->account ?? null;
+
+            return [
+                'order_id' => $order->id,
+                'product_name' => $product->product_name ?? null,
+                'product_images' => $product->product_img ?? [],
+                'unit' => $product->unit ?? null,
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'farmer_id' => $farmer->id ?? null,
+                'farmer_name' => $farmer 
+                    ? trim("{$farmer->first_name} {$farmer->middle_name} {$farmer->last_name}")
+                    : null,
+                'order_date' => $order->created_at->toDateString(),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'delivered_orders' => $deliveredOrders
+        ]);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch delivered orders.',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+//refund
+public function refundStatus(Request $request)
+{
+    try {
+        $user = $request->user(); // Authenticated user
+
+        // Fetch orders with status "Order Delivered"
+        $orders = $user->orders()
+            ->where('status', 'Refund')
+            ->with(['product.account']) // Load product & farmer
+            ->get();
+
+        $deliveredOrders = $orders->map(function ($order) {
+            $product = $order->product;
+            $farmer = $product->account ?? null;
+
+            return [
+                'order_id' => $order->id,
+                'product_name' => $product->product_name ?? null,
+                'product_images' => $product->product_img ?? [],
+                'unit' => $product->unit ?? null,
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'farmer_id' => $farmer->id ?? null,
+                'farmer_name' => $farmer 
+                    ? trim("{$farmer->first_name} {$farmer->middle_name} {$farmer->last_name}")
+                    : null,
+                'order_date' => $order->created_at->toDateString(),
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'delivered_orders' => $deliveredOrders
+        ]);
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch delivered orders.',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
 
 
 

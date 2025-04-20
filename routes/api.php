@@ -47,7 +47,7 @@ Route::options('/{any}', function (Request $request) {
 
 Route::post('shipments', [ShipmentController::class, 'addShipment']);
 Route::middleware('auth:sanctum')->get('getOrders', [ShipmentController::class, 'getOrders']);
-Route::middleware('auth:sanctum')->get('cancelled', [ShipmentController::class, 'getCancelledOrders']);
+Route::middleware('auth:sanctum')->get('cancelled-sa-seller', [ShipmentController::class, 'getCancelledOrders']);
 Route::middleware('auth:sanctum')->get('refund', [ShipmentController::class, 'getRefundOrders']);
 Route::middleware('auth:sanctum')->post('updateOrderStatus/{id}', [ShipmentController::class, 'updateOrderStatus']);
 Route::middleware('auth:sanctum')->post('confirmOrderReceived/{id}', [ShipmentController::class, 'confirmOrderReceived']);
@@ -67,6 +67,9 @@ Route::middleware('auth:sanctum')->post('refundapprove/{order_id}', [ShipmentCon
 Route::middleware('auth:sanctum')->get('my-placed-orders', [ShipmentController::class, 'getPlacedOrders']);
 Route::middleware('auth:sanctum')->get('toship-orders', [ShipmentController::class, 'getWaitingForCourierOrders']);
 Route::middleware('auth:sanctum')->get('order-intransit-status', [ShipmentController::class, 'orderIntransitStatus']);
+Route::middleware('auth:sanctum')->get('delivered', [ShipmentController::class, 'orderDeliveredStatus']);
+Route::middleware('auth:sanctum')->get('Cancelled', [ShipmentController::class, 'cancelledStatus']);
+Route::middleware('auth:sanctum')->get('Refund', [ShipmentController::class, 'refundStatus']);
 
 
 Route::middleware('auth:sanctum')->get('my-products', [ProductController::class, 'getMyPublishedProducts']);
