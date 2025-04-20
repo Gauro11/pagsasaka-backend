@@ -151,7 +151,7 @@ class ChatSessionController extends Controller
 public function store(Request $request)
 {
     $validator = Validator::make($request->all(), [
-        'user2_id' => 'required|exists:accounts,id|not_in:' . Auth::id(),
+        'user2_id' => 'required|exists:accounts,id',
     ]);
 
     if ($validator->fails()) {
@@ -161,78 +161,36 @@ public function store(Request $request)
         ], 422);
     }
 
-    $userId = Auth::id();
+    $user1_id = Auth::id();
+    $user2_id = $request->user2_id;
 
-    if (!$userId) {
-        return response()->json([
-            'success' => false,
-            'message' => 'User not authenticated',
-        ], 401);
-    }
-
-    $user = Account::find($userId);
-
-    if (!$user) {
-        return response()->json([
-            'success' => false,
-            'message' => 'User not found in accounts table',
-        ], 404);
-    }
-
-    $existingSession = ChatSession::where(function ($query) use ($user, $request) {
-        $query->where('user1_id', $user->id)
-              ->where('user2_id', $request->user2_id);
-    })->orWhere(function ($query) use ($user, $request) {
-        $query->where('user1_id', $request->user2_id)
-              ->where('user2_id', $user->id);
+    // Check if chat session already exists
+    $existingChat = ChatSession::where(function($query) use ($user1_id, $user2_id) {
+        $query->where('user1_id', $user1_id)
+              ->where('user2_id', $user2_id);
+    })->orWhere(function($query) use ($user1_id, $user2_id) {
+        $query->where('user1_id', $user2_id)
+              ->where('user2_id', $user1_id);
     })->first();
 
-    // Fetch user2 details (chat partner)
-    $chatPartner = Account::find($request->user2_id);
-    if (!$chatPartner) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Chat partner not found',
-        ], 404);
-    }
-
-    // Construct the chat partner's full name and avatar
-    $chatPartnerName = trim("{$chatPartner->first_name} {$chatPartner->middle_name} {$chatPartner->last_name}");
-    $chatPartnerAvatar = $chatPartner->avatar ?? null;
-
-    if ($existingSession) {
+    if ($existingChat) {
         return response()->json([
             'success' => true,
             'message' => 'Chat session already exists',
-            'data' => [
-                'id' => $existingSession->id,
-                'user1_id' => $existingSession->user1_id,
-                'user2_id' => $existingSession->user2_id,
-                'created_at' => $existingSession->created_at,
-                'updated_at' => $existingSession->updated_at,
-                'chat_partner_name' => $chatPartnerName,
-                'chat_partner_avatar' => $chatPartnerAvatar,
-            ]
-        ], 200);
+            'data' => $existingChat
+        ]);
     }
 
+    // Create new chat session
     $chatSession = ChatSession::create([
-        'user1_id' => $user->id,
-        'user2_id' => $request->user2_id,
+        'user1_id' => $user1_id,
+        'user2_id' => $user2_id,
     ]);
 
     return response()->json([
         'success' => true,
         'message' => 'Chat session created successfully',
-        'data' => [
-            'id' => $chatSession->id,
-            'user1_id' => $chatSession->user1_id,
-            'user2_id' => $chatSession->user2_id,
-            'created_at' => $chatSession->created_at,
-            'updated_at' => $chatSession->updated_at,
-            'chat_partner_name' => $chatPartnerName,
-            'chat_partner_avatar' => $chatPartnerAvatar,
-        ]
+        'data' => $chatSession
     ], 201);
 }
 
