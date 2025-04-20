@@ -460,7 +460,7 @@ class ShipmentController extends Controller
             'orders'    => $formattedOrders
         ], 200);
 
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return response()->json([
             'isSuccess' => false,
             'message'   => 'Failed to retrieve in-transit orders.',
@@ -593,7 +593,7 @@ class ShipmentController extends Controller
             'delivery_proof' => $order ? asset($order->delivery_proof) : null,
         ], 200);
 
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return response()->json([
             'isSuccess' => false,
             'message' => 'Failed to retrieve delivery proof.',
@@ -828,7 +828,7 @@ class ShipmentController extends Controller
             'data' => $order,
         ], 201);
 
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return response()->json([
             'isSuccess' => false,
             'message' => 'Failed to submit refund request.',
@@ -1100,7 +1100,7 @@ public function cancelledStatus(Request $request)
 
         return response()->json([
             'isSuccess' => true,
-            'delivered_orders' => $deliveredOrders
+            'cancelled_orders' => $deliveredOrders
         ]);
     } catch (Throwable $e) {
         return response()->json([
@@ -1145,7 +1145,7 @@ public function refundStatus(Request $request)
 
         return response()->json([
             'isSuccess' => true,
-            'delivered_orders' => $deliveredOrders
+            'refund_orders' => $deliveredOrders
         ]);
     } catch (Throwable $e) {
         return response()->json([
@@ -1155,22 +1155,6 @@ public function refundStatus(Request $request)
         ], 500);
     }
 }
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-
-
 
 
    
