@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Rider;
 use App\Models\Order;
 use App\Models\ApiLog;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class RiderController extends Controller
@@ -52,6 +53,45 @@ class RiderController extends Controller
             ], 500);
         }
     }
+
+    public function updateRiderAvatar(Request $request)
+{
+    $rider = auth()->user(); // Assumes riders use the same auth guard
+
+    $request->validate([
+        'avatar' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+    ]);
+
+    try {
+        if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
+            $fileName = 'RiderAvatar-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('avatar')->getClientOriginalExtension();
+            $request->file('avatar')->move(public_path('avatars/riders'), $fileName);
+            $fileUrl = url('avatars/riders/' . $fileName);
+
+            DB::table('riders')->where('id', $rider->id)->update([
+                'avatar' => $fileUrl,
+            ]);
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Rider avatar uploaded successfully.',
+                'avatar_url' => $fileUrl,
+            ]);
+        } else {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Invalid avatar file.',
+            ], 400);
+        }
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to upload rider avatar.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
 
     public function getPendingRiders()
     {

@@ -142,6 +142,7 @@ Route::controller(AccountController::class)->group(function () {
     Route::post('account/update-password/{id}', 'updatePassword');
 });
 Route::middleware('auth:sanctum')->post('avatar', [AccountController::class, 'updateAvatar']);
+Route::middleware('auth:sanctum')->post('avatar-rider', [RiderController::class, 'updateRiderAvatar']);
 
 Route::get('/organization-logs', [AccountController::class, 'getOrganizationLogs']);
 

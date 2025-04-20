@@ -23,6 +23,7 @@ class Rider extends Authenticatable
         'license',
         'valid_id',
         'status',
+        'avatar',
         'role_id'
     ];
 
