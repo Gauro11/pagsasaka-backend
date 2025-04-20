@@ -217,33 +217,38 @@ class PaymentController extends Controller
 
     // Fetch payment history for the seller
     public function getPaymentHistory(Request $request)
-    {
-        if (!Auth::check()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Authentication required. Please log in.',
-            ], 401);
-        }
-
-        $accountId = Auth::id();
-
-        $orders = Order::where('account_id', $accountId)
-            ->with('product')
-            ->get()
-            ->map(function ($order) {
-                return [
-                    'date' => $order->created_at->format('m/d/Y'),
-                    'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
-                    'payment_method' => $order->payment_method ?? 'Unknown',
-                    'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
-                ];
-            });
-
+{
+    if (!Auth::check()) {
         return response()->json([
-            'isSuccess' => true,
-            'transactions' => $orders,
-        ]);
+            'isSuccess' => false,
+            'message' => 'Authentication required. Please log in.',
+        ], 401);
     }
+
+    $farmerId = Auth::id();
+
+    // Get orders where the product belongs to the logged-in farmer
+    $orders = Order::whereHas('product', function ($query) use ($farmerId) {
+        $query->where('account_id', $farmerId);
+    })
+    ->with(['product'])
+    ->get()
+    ->map(function ($order) {
+        return [
+            'date' => $order->created_at->format('m/d/Y'),
+            'product_name' => $order->product->product_name ?? 'Unknown Product',
+            'payment_method' => $order->payment_method ?? 'Unknown',
+            'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
+            'buyer_account_id' => $order->account_id,
+        ];
+    });
+
+    return response()->json([
+        'isSuccess' => true,
+        'transactions' => $orders,
+    ]);
+}
+
 
     // Check if seller is eligible for payout and get total sales
     public function checkPayoutEligibility(Request $request)
