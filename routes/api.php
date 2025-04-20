@@ -48,7 +48,7 @@ Route::options('/{any}', function (Request $request) {
 Route::post('shipments', [ShipmentController::class, 'addShipment']);
 Route::middleware('auth:sanctum')->get('getOrders', [ShipmentController::class, 'getOrders']);
 Route::middleware('auth:sanctum')->get('cancelled-sa-seller', [ShipmentController::class, 'getCancelledOrders']);
-Route::middleware('auth:sanctum')->get('refund', [ShipmentController::class, 'getRefundOrders']);
+Route::middleware('auth:sanctum')->get('refund-farmer', [ShipmentController::class, 'getRefundedOrders']);
 Route::middleware('auth:sanctum')->post('updateOrderStatus/{id}', [ShipmentController::class, 'updateOrderStatus']);
 Route::middleware('auth:sanctum')->post('confirmOrderReceived/{id}', [ShipmentController::class, 'confirmOrderReceived']);
 Route::middleware('auth:sanctum')->get('orders-for-pickup', [ShipmentController::class, 'getOrdersForPickup']);
