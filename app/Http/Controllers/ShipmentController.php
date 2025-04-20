@@ -23,7 +23,6 @@ class ShipmentController extends Controller
     public function getOrders(Request $request)
     {
         try {
-            // Authenticate the user
             $user = Auth::user();
             if (!$user) {
                 $response = [
@@ -34,7 +33,6 @@ class ShipmentController extends Controller
                 return response()->json($response, 500);
             }
     
-            // Check if the user's role_id is Farmer (role_id = 2)
             if ($user->role_id !== 2) {
                 $response = [
                     'isSuccess' => false,
@@ -44,21 +42,21 @@ class ShipmentController extends Controller
                 return response()->json($response, 403);
             }
     
-            // Retrieve orders with 'processing' status
-            $orders = Order::with('product') // Ensure the product relationship exists
-                ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
-                ->where('account_id', $user->id)
+            // Retrieve orders for products owned by the logged-in farmer with status 'Order placed'
+            $orders = Order::with('product')
+                ->whereHas('product', function ($query) use ($user) {
+                    $query->where('account_id', $user->id); // The farmer owns the product
+                })
+                ->where('status', 'Order placed') // Only orders with 'Order placed' status
                 ->when($request->has('product_id'), function ($query) use ($request) {
                     $query->where('product_id', $request->product_id);
                 })
+                ->select('id', 'account_id', 'product_id', 'ship_to', 'quantity', 'total_amount', 'status', 'created_at', 'updated_at')
                 ->orderBy('created_at', 'desc')
                 ->paginate($request->get('paginate', 10));
     
-            // Transform and format orders
+            // Transform response
             $orders->getCollection()->transform(function ($order) {
-                $order->created_at = Carbon::parse($order->created_at)->format('F d Y');
-                $order->updated_at = Carbon::parse($order->updated_at)->format('F d Y');
-    
                 return [
                     'id' => $order->id,
                     'account_id' => $order->account_id,
@@ -68,8 +66,8 @@ class ShipmentController extends Controller
                     'quantity' => $order->quantity,
                     'total_amount' => $order->total_amount,
                     'status' => $order->status,
-                    'created_at' => $order->created_at,
-                    'updated_at' => $order->updated_at,
+                    'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
+                    'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
                 ];
             });
     
@@ -78,6 +76,7 @@ class ShipmentController extends Controller
                 'message' => 'Orders retrieved successfully.',
                 'orders' => $orders,
             ], 200);
+    
         } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
@@ -86,6 +85,7 @@ class ShipmentController extends Controller
             ], 500);
         }
     }
+    
     
 
     public function updateOrderStatus(Request $request, $id)
