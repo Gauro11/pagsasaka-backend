@@ -13,10 +13,12 @@ class Payout extends Model
         'account_id',
         'amount',
         'scheduled_date',
+        'time_slot',
         'queue_number',
         'status',
+        'created_at',
+        'updated_at',
     ];
-
     public function account()
     {
         return $this->belongsTo(Account::class);
