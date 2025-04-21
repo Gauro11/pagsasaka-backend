@@ -428,88 +428,57 @@ class PaymentController extends Controller
 
     public function requestPayout(Request $request)
     {
-        if (!Auth::check()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Authentication required. Please log in.',
-            ], 401);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'date' => 'required|date|after_or_equal:today',
+        $validated = $request->validate([
+            'date' => 'required|date|after:today',
             'time_slot' => 'required|string|in:10:00-11:00,11:00-12:00,12:00-13:00,13:00-14:00,14:00-15:00,15:00-16:00,16:00-17:00',
             'total_sales' => 'required|numeric|min:500',
             'validation_code' => 'required|string',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Validation failed.',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         $accountId = Auth::id();
-        $scheduledDate = $request->input('date');
-        $timeSlot = $request->input('time_slot');
-        $totalSales = $request->input('total_sales');
-        $validationCode = $request->input('validation_code');
+        $date = $validated['date'];
+        $timeSlot = $validated['time_slot'];
 
-        $maxSlotsPerDay = 10;
-        $timeSlots = [
-            '10:00-11:00',
-            '11:00-12:00',
-            '12:00-13:00',
-            '13:00-14:00',
-            '14:00-15:00',
-            '15:00-16:00',
-            '16:00-17:00',
-        ];
-        $maxSlotsPerTimeSlot = ceil($maxSlotsPerDay / count($timeSlots));
-
-        $date = Carbon::parse($scheduledDate);
-        if (!$date->isWeekday()) {
+        // Check if the date is a weekday
+        $dayOfWeek = Carbon::parse($date)->dayOfWeek;
+        if ($dayOfWeek == 0 || $dayOfWeek == 6) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Selected date must be a weekday.',
+                'message' => 'Payouts can only be scheduled on weekdays.',
             ], 400);
         }
 
-        $existingPayouts = Payout::where('scheduled_date', $scheduledDate)
-            ->count();
-
-        if ($existingPayouts >= $maxSlotsPerDay) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'No available slots for the selected date.',
-            ], 400);
-        }
-
-        $existingPayoutsForSlot = Payout::where('scheduled_date', $scheduledDate)
+        // Check slot availability
+        $existingPayouts = Payout::where('scheduled_date', $date)
             ->where('time_slot', $timeSlot)
             ->count();
 
-        if ($existingPayoutsForSlot >= $maxSlotsPerTimeSlot) {
+        if ($existingPayouts >= 10) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'No available slots for the selected time slot.',
+                'message' => 'Selected time slot is fully booked.',
             ], 400);
         }
 
+        // Calculate queue number
         $queueNumber = $existingPayouts + 1;
 
-        $payout = Payout::create([
-            'account_id' => $accountId,
-            'amount' => $totalSales,
-            'scheduled_date' => $scheduledDate,
-            'time_slot' => $timeSlot,
-            'queue_number' => $queueNumber,
-            'status' => 'Pending',
-            'validation_code' => $validationCode,
-        ]);
+        // Fetch the orders that will be paid out
+        $payouts = Payout::where('account_id', $accountId)->get();
+        $paidOutOrderIds = [];
 
-        Order::whereHas('product', function ($query) use ($accountId) {
+        foreach ($payouts as $payout) {
+            if ($payout->order_ids) {
+                $orderIds = json_decode($payout->order_ids, true);
+                if (is_array($orderIds)) {
+                    $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
+                }
+            }
+        }
+
+        $paidOutOrderIds = array_unique($paidOutOrderIds);
+
+        $orders = Order::whereHas('product', function ($query) use ($accountId) {
             $query->where('account_id', $accountId);
         })
         ->where(function ($query) {
@@ -518,19 +487,43 @@ class PaymentController extends Controller
                   ->where('status', 'Order Delivered');
             })->orWhere('payment_method', 'E-Wallet');
         })
-        ->where('status', '!=', 'Paid Out')
-        ->update(['status' => 'Paid Out']);
+        ->whereNotIn('id', $paidOutOrderIds)
+        ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No eligible orders found for payout.',
+            ], 400);
+        }
+
+        // Calculate total sales to verify
+        $totalSales = $orders->sum('total_amount');
+        if (abs($totalSales - $validated['total_sales']) > 0.01) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Total sales mismatch.',
+            ], 400);
+        }
+
+        // Collect order IDs
+        $orderIds = $orders->pluck('id')->toArray();
+
+        // Create payout record with order_ids
+        $payout = Payout::create([
+            'account_id' => $accountId,
+            'amount' => $validated['total_sales'],
+            'scheduled_date' => $date,
+            'time_slot' => $timeSlot,
+            'queue_number' => $queueNumber,
+            'status' => 'Pending',
+            'validation_code' => $validated['validation_code'],
+            'order_ids' => json_encode($orderIds),
+        ]);
 
         return response()->json([
             'isSuccess' => true,
-            'message' => 'Payout requested successfully.',
-            'payout' => [
-                'scheduled_date' => $payout->scheduled_date,
-                'time_slot' => $payout->time_slot,
-                'queue_number' => $payout->queue_number,
-                'amount' => number_format($payout->amount, 2, '.', ''),
-                'validation_code' => $payout->validation_code,
-            ],
+            'payout' => $payout,
         ]);
     }
 
