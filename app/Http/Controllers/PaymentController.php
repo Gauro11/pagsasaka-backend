@@ -217,44 +217,37 @@ class PaymentController extends Controller
 
     // Fetch payment history for the seller
     public function getPaymentHistory(Request $request)
-    {
-        if (!Auth::check()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Authentication required. Please log in.',
-            ], 401);
-        }
-    
-        $farmerId = Auth::id();
-    
-        // Get orders with complex condition
-        $orders = Order::whereHas('product', function ($query) use ($farmerId) {
-                $query->where('account_id', $farmerId);
-            })
-            ->where(function ($query) {
-                $query->where(function ($q) {
-                    $q->where('payment_method', 'COD')
-                      ->where('status', 'Order delivered');
-                })->orWhere('payment_method', 'E-Wallet');
-            })
-            ->with(['product'])
-            ->get()
-            ->map(function ($order) {
-                return [
-                    'date' => $order->created_at->format('m/d/Y'),
-                    'product_name' => $order->product->product_name ?? 'Unknown Product',
-                    'payment_method' => $order->payment_method,
-                    'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
-                    'buyer_account_id' => $order->account_id,
-                ];
-            });
-    
+{
+    if (!Auth::check()) {
         return response()->json([
-            'isSuccess' => true,
-            'transactions' => $orders,
-        ]);
+            'isSuccess' => false,
+            'message' => 'Authentication required. Please log in.',
+        ], 401);
     }
-    
+
+    $farmerId = Auth::id();
+
+    // Get orders where the product belongs to the logged-in farmer
+    $orders = Order::whereHas('product', function ($query) use ($farmerId) {
+        $query->where('account_id', $farmerId);
+    })
+    ->with(['product'])
+    ->get()
+    ->map(function ($order) {
+        return [
+            'date' => $order->created_at->format('m/d/Y'),
+            'product_name' => $order->product->product_name ?? 'Unknown Product',
+            'payment_method' => $order->payment_method ?? 'Unknown',
+            'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
+            'buyer_account_id' => $order->account_id,
+        ];
+    });
+
+    return response()->json([
+        'isSuccess' => true,
+        'transactions' => $orders,
+    ]);
+}
 
 
     // Check if seller is eligible for payout and get total sales
@@ -392,31 +385,48 @@ class PaymentController extends Controller
             ], 401);
         }
 
-        $accountId = Auth::id();
+        $farmerId = Auth::id();
 
-        $orders = Order::where('account_id', $accountId)
-            ->with('product')
-            ->get()
-            ->map(function ($order) {
-                return [
-                    'date' => $order->created_at->format('m/d/Y'),
-                    'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
-                    'payment_method' => $order->payment_method ?? 'Unknown',
-                    'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
-                ];
-            });
+        // Get orders where the product belongs to the logged-in farmer (same logic as getPaymentHistory)
+        $orders = Order::whereHas('product', function ($query) use ($farmerId) {
+            $query->where('account_id', $farmerId);
+        })
+        ->with(['product'])
+        ->get()
+        ->map(function ($order) {
+            return [
+                'date' => $order->created_at->format('m/d/Y'),
+                'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
+                'payment_method' => $order->payment_method ?? 'Unknown',
+                'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
+            ];
+        });
 
+        // Check if there are orders
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No payment history found.',
+            ], 404);
+        }
+
+        // Generate CSV content in-memory
         $csvFileName = 'payment_history_' . now()->format('Ymd_His') . '.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"$csvFileName\"",
         ];
 
-        $handle = fopen('php://output', 'w');
-        fputcsv($handle, ['Date', 'Product Name', 'Payment Method', 'Amount']);
+        // Use an in-memory stream
+        $output = fopen('php://temp', 'r+');
+        // Add UTF-8 BOM for Excel compatibility (important for special characters)
+        fwrite($output, "\xEF\xBB\xBF");
+        // Write headers
+        fputcsv($output, ['Date', 'Product Name', 'Payment Method', 'Amount']);
 
+        // Write data
         foreach ($orders as $order) {
-            fputcsv($handle, [
+            fputcsv($output, [
                 $order['date'],
                 $order['product_name'],
                 $order['payment_method'],
@@ -424,14 +434,12 @@ class PaymentController extends Controller
             ]);
         }
 
-        fclose($handle);
+        // Rewind the stream to the beginning
+        rewind($output);
+        $csvContent = stream_get_contents($output);
+        fclose($output);
 
-        return response()->stream(
-            function () use ($handle) {
-                // Stream already handled
-            },
-            200,
-            $headers
-        );
+        // Return the CSV content as a response
+        return response($csvContent, 200, $headers);
     }
 }
