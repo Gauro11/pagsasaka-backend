@@ -849,12 +849,11 @@ public function cancelOrder(Request $request, $id)
 
 
 
-    public function requestRefundByOrderId($order_id, Request $request)
+public function requestRefundByOrderId($order_id, Request $request)
 {
     try {
         $user = auth()->user();
 
-        // Check if the user is a consumer or a farmer
         if (!$user || !in_array($user->role_id, [2, 3])) {
             return response()->json([
                 'isSuccess' => false,
@@ -862,15 +861,22 @@ public function cancelOrder(Request $request, $id)
             ], 403);
         }
 
-        // Validate the reason field
-        $request->validate([
-            'reason' => 'required|string|max:255',
+        // Static refund reasons
+        $reasons = [
+            1 => 'Item damaged',
+            2 => 'Wrong item delivered',
+            3 => 'Item not as described',
+            4 => 'Item expired or spoiled',
+            5 => 'Other (please specify)',
+        ];
+
+        // Validate reason ID and optional custom reason
+        $validated = $request->validate([
+            'reason_id' => 'required|integer|in:' . implode(',', array_keys($reasons)),
         ]);
 
-        // Find the order by ID
         $order = Order::find($order_id);
 
-        // Check if the order exists
         if (!$order) {
             return response()->json([
                 'isSuccess' => false,
@@ -878,10 +884,6 @@ public function cancelOrder(Request $request, $id)
             ], 404);
         }
 
-        // Debug log
-        Log::debug('Order Account ID: ' . $order->account_id . ' Logged-in User ID: ' . $user->id);
-
-        // Check ownership
         if ($order->account_id !== $user->id) {
             return response()->json([
                 'isSuccess' => false,
@@ -889,7 +891,6 @@ public function cancelOrder(Request $request, $id)
             ], 403);
         }
 
-        // Check order status
         if ($order->status !== 'Order delivered') {
             return response()->json([
                 'isSuccess' => false,
@@ -897,8 +898,13 @@ public function cancelOrder(Request $request, $id)
             ], 400);
         }
 
-        // Update refund reason and status
-        $order->refund_reason = $request->reason;
+        // Determine reason
+        $reasonText = $reasons[$validated['reason_id']];
+        if ($validated['reason_id'] == 5 && !empty($validated['custom_reason'])) {
+            $reasonText .= ': ' . $validated['custom_reason'];
+        }
+
+        $order->refund_reason = $reasonText;
         $order->status = 'Pending';
         $order->save();
 
@@ -916,6 +922,7 @@ public function cancelOrder(Request $request, $id)
         ], 500);
     }
 }
+
 
 
 public function approveRefundRequest($order_id)
@@ -1237,7 +1244,7 @@ public function refundStatus(Request $request)
 }
 
 //payslipwwwwwwwwwwww
-public function getOrderDetails($order_number)
+public function getOrderDetails(Request $request, $order_number)
 {
     try {
         $user = Auth::user();
@@ -1246,7 +1253,11 @@ public function getOrderDetails($order_number)
                 'isSuccess' => false,
                 'message' => 'User not authenticated.',
             ];
-            Log::info('Unauthenticated user tried to access order.', ['order_number' => $order_number]);
+            Log::info('Unauthenticated user tried to access order.', [
+                'order_number' => $order_number,
+                'ip' => $request->ip(),
+                'user_agent' => $request->header('User-Agent'),
+            ]);
             return response()->json($response, 401);
         }
 
@@ -1259,11 +1270,14 @@ public function getOrderDetails($order_number)
                 'isSuccess' => false,
                 'message' => 'Order not found.',
             ];
-            Log::info('Order not found.', ['user_id' => $user->id, 'order_number' => $order_number]);
+            Log::info('Order not found.', [
+                'user_id' => $user->id,
+                'order_number' => $order_number,
+                'ip' => $request->ip(),
+            ]);
             return response()->json($response, 404);
         }
 
-        // Get the farmer from the product relation
         $farmer = $order->product->account;
 
         $details = [
@@ -1287,7 +1301,8 @@ public function getOrderDetails($order_number)
         Log::info('Order details retrieved', [
             'user_id' => $user->id,
             'order_number' => $order->order_number,
-            'consumer_account_id' => $order->account_id,
+            'ip' => $request->ip(),
+            'user_agent' => $request->header('User-Agent'),
         ]);
 
         return response()->json([
@@ -1297,7 +1312,10 @@ public function getOrderDetails($order_number)
         ], 200);
 
     } catch (Throwable $e) {
-        Log::error('Error retrieving order details', ['error' => $e->getMessage()]);
+        Log::error('Error retrieving order details', [
+            'error' => $e->getMessage(),
+            'ip' => $request->ip(),
+        ]);
         return response()->json([
             'isSuccess' => false,
             'message' => 'An error occurred while retrieving order details.',
