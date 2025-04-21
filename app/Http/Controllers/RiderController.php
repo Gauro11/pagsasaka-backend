@@ -10,11 +10,57 @@ use App\Models\ApiLog;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Auth;
 use Throwable;
 
 class RiderController extends Controller
 {
     // Get rider profile with total delivered amount//
+
+    public function getRiderEarningsSummary($id)
+{
+    try {
+        // Find the rider based on the provided ID
+        $rider = Rider::find($id);
+
+        // Ensure the rider exists and is a rider (role_id = 4)
+        if (!$rider || $rider->role_id != 4) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Rider not found or not authorized.',
+            ], 404);
+        }
+
+        // Get total COD amount of delivered orders for this rider
+        $totalCodDelivered = Order::where('rider_id', $rider->id)
+            ->where('status', 'Order delivered') // Match ENUM exactly
+            ->where('payment_method', 'COD')
+            ->sum('total_amount');
+
+        // E-wallet amount is always zero
+        $totalEWalletDelivered = 0;
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Rider delivery earnings retrieved successfully.',
+            'earnings' => [
+                'cod' => '₱' . number_format($totalCodDelivered, 2),
+                'ewallet' => '₱' . number_format($totalEWalletDelivered, 2),
+            ]
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to retrieve delivery earnings.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+    
+
+
     public function getRiderProfile($id)
     {
         try {

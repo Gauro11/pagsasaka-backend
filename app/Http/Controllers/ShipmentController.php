@@ -758,73 +758,92 @@ public function getCancelledOrders(Request $request)
 }
 
 
-    public function cancelOrder(Request $request, $id)
-    {
-        try {
-            // Validate request
-            $validated = $request->validate([
-                'reason' => 'required|string|max:255',
-            ]);
-    
-            // Get authenticated user
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'User not authenticated.',
-                ], 401);
-            }
-    
-            // Find the order
-            $order = Order::find($id);
-            if (!$order) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Order not found.',
-                ], 404);
-            }
-    
-            // Ensure order can be cancelled
-            if (!in_array($order->status, ['Order placed', 'Waiting for courier'])) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Order cannot be cancelled at this stage.',
-                ], 400);
-            }
-    
-            // Update order status
-            $order->status = 'Cancelled';
-            $order->cancellation_reason = $validated['reason'];
-            $order->save();
-    
-            return response()->json([
-                'isSuccess' => true,
-                'message' => 'Order cancelled successfully.',
-                'order' => [
-                    'id' => $order->id,
-                    'account_id' => $order->account_id,
-                    'status' => $order->status,
-                    'cancellation_reason' => $order->cancellation_reason,
-                    'ship_to' => $order->ship_to,
-                    'quantity' => $order->quantity,
-                    'total_amount' => $order->total_amount,
-                    'created_at' => $order->created_at->format('F d Y'),
-                    'updated_at' => now()->format('F d Y'),
-                ],
-                'user' => [
-                    'id' => $user->id,
-                    'name' => "{$user->first_name} {$user->last_name}",
-                    'role_id' => $user->role_id,
-                ],
-            ], 200);
-        } catch (\Throwable $e) {
+public function cancelOrder(Request $request, $id)
+{
+    try {
+        // Define reasons (should match IDs from getCancellationReasons)
+        $reasons = [
+            1 => 'Changed my mind',
+            2 => 'Found a better price',
+            3 => 'Order delayed',
+            4 => 'Item no longer needed',
+            5 => 'Wrong item ordered',
+            6 => 'Other (please specify)',
+        ];
+
+        // Validate request
+        $validated = $request->validate([
+            'reason_id' => 'required|integer|in:' . implode(',', array_keys($reasons)),
+            
+        ]);
+
+        // Authenticated user
+        $user = Auth::user();
+        if (!$user) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'An error occurred while cancelling the order.',
-                'error' => $e->getMessage(),
-            ], 500);
+                'message' => 'User not authenticated.',
+            ], 401);
         }
+
+        // Find order
+        $order = Order::find($id);
+        if (!$order) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Order not found.',
+            ], 404);
+        }
+
+        // Ensure order can be cancelled
+        if (!in_array($order->status, ['Order placed', 'Waiting for courier'])) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Order cannot be cancelled at this stage.',
+            ], 400);
+        }
+
+        // Final reason
+        $reasonText = $reasons[$validated['reason_id']];
+        if ($validated['reason_id'] == 6 && !empty($validated['custom_reason'])) {
+            $reasonText .= ': ' . $validated['custom_reason'];
+        }
+
+        // Update order
+        $order->status = 'Cancelled';
+        $order->cancellation_reason = $reasonText;
+        $order->save();
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Order cancelled successfully.',
+            'order' => [
+                'id' => $order->id,
+                'account_id' => $order->account_id,
+                'status' => $order->status,
+                'cancellation_reason' => $order->cancellation_reason,
+                'ship_to' => $order->ship_to,
+                'quantity' => $order->quantity,
+                'total_amount' => $order->total_amount,
+                'created_at' => $order->created_at->format('F d Y'),
+                'updated_at' => now()->format('F d Y'),
+            ],
+            'user' => [
+                'id' => $user->id,
+                'name' => "{$user->first_name} {$user->last_name}",
+                'role_id' => $user->role_id,
+            ],
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred while cancelling the order.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
     
 
 
