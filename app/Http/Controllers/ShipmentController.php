@@ -1228,10 +1228,10 @@ public function getOrderDetails($id)
                 'message' => 'User not authenticated.',
             ];
             $this->logAPICalls('getOrderDetails', '', ['order_id' => $id], $response);
+            Log::warning('Unauthenticated user attempted to retrieve order', ['order_id' => $id]);
             return response()->json($response, 401);
         }
 
-        // Fetch the order with related product and accounts
         $order = Order::with(['product.account', 'account'])->find($id);
 
         if (!$order) {
@@ -1240,29 +1240,28 @@ public function getOrderDetails($id)
                 'message' => 'Order not found.',
             ];
             $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+            Log::warning('Order not found', ['user_id' => $user->id, 'order_id' => $id]);
             return response()->json($response, 404);
         }
 
-        // Optional access check for farmers
         if ($user->role_id == 2 && $order->product->account_id !== $user->id) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Access denied. This order does not belong to your products.',
             ];
             $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+            Log::warning('Access denied to order details', ['user_id' => $user->id, 'order_id' => $id]);
             return response()->json($response, 403);
         }
 
         $farmer = $order->product->account;
-        $consumer = $order->account;
-
         $details = [
             'order_id' => $order->id,
             'product_id' => $order->product_id,
             'product_name' => $order->product->product_name ?? 'N/A',
-            'farmer_name' => $farmer ? $farmer->first_name . ' ' . $farmer->last_name : 'N/A',
+            'farmer_name' => $farmer ? $farmer->first_name . ' ' . $farmer->las_tname : 'N/A',
             'farmer_delivery_address' => $farmer->delivery_address ?? 'N/A',
-            'consumer_name' => $consumer ? $consumer->first_name . ' ' . $consumer->last_name : 'N/A',
+            'consumer_name' => $order->account ? $order->account->first_name . ' ' . $order->account->last_name : 'N/A',
             'quantity' => $order->quantity,
             'price' => $order->product->price ?? 0,
             'total_amount' => $order->total_amount,
@@ -1278,6 +1277,12 @@ public function getOrderDetails($id)
             'data' => $details,
         ];
 
+        Log::info('Order details retrieved', [
+            'user_id' => $user->id,
+            'order_id' => $id,
+            'buyer_account_id' => $order->account_id,
+        ]);
+
         $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
 
         return response()->json($response, 200);
@@ -1288,6 +1293,11 @@ public function getOrderDetails($id)
             'message' => 'An error occurred while retrieving order details.',
             'error' => $e->getMessage(),
         ];
+        Log::error('Error retrieving order details', [
+            'user_id' => optional(Auth::user())->id,
+            'order_id' => $id,
+            'error' => $e->getMessage(),
+        ]);
         return response()->json($response, 500);
     }
 }
