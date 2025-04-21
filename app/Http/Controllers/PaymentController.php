@@ -633,49 +633,67 @@ class PaymentController extends Controller
 
 
 
-// Fetch all pending payments
-public function getPendingPayments(Request $request)
-{
-    try {
-        $payments = DB::table('payments')
-            ->leftJoin('sellers', 'payments.account_id', '=', 'sellers.id')
-            ->select(
-                'payments.id',
-                'payments.schedule_date as date',
-                'payments.queue_number',
-                'payments.validation_code',
-                'payments.amount',
-                'payments.status',
-                DB::raw('COALESCE(sellers.name, "Unknown") as seller_name')
-            )
-            ->where('payments.status', 'Pending')
-            ->orderBy('payments.schedule_date', 'desc')
-            ->get();
+   // Fetch all pending payouts
+   public function getPendingPayments(Request $request)
+   {
+       try {
+           // Test database connection
+           DB::connection()->getPdo();
+           $dbName = DB::connection()->getDatabaseName();
+           Log::info('Database connection successful', ['database' => $dbName]);
 
-        // Format the data to match the frontend's expectations
-        $formattedPayments = $payments->map(function ($payment) {
-            return [
-                'id' => $payment->id,
-                'date' => Carbon::parse($payment->date)->format('Y-m-d'), // Format date as YYYY-MM-DD
-                'queue_number' => $payment->queue_number,
-                'seller_name' => $payment->seller_name,
-                'validation_code' => $payment->validation_code,
-                'amount' => (string) $payment->amount, // Convert Decimal to string
-                'status' => $payment->status
-            ];
-        });
+           // Fetch payouts
+           $payouts = DB::table('payouts')
+               ->select(
+                   'payouts.id',
+                   'payouts.created_at as date', // Use created_at for the date
+                   'payouts.queue_number',
+                   'payouts.validation_code',
+                   'payouts.amount',
+                   'payouts.status',
+                   DB::raw('"Unknown" as seller_name')
+               )
+               ->where('payouts.status', 'Pending')
+               ->orderBy('payouts.created_at', 'desc') // Sort by created_at
+               ->get();
 
-        return response()->json($formattedPayments, 200);
-    } catch (\Exception $e) {
-        return response()->json(['message' => 'Failed to fetch pending payments'], 500);
-    }
-}
+           Log::info('Fetched payouts', ['count' => $payouts->count(), 'data' => $payouts->toArray()]);
 
-// Approve a payment by ID
+           // Format the data
+           $formattedPayouts = $payouts->map(function ($payout) {
+               $formattedDate = Carbon::parse($payout->date)->format('Y-m-d');
+               return [
+                   'id' => $payout->id,
+                   'date' => $formattedDate,
+                   'queue_number' => $payout->queue_number,
+                   'seller_name' => $payout->seller_name,
+                   'validation_code' => $payout->validation_code ?? '',
+                   'amount' => (string) $payout->amount,
+                   'status' => $payout->status
+               ];
+           });
+
+           Log::info('Formatted payouts', ['formatted' => $formattedPayouts->toArray()]);
+
+           return response()->json($formattedPayouts, 200);
+       } catch (\Exception $e) {
+           Log::error('Failed to fetch pending payouts', [
+               'error' => $e->getMessage(),
+               'trace' => $e->getTraceAsString()
+           ]);
+           return response()->json([
+               'message' => 'Failed to fetch pending payouts',
+               'error' => $e->getMessage()
+           ], 500);
+       }
+   }
+
+
+// Approve a payout by ID
 public function approvePayment(Request $request, $id)
 {
     try {
-        $updated = DB::table('payments')
+        $updated = DB::table('payouts')
             ->where('id', $id)
             ->where('status', 'Pending')
             ->update([
@@ -684,14 +702,23 @@ public function approvePayment(Request $request, $id)
             ]);
 
         if ($updated === 0) {
-            return response()->json(['message' => 'Payment not found or already processed'], 404);
+            return response()->json(['message' => 'Payout not found or already processed'], 404);
         }
 
-        return response()->json(['message' => 'Payment approved successfully'], 200);
+        return response()->json(['message' => 'Payout approved successfully'], 200);
     } catch (\Exception $e) {
-        return response()->json(['message' => 'Failed to approve payment'], 500);
+        Log::error('Failed to approve payout', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return response()->json([
+            'message' => 'Failed to approve payout',
+            'error' => $e->getMessage()
+        ], 500);
     }
 }
+
+ 
 
 
 }
