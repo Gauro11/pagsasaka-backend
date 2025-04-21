@@ -644,19 +644,21 @@ public function getPendingPayments(Request $request)
 
         // Fetch payouts
         $payouts = DB::table('payouts')
-            ->select(
-                'payouts.id',
-                'payouts.created_at as date',
-                'payouts.time_slot', // Added time_slot
-                'payouts.queue_number',
-                'payouts.validation_code',
-                'payouts.amount',
-                'payouts.status',
-                DB::raw('"Unknown" as seller_name')
-            )
-            ->where('payouts.status', 'Pending')
-            ->orderBy('payouts.created_at', 'desc')
-            ->get();
+    ->join('accounts', 'payouts.account_id', '=', 'accounts.id')
+    ->select(
+        'payouts.id',
+        'payouts.created_at as date',
+        'payouts.time_slot',
+        'payouts.queue_number',
+        'payouts.validation_code',
+        'payouts.amount',
+        'payouts.status',
+        'accounts.id as account_id',
+        DB::raw("CONCAT(accounts.first_name, ' ', accounts.middle_name, ' ', accounts.last_name) as seller_name")
+    )
+    ->where('payouts.status', 'Pending')
+    ->orderBy('payouts.created_at', 'desc')
+    ->get();
 
         Log::info('Fetched payouts', ['count' => $payouts->count(), 'data' => $payouts->toArray()]);
 
