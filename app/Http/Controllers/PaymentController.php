@@ -258,15 +258,33 @@ class PaymentController extends Controller
 
     public function checkPayoutEligibility(Request $request)
     {
-        // Existing checkPayoutEligibility method (unchanged)
         if (!Auth::check()) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Authentication required. Please log in.',
             ], 401);
         }
-
+    
         $accountId = Auth::id();
+    
+        // Get all payout records for this account
+        $payouts = Payout::where('account_id', $accountId)->get();
+        $paidOutOrderIds = [];
+    
+        // Collect all order IDs that have been paid out
+        foreach ($payouts as $payout) {
+            if ($payout->order_ids) {
+                $orderIds = json_decode($payout->order_ids, true);
+                if (is_array($orderIds)) {
+                    $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
+                }
+            }
+        }
+    
+        // Remove duplicates
+        $paidOutOrderIds = array_unique($paidOutOrderIds);
+    
+        // Fetch orders that are not in the paid-out list
         $orders = Order::whereHas('product', function ($query) use ($accountId) {
             $query->where('account_id', $accountId);
         })
@@ -276,12 +294,12 @@ class PaymentController extends Controller
                   ->where('status', 'Order Delivered');
             })->orWhere('payment_method', 'E-Wallet');
         })
-        ->where('status', '!=', 'Paid Out')
+        ->whereNotIn('id', $paidOutOrderIds) // Exclude orders that have been paid out
         ->get();
-
+    
         $totalSales = $orders->sum('total_amount');
         $eligible = $totalSales >= 500;
-
+    
         return response()->json([
             'isSuccess' => true,
             'eligible' => $eligible,
