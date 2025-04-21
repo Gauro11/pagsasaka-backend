@@ -646,7 +646,8 @@ class PaymentController extends Controller
            $payouts = DB::table('payouts')
                ->select(
                    'payouts.id',
-                   'payouts.created_at as date', // Use created_at for the date
+                   'payouts.created_at as date',
+                   'payouts.time_slot', // Added time_slot
                    'payouts.queue_number',
                    'payouts.validation_code',
                    'payouts.amount',
@@ -654,7 +655,7 @@ class PaymentController extends Controller
                    DB::raw('"Unknown" as seller_name')
                )
                ->where('payouts.status', 'Pending')
-               ->orderBy('payouts.created_at', 'desc') // Sort by created_at
+               ->orderBy('payouts.created_at', 'desc')
                ->get();
 
            Log::info('Fetched payouts', ['count' => $payouts->count(), 'data' => $payouts->toArray()]);
@@ -665,6 +666,7 @@ class PaymentController extends Controller
                return [
                    'id' => $payout->id,
                    'date' => $formattedDate,
+                   'time_slot' => $payout->time_slot, // Include time_slot in the response
                    'queue_number' => $payout->queue_number,
                    'seller_name' => $payout->seller_name,
                    'validation_code' => $payout->validation_code ?? '',
@@ -689,35 +691,34 @@ class PaymentController extends Controller
    }
 
 
-// Approve a payout by ID
-public function approvePayment(Request $request, $id)
-{
-    try {
-        $updated = DB::table('payouts')
-            ->where('id', $id)
-            ->where('status', 'Pending')
-            ->update([
-                'status' => 'Approved',
-                'updated_at' => Carbon::now()
-            ]);
+ // Approve a payout by ID
+ public function approvePayment(Request $request, $id)
+ {
+     try {
+         $updated = DB::table('payouts')
+             ->where('id', $id)
+             ->where('status', 'Pending')
+             ->update([
+                 'status' => 'Approved',
+                 'updated_at' => Carbon::now()
+             ]);
 
-        if ($updated === 0) {
-            return response()->json(['message' => 'Payout not found or already processed'], 404);
-        }
+         if ($updated === 0) {
+             return response()->json(['message' => 'Payout not found or already processed'], 404);
+         }
 
-        return response()->json(['message' => 'Payout approved successfully'], 200);
-    } catch (\Exception $e) {
-        Log::error('Failed to approve payout', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-        return response()->json([
-            'message' => 'Failed to approve payout',
-            'error' => $e->getMessage()
-        ], 500);
-    }
-}
-
+         return response()->json(['message' => 'Payout approved successfully'], 200);
+     } catch (\Exception $e) {
+         Log::error('Failed to approve payout', [
+             'error' => $e->getMessage(),
+             'trace' => $e->getTraceAsString()
+         ]);
+         return response()->json([
+             'message' => 'Failed to approve payout',
+             'error' => $e->getMessage()
+         ], 500);
+     }
+ }
  
 
 
