@@ -16,11 +16,13 @@ use App\Models\Order;
 use App\Models\Cart;
 use App\Models\Payout;
 use Exception;
+use Carbon\Carbon;
 
 class PaymentController extends Controller
 {
     public function payment(Request $request)
     {
+        // Existing payment method (unchanged)
         if (!Auth::check()) {
             return response()->json([
                 'isSuccess' => false,
@@ -215,9 +217,9 @@ class PaymentController extends Controller
         }
     }
 
-    // Fetch payment history for the seller
     public function getPaymentHistory(Request $request)
     {
+        // Existing getPaymentHistory method (unchanged)
         if (!Auth::check()) {
             return response()->json([
                 'isSuccess' => false,
@@ -240,7 +242,6 @@ class PaymentController extends Controller
             ->get()
             ->map(function ($order) {
                 return [
-                  
                     'date' => $order->created_at->format('m/d/Y'),
                     'product_name' => $order->product->product_name ?? 'Unknown Product',
                     'payment_method' => $order->payment_method,
@@ -255,7 +256,6 @@ class PaymentController extends Controller
         ]);
     }
 
-    // Check if seller is eligible for payout and get total sales
     public function checkPayoutEligibility(Request $request)
     {
         if (!Auth::check()) {
@@ -264,8 +264,27 @@ class PaymentController extends Controller
                 'message' => 'Authentication required. Please log in.',
             ], 401);
         }
-
+    
         $accountId = Auth::id();
+    
+        // Get all payout records for this account
+        $payouts = Payout::where('account_id', $accountId)->get();
+        $paidOutOrderIds = [];
+    
+        // Collect all order IDs that have been paid out
+        foreach ($payouts as $payout) {
+            if ($payout->order_ids) {
+                $orderIds = json_decode($payout->order_ids, true);
+                if (is_array($orderIds)) {
+                    $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
+                }
+            }
+        }
+    
+        // Remove duplicates
+        $paidOutOrderIds = array_unique($paidOutOrderIds);
+    
+        // Fetch orders that are not in the paid-out list
         $orders = Order::whereHas('product', function ($query) use ($accountId) {
             $query->where('account_id', $accountId);
         })
@@ -275,12 +294,12 @@ class PaymentController extends Controller
                   ->where('status', 'Order Delivered');
             })->orWhere('payment_method', 'E-Wallet');
         })
-        ->where('status', '!=', 'Paid Out')
+        ->whereNotIn('id', $paidOutOrderIds) // Exclude orders that have been paid out
         ->get();
-
+    
         $totalSales = $orders->sum('total_amount');
         $eligible = $totalSales >= 500;
-
+    
         return response()->json([
             'isSuccess' => true,
             'eligible' => $eligible,
@@ -288,11 +307,10 @@ class PaymentController extends Controller
         ]);
     }
 
-    // Get available slots for a given date or date range
     public function getAvailableSlots(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'date' => 'required|string', // Can be a single date or range (e.g., '2025-05-05' or '2025-05-01/2025-05-31')
+            'date' => 'required|string',
         ]);
 
         if ($validator->fails()) {
@@ -304,7 +322,7 @@ class PaymentController extends Controller
         }
 
         $dateInput = $request->input('date');
-        $maxSlotsPerTimeSlot = 2; // Maximum bookings per time slot
+        $maxSlotsPerDay = 10;
         $timeSlots = [
             '10:00-11:00',
             '11:00-12:00',
@@ -314,15 +332,15 @@ class PaymentController extends Controller
             '15:00-16:00',
             '16:00-17:00',
         ];
+        $maxSlotsPerTimeSlot = ceil($maxSlotsPerDay / count($timeSlots));
 
         $today = now()->startOfDay();
         $availableSlots = [];
 
         if (strpos($dateInput, '/') !== false) {
-            // Handle date range (for calendar)
             [$startDate, $endDate] = explode('/', $dateInput);
-            $start = \Carbon\Carbon::parse($startDate);
-            $end = \Carbon\Carbon::parse($endDate);
+            $start = Carbon::parse($startDate);
+            $end = Carbon::parse($endDate);
 
             if ($start->lt($today)) {
                 $start = $today;
@@ -337,26 +355,32 @@ class PaymentController extends Controller
 
             $currentDate = $start->copy();
             while ($currentDate->lte($end)) {
-                foreach ($timeSlots as $timeSlot) {
+                if ($currentDate->isWeekday()) {
                     $existingPayouts = Payout::where('scheduled_date', $currentDate->format('Y-m-d'))
-                        ->where('time_slot', $timeSlot)
                         ->count();
 
-                    $availableCount = max(0, $maxSlotsPerTimeSlot - $existingPayouts);
-                    if ($availableCount > 0) {
-                        $availableSlots[] = [
-                            'date' => $currentDate->format('Y-m-d'),
-                            'time_slot' => $timeSlot,
-                            'is_available' => true,
-                            'available_slots' => $availableCount,
-                        ];
+                    if ($existingPayouts < $maxSlotsPerDay) {
+                        foreach ($timeSlots as $timeSlot) {
+                            $existingPayoutsForSlot = Payout::where('scheduled_date', $currentDate->format('Y-m-d'))
+                                ->where('time_slot', $timeSlot)
+                                ->count();
+
+                            $availableCount = max(0, $maxSlotsPerTimeSlot - $existingPayoutsForSlot);
+                            if ($availableCount > 0) {
+                                $availableSlots[] = [
+                                    'date' => $currentDate->format('Y-m-d'),
+                                    'time_slot' => $timeSlot,
+                                    'is_available' => true,
+                                    'available_slots' => $availableCount,
+                                ];
+                            }
+                        }
                     }
                 }
                 $currentDate->addDay();
             }
         } else {
-            // Handle single date (for time slot selection)
-            $date = \Carbon\Carbon::parse($dateInput);
+            $date = Carbon::parse($dateInput);
             if ($date->lt($today)) {
                 return response()->json([
                     'isSuccess' => false,
@@ -364,12 +388,29 @@ class PaymentController extends Controller
                 ], 400);
             }
 
+            if (!$date->isWeekday()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Selected date must be a weekday.',
+                ], 400);
+            }
+
+            $existingPayouts = Payout::where('scheduled_date', $date->format('Y-m-d'))
+                ->count();
+
+            if ($existingPayouts >= $maxSlotsPerDay) {
+                return response()->json([
+                    'isSuccess' => true,
+                    'available_slots' => [],
+                ]);
+            }
+
             foreach ($timeSlots as $timeSlot) {
-                $existingPayouts = Payout::where('scheduled_date', $date->format('Y-m-d'))
+                $existingPayoutsForSlot = Payout::where('scheduled_date', $date->format('Y-m-d'))
                     ->where('time_slot', $timeSlot)
                     ->count();
 
-                $availableCount = max(0, $maxSlotsPerTimeSlot - $existingPayouts);
+                $availableCount = max(0, $maxSlotsPerTimeSlot - $existingPayoutsForSlot);
                 $availableSlots[] = [
                     'date' => $date->format('Y-m-d'),
                     'time_slot' => $timeSlot,
@@ -385,7 +426,6 @@ class PaymentController extends Controller
         ]);
     }
 
-    // Request a payout and schedule it
     public function requestPayout(Request $request)
     {
         if (!Auth::check()) {
@@ -399,6 +439,7 @@ class PaymentController extends Controller
             'date' => 'required|date|after_or_equal:today',
             'time_slot' => 'required|string|in:10:00-11:00,11:00-12:00,12:00-13:00,13:00-14:00,14:00-15:00,15:00-16:00,16:00-17:00',
             'total_sales' => 'required|numeric|min:500',
+            'validation_code' => 'required|string',
         ]);
 
         if ($validator->fails()) {
@@ -413,26 +454,51 @@ class PaymentController extends Controller
         $scheduledDate = $request->input('date');
         $timeSlot = $request->input('time_slot');
         $totalSales = $request->input('total_sales');
+        $validationCode = $request->input('validation_code');
 
-        $maxSlotsPerTimeSlot = 2;
+        $maxSlotsPerDay = 10;
+        $timeSlots = [
+            '10:00-11:00',
+            '11:00-12:00',
+            '12:00-13:00',
+            '13:00-14:00',
+            '14:00-15:00',
+            '15:00-16:00',
+            '16:00-17:00',
+        ];
+        $maxSlotsPerTimeSlot = ceil($maxSlotsPerDay / count($timeSlots));
 
-        // Check existing payouts for the selected date and time slot
-        $existingPayouts = Payout::where('scheduled_date', $scheduledDate)
-            ->where('time_slot', $timeSlot)
-            ->count();
-
-        if ($existingPayouts >= $maxSlotsPerTimeSlot) {
+        $date = Carbon::parse($scheduledDate);
+        if (!$date->isWeekday()) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'No available slots for the selected date and time.',
+                'message' => 'Selected date must be a weekday.',
             ], 400);
         }
 
-        // Calculate queue number for the day
-        $queueNumber = Payout::where('scheduled_date', $scheduledDate)
-            ->count() + 1;
+        $existingPayouts = Payout::where('scheduled_date', $scheduledDate)
+            ->count();
 
-        // Create the payout request
+        if ($existingPayouts >= $maxSlotsPerDay) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No available slots for the selected date.',
+            ], 400);
+        }
+
+        $existingPayoutsForSlot = Payout::where('scheduled_date', $scheduledDate)
+            ->where('time_slot', $timeSlot)
+            ->count();
+
+        if ($existingPayoutsForSlot >= $maxSlotsPerTimeSlot) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No available slots for the selected time slot.',
+            ], 400);
+        }
+
+        $queueNumber = $existingPayouts + 1;
+
         $payout = Payout::create([
             'account_id' => $accountId,
             'amount' => $totalSales,
@@ -440,9 +506,9 @@ class PaymentController extends Controller
             'time_slot' => $timeSlot,
             'queue_number' => $queueNumber,
             'status' => 'Pending',
+            'validation_code' => $validationCode,
         ]);
 
-        // Mark orders as paid out
         Order::whereHas('product', function ($query) use ($accountId) {
             $query->where('account_id', $accountId);
         })
@@ -463,36 +529,36 @@ class PaymentController extends Controller
                 'time_slot' => $payout->time_slot,
                 'queue_number' => $payout->queue_number,
                 'amount' => number_format($payout->amount, 2, '.', ''),
+                'validation_code' => $payout->validation_code,
             ],
         ]);
     }
 
-     // Export payment history to CSV
-     public function exportPaymentHistoryToCSV(Request $request)
-     {
-         if (!Auth::check()) {
-             return response()->json([
-                 'isSuccess' => false,
-                 'message' => 'Authentication required. Please log in.',
-             ], 401);
-         }
- 
-         $farmerId = Auth::id();
- 
-         // Get orders where the product belongs to the logged-in farmer (same logic as getPaymentHistory)
-         $orders = Order::whereHas('product', function ($query) use ($farmerId) {
-             $query->where('account_id', $farmerId);
-         })
-         ->with(['product'])
-         ->get()
-         ->map(function ($order) {
-             return [
-                 'date' => $order->created_at->format('m/d/Y'),
-                 'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
-                 'payment_method' => $order->payment_method ?? 'Unknown',
-                 'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
-             ];
-         });
+    public function exportPaymentHistoryToCSV(Request $request)
+    {
+        // Existing exportPaymentHistoryToCSV method (unchanged)
+        if (!Auth::check()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Authentication required. Please log in.',
+            ], 401);
+        }
+
+        $farmerId = Auth::id();
+
+        $orders = Order::whereHas('product', function ($query) use ($farmerId) {
+            $query->where('account_id', $farmerId);
+        })
+        ->with(['product'])
+        ->get()
+        ->map(function ($order) {
+            return [
+                'date' => $order->created_at->format('m/d/Y'),
+                'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
+                'payment_method' => $order->payment_method ?? 'Unknown',
+                'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
+            ];
+        });
 
         if ($orders->isEmpty()) {
             return response()->json([
