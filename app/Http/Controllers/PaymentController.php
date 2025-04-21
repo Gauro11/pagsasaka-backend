@@ -224,23 +224,23 @@ class PaymentController extends Controller
                 'message' => 'Authentication required. Please log in.',
             ], 401);
         }
-    
+
         $farmerId = Auth::id();
-    
-        $payouts = Payout::where('account_id', $farmerId)->get();
-        $paidOutOrderIds = [];
-    
-        foreach ($payouts as $payout) {
-            if ($payout->order_ids) {
-                $orderIds = json_decode($payout->order_ids, true);
-                if (is_array($orderIds)) {
-                    $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
-                }
-            }
-        }
-    
-        $paidOutOrderIds = array_unique($paidOutOrderIds);
-    
+
+        // Optimize retrieval of paid-out order IDs
+        $paidOutOrderIds = Payout::where('account_id', $farmerId)
+            ->whereNotNull('order_ids')
+            ->pluck('order_ids')
+            ->map(function ($orderIds) {
+                return json_decode($orderIds, true);
+            })
+            ->flatten()
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        // Fetch eligible orders
         $orders = Order::whereHas('product', function ($query) use ($farmerId) {
                 $query->where('account_id', $farmerId);
             })
@@ -248,24 +248,36 @@ class PaymentController extends Controller
                 $query->where(function ($q) {
                     $q->where('payment_method', 'COD')
                       ->where('status', 'Order Delivered');
-                })->orWhere('payment_method', 'E-Wallet');
+                })->orWhere(function ($q) {
+                    $q->where('payment_method', 'E-Wallet')
+                      ->whereNotNull('status');
+                });
             })
+            ->whereNotNull('payment_method')
             ->whereNotIn('id', $paidOutOrderIds)
             ->with(['product'])
-            ->get()
-            ->map(function ($order) {
-                return [
-                    'date' => $order->created_at->format('m/d/Y'),
-                    'product_name' => $order->product->product_name ?? 'Unknown Product',
-                    'payment_method' => $order->payment_method,
-                    'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
-                    'buyer_account_id' => $order->account_id,
-                ];
-            });
-    
+            ->get();
+
+        // Log the fetched orders for debugging
+        Log::info('Fetched payment history for farmer', [
+            'farmer_id' => $farmerId,
+            'order_count' => $orders->count(),
+            'order_ids' => $orders->pluck('id')->toArray(),
+        ]);
+
+        $transactions = $orders->map(function ($order) {
+            return [
+                'date' => $order->created_at ? $order->created_at->format('m/d/Y') : 'Unknown Date',
+                'product_name' => $order->product ? ($order->product->product_name ?? 'Unknown Product') : 'Product Not Found',
+                'payment_method' => $order->payment_method ?? 'Unknown',
+                'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format((float)$order->total_amount, 2, '.', ''),
+                'buyer_account_id' => $order->account_id,
+            ];
+        });
+
         return response()->json([
             'isSuccess' => true,
-            'transactions' => $orders,
+            'transactions' => $transactions,
         ]);
     }
 
