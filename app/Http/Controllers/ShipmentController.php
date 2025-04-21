@@ -761,7 +761,6 @@ public function getCancelledOrders(Request $request)
 public function cancelOrder(Request $request, $id)
 {
     try {
-        // Define reasons (should match IDs from getCancellationReasons)
         $reasons = [
             1 => 'Changed my mind',
             2 => 'Found a better price',
@@ -771,13 +770,10 @@ public function cancelOrder(Request $request, $id)
             6 => 'Other (please specify)',
         ];
 
-        // Validate request
         $validated = $request->validate([
             'reason_id' => 'required|integer|in:' . implode(',', array_keys($reasons)),
-            
         ]);
 
-        // Authenticated user
         $user = Auth::user();
         if (!$user) {
             return response()->json([
@@ -786,8 +782,8 @@ public function cancelOrder(Request $request, $id)
             ], 401);
         }
 
-        // Find order
-        $order = Order::find($id);
+        // Load order with related product
+        $order = Order::with('product')->find($id);
         if (!$order) {
             return response()->json([
                 'isSuccess' => false,
@@ -795,7 +791,6 @@ public function cancelOrder(Request $request, $id)
             ], 404);
         }
 
-        // Ensure order can be cancelled
         if (!in_array($order->status, ['Order placed', 'Waiting for courier'])) {
             return response()->json([
                 'isSuccess' => false,
@@ -803,7 +798,6 @@ public function cancelOrder(Request $request, $id)
             ], 400);
         }
 
-        // Final reason
         $reasonText = $reasons[$validated['reason_id']];
         if ($validated['reason_id'] == 6 && !empty($validated['custom_reason'])) {
             $reasonText .= ': ' . $validated['custom_reason'];
@@ -813,6 +807,8 @@ public function cancelOrder(Request $request, $id)
         $order->status = 'Cancelled';
         $order->cancellation_reason = $reasonText;
         $order->save();
+
+        $product = $order->product;
 
         return response()->json([
             'isSuccess' => true,
@@ -827,6 +823,14 @@ public function cancelOrder(Request $request, $id)
                 'total_amount' => $order->total_amount,
                 'created_at' => $order->created_at->format('F d Y'),
                 'updated_at' => now()->format('F d Y'),
+
+                // ✅ Additional product info
+                'product_id' => $product->id ?? null,
+                'product_name' => $product->product_name ?? 'N/A',
+                'product_img' => $product->product_img ?? null,
+                'unit' => $product->unit ?? 'N/A',
+                'price' => $product->price ?? 0,
+                'total' => $product ? ($product->price * $order->quantity) : 0,
             ],
             'user' => [
                 'id' => $user->id,
@@ -843,6 +847,7 @@ public function cancelOrder(Request $request, $id)
         ], 500);
     }
 }
+
 
     
 
