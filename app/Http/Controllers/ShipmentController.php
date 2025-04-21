@@ -1218,7 +1218,7 @@ public function refundStatus(Request $request)
 }
 
 
-public function getOrderDetails($id)
+public function getOrderDetails(Request $request)
 {
     try {
         $user = Auth::user();
@@ -1227,30 +1227,25 @@ public function getOrderDetails($id)
                 'isSuccess' => false,
                 'message' => 'User not authenticated.',
             ];
-            $this->logAPICalls('getOrderDetails', '', ['order_id' => $id], $response);
+            $this->logAPICalls('getOrderDetails', '', $request->all(), $response);
             return response()->json($response, 401);
         }
 
-        // Load the order with related product, farmer (product.account), and consumer (order.account)
-        $order = Order::with(['product.account', 'account']) // Relationships must be properly defined
-            ->find($id);
+        // Validate input
+      
 
-        if (!$order) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Order not found.',
-            ];
-            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
-            return response()->json($response, 404);
-        }
+        $orderId = $request->input('order_id');
 
-        // Optional: Restrict farmer access to only their own products
+        // Load the order with product (and its farmer) + account (consumer)
+        $order = Order::with(['product.account', 'account'])->find($orderId);
+
+        // Ownership check for farmers
         if ($user->role_id == 2 && $order->product->account_id !== $user->id) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Access denied. This order does not belong to your products.',
             ];
-            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+            $this->logAPICalls('getOrderDetails', $user->id, $request->all(), $response);
             return response()->json($response, 403);
         }
 
@@ -1258,23 +1253,8 @@ public function getOrderDetails($id)
             'order_id' => $order->id,
             'product_id' => $order->product_id,
             'product_name' => $order->product->product_name ?? 'N/A',
-
-            // Farmer details based on product.account_id
-            'farmer_id' => $order->product->account_id ?? null,
-            'farmer_name' => $order->product->account 
-                ? $order->product->account->first_name . ' ' . $order->product->account->last_name 
-                : 'N/A',
-
-            // Consumer details based on order.account_id
-            'consumer_id' => $order->account_id,
-            'consumer_name' => $order->account 
-                ? $order->account->first_name . ' ' . $order->account->last_name 
-                : 'N/A',
-
-            // Optional: You can include emails or phone numbers
-            // 'consumer_email' => $order->account->email ?? null,
-            // 'farmer_email' => $order->product->account->email ?? null,
-
+            'farmer_name' => optional($order->product->account)->first_name . ' ' . optional($order->product->account)->last_name,
+            'consumer_name' => optional($order->account)->first_name . ' ' . optional($order->account)->last_name,
             'quantity' => $order->quantity,
             'price' => $order->product->price ?? 0,
             'total_amount' => $order->total_amount,
@@ -1290,19 +1270,19 @@ public function getOrderDetails($id)
             'data' => $details,
         ];
 
-        $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
-
+        $this->logAPICalls('getOrderDetails', $user->id, $request->all(), $response);
         return response()->json($response, 200);
 
     } catch (Throwable $e) {
-        $response = [
+        return response()->json([
             'isSuccess' => false,
             'message' => 'An error occurred while retrieving order details.',
             'error' => $e->getMessage(),
-        ];
-        return response()->json($response, 500);
+        ], 500);
     }
 }
+
+
 
 
 
