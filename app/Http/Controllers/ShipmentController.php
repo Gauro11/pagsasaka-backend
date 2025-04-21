@@ -1218,47 +1218,57 @@ public function refundStatus(Request $request)
 }
 
 //payslipwwwwwwwwwwww
-public function getpayslip($id)
+public function getOrderDetails(Request $request)
 {
     try {
         $user = Auth::user();
+        $payload = $request->all();
+
         if (!$user) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'User not authenticated.',
             ];
-            $this->logAPICalls('getOrderDetails', '', ['order_id' => $id], $response);
+            $this->logAPICalls('getOrderDetails', '', $payload, $response);
             return response()->json($response, 401);
         }
 
-        // Load the order with related product (with farmer) and consumer
-        $order = Order::with(['product.account', 'account'])->find($id);
+        // Log input request
+        $this->logAPICalls('getOrderDetails - Request Received', $user->id, $payload, []);
+
+        // Fetch order by ID
+        $order = Order::with(['product.account', 'account'])->find($payload['order_id'] ?? null);
 
         if (!$order) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Order not found.',
             ];
-            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+            $this->logAPICalls('getOrderDetails - Order Not Found', $user->id, $payload, $response);
             return response()->json($response, 404);
         }
 
-        // If user is farmer, ensure they own the product
+        // Check farmer ownership (if applicable)
         if ($user->role_id == 2 && $order->product->account_id !== $user->id) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Access denied. This order does not belong to your products.',
             ];
-            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+            $this->logAPICalls('getOrderDetails - Access Denied', $user->id, $payload, $response);
             return response()->json($response, 403);
         }
+
+        // Get delivery address from farmer via product's account
+        $farmer = $order->product->account;
+        $deliveryAddress = $farmer ? $farmer->delivery_address : 'N/A';
 
         $details = [
             'order_id' => $order->id,
             'product_id' => $order->product_id,
             'product_name' => $order->product->product_name ?? 'N/A',
-            'farmer_name' => optional($order->product->account)->first_name . ' ' . optional($order->product->account)->last_name,
-            'consumer_name' => optional($order->account)->first_name . ' ' . optional($order->account)->last_name,
+            'farmer_name' => $farmer ? $farmer->first_name . ' ' . $farmer->last_name : 'N/A',
+            'farmer_delivery_address' => $deliveryAddress,
+            'consumer_name' => $order->account ? $order->account->first_name . ' ' . $order->account->last_name : 'N/A',
             'quantity' => $order->quantity,
             'price' => $order->product->price ?? 0,
             'total_amount' => $order->total_amount,
@@ -1274,17 +1284,21 @@ public function getpayslip($id)
             'data' => $details,
         ];
 
-        $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+        $this->logAPICalls('getOrderDetails - Success', $user->id, $payload, $response);
+
         return response()->json($response, 200);
 
     } catch (Throwable $e) {
-        return response()->json([
+        $response = [
             'isSuccess' => false,
             'message' => 'An error occurred while retrieving order details.',
             'error' => $e->getMessage(),
-        ], 500);
+        ];
+        $this->logAPICalls('getOrderDetails - Exception', Auth::id(), $request->all(), $response);
+        return response()->json($response, 500);
     }
 }
+
 
 
 

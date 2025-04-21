@@ -53,4 +53,6 @@ public function account()
     {
         return $this->ratings()->count();
     }
+
+    
 }
