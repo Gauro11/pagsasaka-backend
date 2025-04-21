@@ -1227,8 +1227,7 @@ public function getOrderDetails($id)
                 'isSuccess' => false,
                 'message' => 'User not authenticated.',
             ];
-            $this->logAPICalls('getOrderDetails', '', ['order_id' => $id], $response);
-            Log::warning('Unauthenticated user attempted to retrieve order', ['order_id' => $id]);
+            Log::info('Unauthenticated user tried to access order.', ['order_id' => $id]);
             return response()->json($response, 401);
         }
 
@@ -1239,29 +1238,21 @@ public function getOrderDetails($id)
                 'isSuccess' => false,
                 'message' => 'Order not found.',
             ];
-            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
-            Log::warning('Order not found', ['user_id' => $user->id, 'order_id' => $id]);
+            Log::info('Order not found.', ['user_id' => $user->id, 'order_id' => $id]);
             return response()->json($response, 404);
         }
 
-        if ($user->role_id == 2 && $order->product->account_id !== $user->id) {
-            $response = [
-                'isSuccess' => false,
-                'message' => 'Access denied. This order does not belong to your products.',
-            ];
-            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
-            Log::warning('Access denied to order details', ['user_id' => $user->id, 'order_id' => $id]);
-            return response()->json($response, 403);
-        }
-
+        // Get the farmer from the product relation
         $farmer = $order->product->account;
+
         $details = [
             'order_id' => $order->id,
             'product_id' => $order->product_id,
             'product_name' => $order->product->product_name ?? 'N/A',
-            'farmer_name' => $farmer ? $farmer->first_name . ' ' . $farmer->las_tname : 'N/A',
+            'farmer_name' => $farmer ? $farmer->first_name . ' ' . $farmer->last_name : 'N/A',
             'farmer_delivery_address' => $farmer->delivery_address ?? 'N/A',
             'consumer_name' => $order->account ? $order->account->first_name . ' ' . $order->account->last_name : 'N/A',
+            'consumer_account_id' => $order->account_id, // add buyer's ID here
             'quantity' => $order->quantity,
             'price' => $order->product->price ?? 0,
             'total_amount' => $order->total_amount,
@@ -1271,34 +1262,25 @@ public function getOrderDetails($id)
             'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
         ];
 
-        $response = [
-            'isSuccess' => true,
-            'message' => 'Order details retrieved successfully.',
-            'data' => $details,
-        ];
-
         Log::info('Order details retrieved', [
             'user_id' => $user->id,
-            'order_id' => $id,
-            'buyer_account_id' => $order->account_id,
+            'order_id' => $order->id,
+            'consumer_account_id' => $order->account_id,
         ]);
 
-        $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
-
-        return response()->json($response, 200);
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Order details retrieved successfully.',
+            'payslip' => $details, // 👈 this key should match frontend expectations
+        ], 200);
 
     } catch (Throwable $e) {
-        $response = [
+        Log::error('Error retrieving order details', ['error' => $e->getMessage()]);
+        return response()->json([
             'isSuccess' => false,
             'message' => 'An error occurred while retrieving order details.',
             'error' => $e->getMessage(),
-        ];
-        Log::error('Error retrieving order details', [
-            'user_id' => optional(Auth::user())->id,
-            'order_id' => $id,
-            'error' => $e->getMessage(),
-        ]);
-        return response()->json($response, 500);
+        ], 500);
     }
 }
 
