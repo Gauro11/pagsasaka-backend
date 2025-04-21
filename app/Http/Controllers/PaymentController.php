@@ -765,69 +765,76 @@ class PaymentController extends Controller
     }
 
     public function approvePayment(Request $request, $id)
-    {
-        try {
-            DB::beginTransaction();
-
-            $payout = Payout::where('id', $id)
-                ->where('status', 'Pending')
-                ->first();
-
-            if (!$payout) {
-                Log::warning('Payout not found or already processed', ['payout_id' => $id]);
-                return response()->json([
-                    'message' => 'Payout not found or already processed'
-                ], 404);
-            }
-
-            // Decode order_ids and validate
-            $orderIds = $payout->order_ids ? json_decode($payout->order_ids, true) : [];
-
-            if (!is_array($orderIds) || empty($orderIds)) {
-                Log::warning('Invalid or empty order_ids for payout', [
-                    'payout_id' => $id,
-                    'order_ids' => $payout->order_ids,
-                ]);
-                $payout->status = 'Approved';
-                $payout->updated_at = Carbon::now();
-                $payout->save();
-                DB::commit();
-                return response()->json([
-                    'message' => 'Payout approved successfully, no orders to process'
-                ], 200);
-            }
-
-            // Update payment_method to "Paid" for the associated orders
-            $updatedCount = Order::whereIn('id', $orderIds)
-                ->update(['payment_method' => 'Paid']);
-
-            Log::info('Orders updated to Paid', [
+{
+    try {
+        DB::beginTransaction();
+        $payout = Payout::where('id', $id)
+            ->where('status', 'Pending')
+            ->first();
+        
+        if (!$payout) {
+            Log::warning('Payout not found or already processed', ['payout_id' => $id]);
+            return response()->json([
+                'message' => 'Payout not found or already processed'
+            ], 404);
+        }
+        
+        // Decode order_ids and validate
+        $orderIds = $payout->order_ids ? json_decode($payout->order_ids, true) : [];
+        if (!is_array($orderIds) || empty($orderIds)) {
+            Log::warning('Invalid or empty order_ids for payout', [
                 'payout_id' => $id,
-                'updated_count' => $updatedCount,
-                'expected_count' => count($orderIds),
+                'order_ids' => $payout->order_ids,
             ]);
-
-            // Update payout status
             $payout->status = 'Approved';
             $payout->updated_at = Carbon::now();
             $payout->save();
-
             DB::commit();
-
             return response()->json([
-                'message' => "Payout approved successfully, updated $updatedCount orders to Paid"
+                'message' => 'Payout approved successfully, no orders to process'
             ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to approve payout', [
-                'payout_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json([
-                'message' => 'Failed to approve payout',
-                'error' => $e->getMessage()
-            ], 500);
         }
+        
+        // Get orders with COD or e-wallet payment methods
+        $orders = Order::whereIn('id', $orderIds)
+            ->whereIn('payment_method', ['COD', 'E-Wallet'])
+            ->get();
+        
+        // Update payment_method to "Paid" for the associated orders
+        $updatedCount = Order::whereIn('id', $orderIds)
+            ->whereIn('payment_method', ['COD', 'E-Wallet'])
+            ->update(['payment_method' => 'Paid']);
+            
+        Log::info('Orders updated to Paid', [
+            'payout_id' => $id,
+            'updated_count' => $updatedCount,
+            'orders_payment_types' => $orders->pluck('payment_method', 'id'),
+        ]);
+        
+        // Update payout status
+        $payout->status = 'Approved';
+        $payout->updated_at = Carbon::now();
+        $payout->save();
+        
+        DB::commit();
+        
+        return response()->json([
+            'message' => "Payout approved successfully, updated $updatedCount COD/E-Wallet orders to Paid"
+        ], 200);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Failed to approve payout', [
+            'payout_id' => $id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'message' => 'Failed to approve payout',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
+
 }
