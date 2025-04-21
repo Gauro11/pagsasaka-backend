@@ -24,6 +24,7 @@ class Order extends Model
         'created_at',
         'updated_at',
         'payment_method',
+        'order_number',
     ];
 
     

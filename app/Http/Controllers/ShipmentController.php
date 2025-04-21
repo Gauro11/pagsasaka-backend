@@ -1238,7 +1238,7 @@ public function getOrderDetails($id)
                 'isSuccess' => false,
                 'message' => 'Order not found.',
             ];
-            Log::info('Order not found.', ['user_id' => $user->id, 'order_id' => $id]);
+            Log::info('Order not found.', ['farmer_id' => $user->id, 'order_id' => $id]);
             return response()->json($response, 404);
         }
 
