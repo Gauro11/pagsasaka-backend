@@ -384,9 +384,10 @@ class PaymentController extends Controller
                 'message' => 'Authentication required. Please log in.',
             ], 401);
         }
-
+    
         $accountId = Auth::id();
-
+    
+        // Fetch orders
         $orders = Order::where('account_id', $accountId)
             ->with('product')
             ->get()
@@ -398,33 +399,48 @@ class PaymentController extends Controller
                     'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
                 ];
             });
-
+    
+        // Check if there are orders
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No payment history found.',
+            ], 404);
+        }
+    
+        // Generate CSV content in-memory
         $csvFileName = 'payment_history_' . now()->format('Ymd_His') . '.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"$csvFileName\"",
         ];
-
-        $handle = fopen('php://output', 'w');
-        fputcsv($handle, ['Date', 'Product Name', 'Payment Method', 'Amount']);
-
+    
+        // Use an in-memory stream
+        $output = fopen('php://temp', 'r+');
+        // Add UTF-8 BOM for Excel compatibility (important for special characters)
+        fwrite($output, "\xEF\xBB\xBF");
+        // Write headers
+        fputcsv($output, ['Date', 'Product Name', 'Payment Method', 'Amount']);
+    
+        // Write data
         foreach ($orders as $order) {
-            fputcsv($handle, [
+            fputcsv($output, [
                 $order['date'],
                 $order['product_name'],
                 $order['payment_method'],
                 $order['amount'],
             ]);
         }
-
-        fclose($handle);
-
-        return response()->stream(
-            function () use ($handle) {
-                // Stream already handled
-            },
-            200,
-            $headers
-        );
+    
+        // Rewind the stream to the beginning
+        rewind($output);
+        $csvContent = stream_get_contents($output);
+        fclose($output);
+    
+        // Return the CSV content as a response
+        return response($csvContent, 200, $headers);
     }
+
+
+    
 }
