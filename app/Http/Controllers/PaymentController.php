@@ -447,23 +447,23 @@ class PaymentController extends Controller
             'total_sales' => 'required|numeric|min:500',
             'validation_code' => 'required|string',
         ]);
-
+    
         $accountId = Auth::id();
         $date = $validated['date'];
         $timeSlot = $validated['time_slot'];
-
+    
         // Check if the seller has a pending payout request
         $existingPayout = Payout::where('account_id', $accountId)
             ->where('status', 'Pending')
             ->first();
-
+    
         if ($existingPayout) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'You have a pending payout request. Please wait for it to be approved.',
             ], 400);
         }
-
+    
         // Check if the date is a weekday
         $dayOfWeek = Carbon::parse($date)->dayOfWeek;
         if ($dayOfWeek == 0 || $dayOfWeek == 6) {
@@ -472,26 +472,26 @@ class PaymentController extends Controller
                 'message' => 'Payouts can only be scheduled on weekdays.',
             ], 400);
         }
-
+    
         // Check slot availability
         $existingPayouts = Payout::where('scheduled_date', $date)
             ->where('time_slot', $timeSlot)
             ->count();
-
+    
         if ($existingPayouts >= 10) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Selected time slot is fully booked.',
             ], 400);
         }
-
+    
         // Calculate queue number
         $queueNumber = $existingPayouts + 1;
-
-        // Fetch all orders for the seller's products that haven't been marked as Paid
+    
+        // Fetch all paid-out order IDs previously included in payouts
         $paidOutOrderIds = Payout::where('account_id', $accountId)
-            ->whereNotNull('order_ids')
-            ->pluck('order_ids')
+            ->whereNotNull('order_id')
+            ->pluck('order_id')
             ->map(function ($orderIds) {
                 return json_decode($orderIds, true);
             })
@@ -500,7 +500,8 @@ class PaymentController extends Controller
             ->unique()
             ->values()
             ->toArray();
-
+    
+        // Get current eligible orders
         $orders = Order::whereHas('product', function ($query) use ($accountId) {
             $query->where('account_id', $accountId);
         })
@@ -508,8 +509,7 @@ class PaymentController extends Controller
         ->whereNotNull('payment_method')
         ->whereNotIn('id', $paidOutOrderIds)
         ->get();
-
-        // Log detailed information about the orders query
+    
         Log::info('Attempting to fetch orders for payout request', [
             'account_id' => $accountId,
             'order_count' => $orders->count(),
@@ -523,38 +523,36 @@ class PaymentController extends Controller
             })->toArray(),
             'paid_out_order_ids' => $paidOutOrderIds,
         ]);
-
+    
         if ($orders->isEmpty()) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'No eligible orders found for payout.',
             ], 400);
         }
-
-        // Calculate total sales (only COD amounts, as per your UI)
+    
+        // Calculate total sales (only for COD)
         $totalSales = $orders->reduce(function ($carry, $order) {
             return $carry + ($order->payment_method === 'COD' ? (float)$order->total_amount : 0);
         }, 0);
-
+    
         if (abs($totalSales - $validated['total_sales']) > 0.01) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Total sales mismatch.',
             ], 400);
         }
-
-        // Collect ALL order IDs present at the time of the request
+    
         $orderIds = $orders->pluck('id')->toArray();
-
-        // Log the orders being captured
+    
         Log::info('Capturing orders for payout request', [
             'account_id' => $accountId,
             'order_ids' => $orderIds,
             'total_sales' => $totalSales,
             'order_count' => count($orderIds),
         ]);
-
-        // Create payout record with all order_ids
+    
+        // ✅ Save as JSON array string to `order_id` column
         $payout = Payout::create([
             'account_id' => $accountId,
             'amount' => $validated['total_sales'],
@@ -563,14 +561,15 @@ class PaymentController extends Controller
             'queue_number' => $queueNumber,
             'status' => 'Pending',
             'validation_code' => $validated['validation_code'],
-            'order_ids' => json_encode($orderIds),
+            'order_id' => json_encode($orderIds),
         ]);
-
+    
         return response()->json([
             'isSuccess' => true,
             'payout' => $payout,
         ]);
     }
+    
 
     public function exportPaymentHistoryToCSV(Request $request)
     {
@@ -707,134 +706,167 @@ class PaymentController extends Controller
     }
 
     public function getApprovedPayments(Request $request)
-    {
-        try {
-            DB::connection()->getPdo();
-            $dbName = DB::connection()->getDatabaseName();
-            Log::info('Database connection successful', ['database' => $dbName]);
-            
-            $payouts = DB::table('payouts')
-                ->join('accounts', 'payouts.account_id', '=', 'accounts.id')
-                ->select(
-                    'payouts.id',
-                    'payouts.created_at as date',
-                    'payouts.time_slot',
-                    'payouts.queue_number',
-                    'payouts.validation_code',
-                    'payouts.amount',
-                    'payouts.status',
-                    'accounts.id as account_id',
-                    DB::raw("CONCAT(accounts.first_name, ' ', accounts.middle_name, ' ', accounts.last_name) as seller_name")
-                )
-                ->where('payouts.status', 'Approved')
-                ->orderBy('payouts.created_at', 'desc')
-                ->get();
-            
-            Log::info('Fetched approved payouts', ['count' => $payouts->count(), 'data' => $payouts->toArray()]);
-            
-            $formattedPayouts = $payouts->map(function ($payout) {
-                $formattedDate = Carbon::parse($payout->date)->format('Y-m-d');
-                return [
-                    'id' => $payout->id,
-                    'date' => $formattedDate,
-                    'time_slot' => $payout->time_slot,
-                    'queue_number' => $payout->queue_number,
-                    'seller_name' => $payout->seller_name,
-                    'validation_code' => $payout->validation_code ?? '',
-                    'amount' => (string) $payout->amount,
-                    'status' => $payout->status
-                ];
-            });
-            
-            Log::info('Formatted approved payouts', ['formatted' => $formattedPayouts->toArray()]);
-            
-            return response()->json([
-                'title' => 'Approved Payouts',
-                'data' => $formattedPayouts
-            ], 200);
-        } catch (\Exception $e) {
-            Log::error('Failed to fetch approved payouts', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json([
-                'message' => 'Failed to fetch approved payouts',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+{
+    try {
+        // Optional: Log the database name only (safe and no error)
+        $dbName = DB::connection()->getDatabaseName();
+        Log::info('Using database', ['database' => $dbName]);
 
-    public function approvePayment(Request $request, $id)
+        $payouts = DB::table('payouts')
+            ->join('accounts', 'payouts.account_id', '=', 'accounts.id')
+            ->select(
+                'payouts.id',
+                'payouts.created_at as date',
+                'payouts.time_slot',
+                'payouts.queue_number',
+                'payouts.validation_code',
+                'payouts.amount',
+                'payouts.status',
+                'accounts.id as account_id',
+                DB::raw("CONCAT(accounts.first_name, ' ', accounts.middle_name, ' ', accounts.last_name) as seller_name")
+            )
+            ->where('payouts.status', 'Approved')
+            ->orderBy('payouts.created_at', 'desc')
+            ->get();
+
+        Log::info('Fetched approved payouts', [
+            'count' => $payouts->count(),
+            'data' => $payouts->toArray()
+        ]);
+
+        $formattedPayouts = $payouts->map(function ($payout) {
+            $formattedDate = Carbon::parse($payout->date)->format('Y-m-d');
+            return [
+                'id' => $payout->id,
+                'date' => $formattedDate,
+                'time_slot' => $payout->time_slot,
+                'queue_number' => $payout->queue_number,
+                'seller_name' => $payout->seller_name,
+                'validation_code' => $payout->validation_code ?? '',
+                'amount' => (string) $payout->amount,
+                'status' => $payout->status
+            ];
+        });
+
+        Log::info('Formatted approved payouts', [
+            'formatted' => $formattedPayouts->toArray()
+        ]);
+
+        return response()->json([
+            'title' => 'Approved Payouts',
+            'data' => $formattedPayouts
+        ], 200);
+    } catch (\Exception $e) {
+        Log::error('Failed to fetch approved payouts', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return response()->json([
+            'message' => 'Failed to fetch approved payouts',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+public function approvePayment(Request $request, $id)
 {
     try {
         DB::beginTransaction();
+
+        Log::info('Approve payout request received', ['payout_id' => $id]);
+
+        // Find the payout record that is still pending
         $payout = Payout::where('id', $id)
             ->where('status', 'Pending')
             ->first();
-        
+
         if (!$payout) {
             Log::warning('Payout not found or already processed', ['payout_id' => $id]);
             return response()->json([
                 'message' => 'Payout not found or already processed'
             ], 404);
         }
-        
-        // Decode order_ids and validate
-        $orderIds = $payout->order_ids ? json_decode($payout->order_ids, true) : [];
-        if (!is_array($orderIds) || empty($orderIds)) {
-            Log::warning('Invalid or empty order_ids for payout', [
-                'payout_id' => $id,
-                'order_ids' => $payout->order_ids,
-            ]);
+
+        // Decode the order_id JSON field
+        $orderIds = [];
+
+        if (!empty($payout->order_id)) {
+            $decoded = json_decode($payout->order_id, true);
+
+            if (is_array($decoded)) {
+                $orderIds = $decoded;
+            } else {
+                Log::warning('Failed to decode order_id JSON', ['raw' => $payout->order_id]);
+            }
+        }
+
+        // If orderIds are empty, still approve the payout
+        if (empty($orderIds)) {
+            Log::warning('No valid orders found to update', ['payout_id' => $id]);
+
             $payout->status = 'Approved';
-            $payout->updated_at = Carbon::now();
+            $payout->updated_at = now();
             $payout->save();
+
             DB::commit();
+
             return response()->json([
-                'message' => 'Payout approved successfully, no orders to process'
+                'message' => 'Payout approved successfully, but no eligible orders found.'
             ], 200);
         }
-        
-        // Get orders with COD or e-wallet payment methods
-        $orders = Order::whereIn('id', $orderIds)
+
+        // Find only COD or E-Wallet orders that are in the payout list
+        $eligibleOrders = Order::whereIn('id', $orderIds)
             ->whereIn('payment_method', ['COD', 'E-Wallet'])
-            ->get();
-        
-        // Update payment_method to "Paid" for the associated orders
-        $updatedCount = Order::whereIn('id', $orderIds)
-            ->whereIn('payment_method', ['COD', 'E-Wallet'])
+            ->pluck('id');
+
+        Log::info('Eligible orders to mark as Paid', [
+            'payout_id' => $id,
+            'eligible_order_ids' => $eligibleOrders
+        ]);
+
+        // Update those orders' payment_method to "Paid"
+        $updatedCount = Order::whereIn('id', $eligibleOrders)
             ->update(['payment_method' => 'Paid']);
-            
+
         Log::info('Orders updated to Paid', [
             'payout_id' => $id,
-            'updated_count' => $updatedCount,
-            'orders_payment_types' => $orders->pluck('payment_method', 'id'),
+            'updated_count' => $updatedCount
         ]);
-        
-        // Update payout status
+
+        // Approve the payout
         $payout->status = 'Approved';
-        $payout->updated_at = Carbon::now();
+        $payout->updated_at = now();
         $payout->save();
-        
+
         DB::commit();
-        
+
         return response()->json([
-            'message' => "Payout approved successfully, updated $updatedCount COD/E-Wallet orders to Paid"
+            'message' => "Payout approved successfully. Updated $updatedCount orders to Paid."
         ], 200);
-    } catch (\Exception $e) {
+
+    } catch (Exception $e) {
         DB::rollBack();
+
         Log::error('Failed to approve payout', [
             'payout_id' => $id,
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString()
         ]);
-        
+
         return response()->json([
             'message' => 'Failed to approve payout',
             'error' => $e->getMessage()
         ], 500);
     }
 }
+
+
+
+    
+
+
 
 
 }
