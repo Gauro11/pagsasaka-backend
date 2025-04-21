@@ -487,7 +487,7 @@ class PaymentController extends Controller
         // Calculate queue number
         $queueNumber = $existingPayouts + 1;
 
-        // Fetch the orders that will be paid out
+        // Fetch all eligible orders at the time of the payout request
         $payouts = Payout::where('account_id', $accountId)->get();
         $paidOutOrderIds = [];
 
@@ -509,8 +509,12 @@ class PaymentController extends Controller
             $query->where(function ($q) {
                 $q->where('payment_method', 'COD')
                   ->where('status', 'Order Delivered');
-            })->orWhere('payment_method', 'E-Wallet');
+            })->orWhere(function ($q) {
+                $q->where('payment_method', 'E-Wallet')
+                  ->whereNotNull('status');
+            });
         })
+        ->whereNotNull('payment_method')
         ->whereNotIn('id', $paidOutOrderIds)
         ->get();
 
@@ -533,10 +537,18 @@ class PaymentController extends Controller
             ], 400);
         }
 
-        // Collect order IDs
+        // Collect ALL order IDs present at the time of the request
         $orderIds = $orders->pluck('id')->toArray();
 
-        // Create payout record with order_ids
+        // Log the orders being captured
+        Log::info('Capturing orders for payout request', [
+            'account_id' => $accountId,
+            'order_ids' => $orderIds,
+            'total_sales' => $totalSales,
+            'order_count' => count($orderIds)
+        ]);
+
+        // Create payout record with all order_ids
         $payout = Payout::create([
             'account_id' => $accountId,
             'amount' => $validated['total_sales'],
@@ -820,5 +832,5 @@ class PaymentController extends Controller
             ], 500);
         }
     }
-    
+
 }
