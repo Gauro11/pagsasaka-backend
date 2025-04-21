@@ -759,30 +759,58 @@ class PaymentController extends Controller
                 ->first();
 
             if (!$payout) {
+                Log::warning('Payout not found or already processed', ['payout_id' => $id]);
                 return response()->json([
                     'message' => 'Payout not found or already processed'
                 ], 404);
             }
 
-            // Update payout status to Approved
+            // Decode order_ids and validate
+            $orderIds = json_decode($payout->order_ids, true);
+            if (!is_array($orderIds) || empty($orderIds)) {
+                Log::warning('Invalid or empty order_ids for payout', [
+                    'payout_id' => $id,
+                    'order_ids' => $payout->order_ids
+                ]);
+                // Update status even if no orders to delete, to allow new payout requests
+                $payout->status = 'Approved';
+                $payout->updated_at = Carbon::now();
+                $payout->save();
+                DB::commit();
+                return response()->json([
+                    'message' => 'Payout approved successfully, no orders to delete'
+                ], 200);
+            }
+
+            // Log the orders to be deleted
+            Log::info('Attempting to delete orders for payout', [
+                'payout_id' => $id,
+                'order_ids' => $orderIds
+            ]);
+
+            // Delete associated orders
+            $deletedCount = Order::whereIn('id', $orderIds)->delete();
+
+            Log::info('Orders deletion result', [
+                'payout_id' => $id,
+                'deleted_count' => $deletedCount,
+                'expected_count' => count($orderIds)
+            ]);
+
+            // Update payout status
             $payout->status = 'Approved';
             $payout->updated_at = Carbon::now();
             $payout->save();
 
-            // Delete associated orders
-            $orderIds = json_decode($payout->order_ids, true);
-            if (is_array($orderIds) && !empty($orderIds)) {
-                Order::whereIn('id', $orderIds)->delete();
-            }
-
             DB::commit();
 
             return response()->json([
-                'message' => 'Payout approved successfully and associated orders deleted'
+                'message' => "Payout approved successfully, deleted $deletedCount orders"
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to approve payout', [
+                'payout_id' => $id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -792,4 +820,5 @@ class PaymentController extends Controller
             ], 500);
         }
     }
+    
 }
