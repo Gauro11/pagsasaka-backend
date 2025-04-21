@@ -1218,7 +1218,7 @@ public function refundStatus(Request $request)
 }
 
 //payslipwwwwwwwwwwww
-public function getOrderDetails($id)
+public function getOrderDetails($order_number)
 {
     try {
         $user = Auth::user();
@@ -1227,18 +1227,20 @@ public function getOrderDetails($id)
                 'isSuccess' => false,
                 'message' => 'User not authenticated.',
             ];
-            Log::info('Unauthenticated user tried to access order.', ['order_id' => $id]);
+            Log::info('Unauthenticated user tried to access order.', ['order_number' => $order_number]);
             return response()->json($response, 401);
         }
 
-        $order = Order::with(['product.account', 'account'])->find($id);
+        $order = Order::with(['product.account', 'account'])
+                    ->where('order_number', $order_number)
+                    ->first();
 
         if (!$order) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Order not found.',
             ];
-            Log::info('Order not found.', ['farmer_id' => $user->id, 'order_id' => $id]);
+            Log::info('Order not found.', ['user_id' => $user->id, 'order_number' => $order_number]);
             return response()->json($response, 404);
         }
 
@@ -1246,13 +1248,14 @@ public function getOrderDetails($id)
         $farmer = $order->product->account;
 
         $details = [
+            'order_number' => $order->order_number,
             'order_id' => $order->id,
             'product_id' => $order->product_id,
             'product_name' => $order->product->product_name ?? 'N/A',
             'farmer_name' => $farmer ? $farmer->first_name . ' ' . $farmer->last_name : 'N/A',
             'farmer_delivery_address' => $farmer->delivery_address ?? 'N/A',
             'consumer_name' => $order->account ? $order->account->first_name . ' ' . $order->account->last_name : 'N/A',
-            'consumer_account_id' => $order->account_id, // add buyer's ID here
+            'consumer_account_id' => $order->account_id,
             'quantity' => $order->quantity,
             'price' => $order->product->price ?? 0,
             'total_amount' => $order->total_amount,
@@ -1264,14 +1267,14 @@ public function getOrderDetails($id)
 
         Log::info('Order details retrieved', [
             'user_id' => $user->id,
-            'order_id' => $order->id,
+            'order_number' => $order->order_number,
             'consumer_account_id' => $order->account_id,
         ]);
 
         return response()->json([
             'isSuccess' => true,
             'message' => 'Order details retrieved successfully.',
-            'payslip' => $details, // 👈 this key should match frontend expectations
+            'payslip' => $details,
         ], 200);
 
     } catch (Throwable $e) {
@@ -1283,6 +1286,7 @@ public function getOrderDetails($id)
         ], 500);
     }
 }
+
 
 
 
