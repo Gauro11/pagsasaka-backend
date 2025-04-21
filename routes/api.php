@@ -70,6 +70,9 @@ Route::middleware('auth:sanctum')->get('order-intransit-status', [ShipmentContro
 Route::middleware('auth:sanctum')->get('delivered', [ShipmentController::class, 'orderDeliveredStatus']);
 Route::middleware('auth:sanctum')->get('Cancelled', [ShipmentController::class, 'cancelledStatus']);
 Route::middleware('auth:sanctum')->get('Refund', [ShipmentController::class, 'refundStatus']);
+Route::middleware('auth:sanctum')->get('orders-details/{id}', [ShipmentController::class, 'getOrderDetails']);
+
+
 
 
 Route::middleware('auth:sanctum')->get('my-products', [ProductController::class, 'getMyPublishedProducts']);
