@@ -7,7 +7,9 @@ use App\Models\Account;
 use App\Models\Rider;
 use App\Models\Order;
 use App\Models\ApiLog;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class RiderController extends Controller
@@ -147,7 +149,7 @@ class RiderController extends Controller
                 'password'      => 'required|string|min:9',
                 'phone_number'  => 'required|string|max:20',
                 'license'       => 'required|image|mimes:jpg,png,jpeg|max:2048',
-                'valid_id'      => 'required|image|mimes:jpg,png,jpeg|max:2048', // New validation rule for valid ID
+                'valid_id'      => 'required|image|mimes:jpg,png,jpeg|max:2048',
             ]);
     
             // Ensure directories exist
@@ -165,36 +167,62 @@ class RiderController extends Controller
             // Generate unique file names
             $licenseFileName = 'License-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('license')->getClientOriginalExtension();
             $validIdFileName = 'ValidID-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $request->file('valid_id')->getClientOriginalExtension();
-            
-            // Move files to the respective directories
+    
+            // Move files
             $request->file('license')->move($licenseDirectory, $licenseFileName);
             $request->file('valid_id')->move($validIdDirectory, $validIdFileName);
     
-            // Store full image URLs
+            // Store paths
             $licensePath = asset('img/licenses/' . $licenseFileName);
             $validIdPath = asset('img/valid_ids/' . $validIdFileName);
     
-            // Create rider entry
+            // Create rider
             $rider = Rider::create([
                 'first_name'   => $validated['first_name'],
                 'last_name'    => $validated['last_name'],
                 'email'        => $validated['email'],
                 'password'     => bcrypt($validated['password']),
                 'phone_number' => $validated['phone_number'],
-                'license'      => $licensePath, // Save full image URL for license
-                'valid_id'     => $validIdPath, // Save full image URL for valid ID
+                'license'      => $licensePath,
+                'valid_id'     => $validIdPath,
                 'status'       => 'Pending',
                 'role_id'      => 4
             ]);
     
-            // Prepare success response
+            // ✅ Send email notification
+            $fullName = trim("{$rider->first_name} {$rider->last_name}");
+    
+            $emailBody = "Hello {$fullName},\n\n";
+            $emailBody .= "Thank you for applying as a rider!\n\n";
+            $emailBody .= "Your application has been received and is currently under review. We'll notify you once it's approved.\n\n";
+            $emailBody .= "Submitted Details:\n";
+            $emailBody .= "Email: {$rider->email}\n";
+            $emailBody .= "Phone Number: {$rider->phone_number}\n";
+            $emailBody .= "Status: {$rider->status}\n\n";
+            $emailBody .= "If you have any questions, feel free to contact our support team.\n\n";
+            $emailBody .= "Best regards,\nThe Pagsasaka Team";
+    
+            try {
+                Mail::raw($emailBody, function ($message) use ($rider, $fullName) {
+                    $message->to($rider->email, $fullName)
+                            ->subject('Rider Application Received');
+                });
+    
+                // 📘 Log email success
+                Log::info("Rider application email sent successfully to {$rider->email}");
+            } catch (\Exception $mailEx) {
+                // ❌ Log email failure
+                Log::error("Failed to send rider application email to {$rider->email}. Error: " . $mailEx->getMessage());
+            }
+    
+            // Prepare response
             $response = [
                 'isSuccess' => true,
                 'message'   => 'Application submitted successfully. Waiting for approval.',
-                'rider'     => $rider->makeHidden(['password']), // Hide the password field
+                'rider'     => $rider->makeHidden(['password']),
             ];
     
-            // Log the API call
+            // Log API call
             $this->logAPICalls('applyRider', $rider->id, $request->all(), $response);
     
             return response()->json($response, 201);
@@ -206,7 +234,7 @@ class RiderController extends Controller
                 'error'     => $e->getMessage(),
             ];
     
-            // Log the API call
+            // Log API failure
             $this->logAPICalls('applyRider', null, $request->all(), $response);
     
             return response()->json($response, 500);
@@ -214,21 +242,68 @@ class RiderController extends Controller
     }
     
 
+    
+
 
     
 
-public function approveRider($id)
-{
-    $rider = Rider::findOrFail($id);
+    public function approveRider($id)
+    {
+        try {
+            $rider = Rider::findOrFail($id);
     
-    if ($rider->status === 'Approve') {
-        return response()->json(['message' => 'Rider is already approved.'], 400);
+            if ($rider->status === 'Approve') {
+                $response = ['message' => 'Rider is already approved.'];
+                $this->logAPICalls('approveRider', $rider->id, ['id' => $id], $response);
+                return response()->json($response, 400);
+            }
+    
+            $rider->update(['status' => 'Approve']);
+    
+            // ✅ Send approval email notification
+            $fullName = trim("{$rider->first_name} {$rider->last_name}");
+    
+            $emailBody = "Hello {$fullName},\n\n";
+            $emailBody .= "Congratulations! Your rider application has been approved.\n\n";
+            $emailBody .= "You can now access your rider account and start accepting deliveries.\n\n";
+            $emailBody .= "If you have any questions, feel free to contact this person.\n\n";
+            $emailBody .= "https://web.facebook.com/kurtsteven.arciga.7";
+    
+            try {
+                Mail::raw($emailBody, function ($message) use ($rider, $fullName) {
+                    $message->to($rider->email, $fullName)
+                            ->subject('Rider Application Approved');
+                });
+    
+                // 📘 Log email success
+                Log::info("Approval email sent successfully to {$rider->email}");
+            } catch (\Exception $mailEx) {
+                // ❌ Log email failure
+                Log::error("Failed to send approval email to {$rider->email}. Error: " . $mailEx->getMessage());
+            }
+    
+            $response = [
+                'message' => 'Rider approved successfully.',
+                'rider'   => $rider,
+            ];
+    
+            // Log API call
+            $this->logAPICalls('approveRider', $rider->id, ['id' => $id], $response);
+    
+            return response()->json($response, 200);
+    
+        } catch (Throwable $e) {
+            $response = [
+                'message' => 'Failed to approve rider.',
+                'error'   => $e->getMessage(),
+            ];
+    
+            $this->logAPICalls('approveRider', null, ['id' => $id], $response);
+    
+            return response()->json($response, 500);
+        }
     }
-
-    $rider->update(['status' => 'Approve']);
-
-    return response()->json(['message' => 'Rider approved successfully.', 'rider' => $rider], 200);
-}
+    
 
 public function invalidateRider($id)
 {

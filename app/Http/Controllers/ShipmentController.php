@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Account;
 use App\Models\Rider;
 use App\Models\Refund;
+use Illuminate\Support\Facades\DB;
 
 class ShipmentController extends Controller
 {
@@ -1215,6 +1216,95 @@ public function refundStatus(Request $request)
         ], 500);
     }
 }
+
+
+public function getOrderDetails($id)
+{
+    try {
+        $user = Auth::user();
+        if (!$user) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'User not authenticated.',
+            ];
+            $this->logAPICalls('getOrderDetails', '', ['order_id' => $id], $response);
+            return response()->json($response, 401);
+        }
+
+        // Load the order with related product, farmer (product.account), and consumer (order.account)
+        $order = Order::with(['product.account', 'account']) // Relationships must be properly defined
+            ->find($id);
+
+        if (!$order) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Order not found.',
+            ];
+            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+            return response()->json($response, 404);
+        }
+
+        // Optional: Restrict farmer access to only their own products
+        if ($user->role_id == 2 && $order->product->account_id !== $user->id) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Access denied. This order does not belong to your products.',
+            ];
+            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+            return response()->json($response, 403);
+        }
+
+        $details = [
+            'order_id' => $order->id,
+            'product_id' => $order->product_id,
+            'product_name' => $order->product->product_name ?? 'N/A',
+
+            // Farmer details based on product.account_id
+            'farmer_id' => $order->product->account_id ?? null,
+            'farmer_name' => $order->product->account 
+                ? $order->product->account->first_name . ' ' . $order->product->account->last_name 
+                : 'N/A',
+
+            // Consumer details based on order.account_id
+            'consumer_id' => $order->account_id,
+            'consumer_name' => $order->account 
+                ? $order->account->first_name . ' ' . $order->account->last_name 
+                : 'N/A',
+
+            // Optional: You can include emails or phone numbers
+            // 'consumer_email' => $order->account->email ?? null,
+            // 'farmer_email' => $order->product->account->email ?? null,
+
+            'quantity' => $order->quantity,
+            'price' => $order->product->price ?? 0,
+            'total_amount' => $order->total_amount,
+            'ship_to' => $order->ship_to,
+            'status' => $order->status,
+            'created_at' => Carbon::parse($order->created_at)->format('F d Y'),
+            'updated_at' => Carbon::parse($order->updated_at)->format('F d Y'),
+        ];
+
+        $response = [
+            'isSuccess' => true,
+            'message' => 'Order details retrieved successfully.',
+            'data' => $details,
+        ];
+
+        $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+
+        return response()->json($response, 200);
+
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => 'An error occurred while retrieving order details.',
+            'error' => $e->getMessage(),
+        ];
+        return response()->json($response, 500);
+    }
+}
+
+
 
 
    
