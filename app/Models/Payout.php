@@ -16,9 +16,11 @@ class Payout extends Model
         'time_slot',
         'queue_number',
         'status',
+        'validation_code',
         'created_at',
         'updated_at',
     ];
+
     public function account()
     {
         return $this->belongsTo(Account::class);
