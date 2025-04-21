@@ -632,4 +632,66 @@ class PaymentController extends Controller
 }
 
 
+
+// Fetch all pending payments
+public function getPendingPayments(Request $request)
+{
+    try {
+        $payments = DB::table('payments')
+            ->leftJoin('sellers', 'payments.account_id', '=', 'sellers.id')
+            ->select(
+                'payments.id',
+                'payments.schedule_date as date',
+                'payments.queue_number',
+                'payments.validation_code',
+                'payments.amount',
+                'payments.status',
+                DB::raw('COALESCE(sellers.name, "Unknown") as seller_name')
+            )
+            ->where('payments.status', 'Pending')
+            ->orderBy('payments.schedule_date', 'desc')
+            ->get();
+
+        // Format the data to match the frontend's expectations
+        $formattedPayments = $payments->map(function ($payment) {
+            return [
+                'id' => $payment->id,
+                'date' => Carbon::parse($payment->date)->format('Y-m-d'), // Format date as YYYY-MM-DD
+                'queue_number' => $payment->queue_number,
+                'seller_name' => $payment->seller_name,
+                'validation_code' => $payment->validation_code,
+                'amount' => (string) $payment->amount, // Convert Decimal to string
+                'status' => $payment->status
+            ];
+        });
+
+        return response()->json($formattedPayments, 200);
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'Failed to fetch pending payments'], 500);
+    }
+}
+
+// Approve a payment by ID
+public function approvePayment(Request $request, $id)
+{
+    try {
+        $updated = DB::table('payments')
+            ->where('id', $id)
+            ->where('status', 'Pending')
+            ->update([
+                'status' => 'Approved',
+                'updated_at' => Carbon::now()
+            ]);
+
+        if ($updated === 0) {
+            return response()->json(['message' => 'Payment not found or already processed'], 404);
+        }
+
+        return response()->json(['message' => 'Payment approved successfully'], 200);
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'Failed to approve payment'], 500);
+    }
+}
+
+
 }

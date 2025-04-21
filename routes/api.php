@@ -367,3 +367,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/available-slots', [PaymentController::class, 'getAvailableSlots']);
     Route::get('/export-payment-history', [PaymentController::class, 'exportPaymentHistoryToCSV']);
 });
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/payments/pending', [PaymentController::class, 'getPendingPayments']);
+    Route::post('/payments/approve/{id}', [PaymentController::class, 'approvePayment']);
+});
