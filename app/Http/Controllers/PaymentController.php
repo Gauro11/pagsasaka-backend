@@ -219,16 +219,31 @@ class PaymentController extends Controller
 
     public function getPaymentHistory(Request $request)
     {
-        // Existing getPaymentHistory method (unchanged)
         if (!Auth::check()) {
             return response()->json([
                 'isSuccess' => false,
                 'message' => 'Authentication required. Please log in.',
             ], 401);
         }
-
+    
         $farmerId = Auth::id();
-
+    
+        // Fetch all payouts for this account to get paid-out order IDs
+        $payouts = Payout::where('account_id', $farmerId)->get();
+        $paidOutOrderIds = [];
+    
+        foreach ($payouts as $payout) {
+            if ($payout->order_ids) {
+                $orderIds = json_decode($payout->order_ids, true);
+                if (is_array($orderIds)) {
+                    $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
+                }
+            }
+        }
+    
+        $paidOutOrderIds = array_unique($paidOutOrderIds);
+    
+        // Fetch eligible orders, excluding paid-out orders
         $orders = Order::whereHas('product', function ($query) use ($farmerId) {
                 $query->where('account_id', $farmerId);
             })
@@ -238,6 +253,7 @@ class PaymentController extends Controller
                       ->where('status', 'Order Delivered');
                 })->orWhere('payment_method', 'E-Wallet');
             })
+            ->whereNotIn('id', $paidOutOrderIds)
             ->with(['product'])
             ->get()
             ->map(function ($order) {
@@ -249,7 +265,7 @@ class PaymentController extends Controller
                     'buyer_account_id' => $order->account_id,
                 ];
             });
-
+    
         return response()->json([
             'isSuccess' => true,
             'transactions' => $orders,
@@ -528,61 +544,85 @@ class PaymentController extends Controller
     }
 
     public function exportPaymentHistoryToCSV(Request $request)
-    {
-        // Existing exportPaymentHistoryToCSV method (unchanged)
-        if (!Auth::check()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Authentication required. Please log in.',
-            ], 401);
-        }
-
-        $farmerId = Auth::id();
-
-        $orders = Order::whereHas('product', function ($query) use ($farmerId) {
-            $query->where('account_id', $farmerId);
-        })
-        ->with(['product'])
-        ->get()
-        ->map(function ($order) {
-            return [
-                'date' => $order->created_at->format('m/d/Y'),
-                'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
-                'payment_method' => $order->payment_method ?? 'Unknown',
-                'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
-            ];
-        });
-
-        if ($orders->isEmpty()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'No payment history found.',
-            ], 404);
-        }
-
-        $csvFileName = 'payment_history_' . now()->format('Ymd_His') . '.csv';
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"$csvFileName\"",
-        ];
-
-        $output = fopen('php://temp', 'r+');
-        fwrite($output, "\xEF\xBB\xBF");
-        fputcsv($output, ['Date', 'Product Name', 'Payment Method', 'Amount']);
-
-        foreach ($orders as $order) {
-            fputcsv($output, [
-                $order['date'],
-                $order['product_name'],
-                $order['payment_method'],
-                $order['amount'],
-            ]);
-        }
-
-        rewind($output);
-        $csvContent = stream_get_contents($output);
-        fclose($output);
-
-        return response($csvContent, 200, $headers);
+{
+    if (!Auth::check()) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Authentication required. Please log in.',
+        ], 401);
     }
+
+    $farmerId = Auth::id();
+
+    // Fetch all payouts for this account to get paid-out order IDs
+    $payouts = Payout::where('account_id', $farmerId)->get();
+    $paidOutOrderIds = [];
+
+    foreach ($payouts as $payout) {
+        if ($payout->order_ids) {
+            $orderIds = json_decode($payout->order_ids, true);
+            if (is_array($orderIds)) {
+                $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
+            }
+        }
+    }
+
+    $paidOutOrderIds = array_unique($paidOutOrderIds);
+
+    // Fetch orders, excluding paid-out orders
+    $orders = Order::whereHas('product', function ($query) use ($farmerId) {
+        $query->where('account_id', $farmerId);
+    })
+    ->where(function ($query) {
+        $query->where(function ($q) {
+            $q->where('payment_method', 'COD')
+              ->where('status', 'Order Delivered');
+        })->orWhere('payment_method', 'E-Wallet');
+    })
+    ->whereNotIn('id', $paidOutOrderIds)
+    ->with(['product'])
+    ->get()
+    ->map(function ($order) {
+        return [
+            'date' => $order->created_at->format('m/d/Y'),
+            'product_name' => $order->product ? $order->product->product_name : 'Unknown Product',
+            'payment_method' => $order->payment_method ?? 'Unknown',
+            'amount' => $order->payment_method === 'E-Wallet' ? '0.00' : number_format($order->total_amount, 2, '.', ''),
+        ];
+    });
+
+    if ($orders->isEmpty()) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'No payment history found.',
+        ], 404);
+    }
+
+    $csvFileName = 'payment_history_' . now()->format('Ymd_His') . '.csv';
+    $headers = [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => "attachment; filename=\"$csvFileName\"",
+    ];
+
+    $output = fopen('php://temp', 'r+');
+    fwrite($output, "\xEF\xBB\xBF");
+    fputcsv($output, ['Date', 'Product Name', 'Payment Method', 'Amount']);
+
+    foreach ($orders as $order) {
+        fputcsv($output, [
+            $order['date'],
+            $order['product_name'],
+            $order['payment_method'],
+            $order['amount'],
+        ]);
+    }
+
+    rewind($output);
+    $csvContent = stream_get_contents($output);
+    fclose($output);
+
+    return response($csvContent, 200, $headers);
+}
+
+
 }
