@@ -371,5 +371,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/payments/pending', [PaymentController::class, 'getPendingPayments']);
+    Route::get('/payments/approved', [PaymentController::class, 'getApprovedPayments']);
     Route::post('/payments/approve/{id}', [PaymentController::class, 'approvePayment']);
 });
