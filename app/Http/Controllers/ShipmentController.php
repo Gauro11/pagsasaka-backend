@@ -1217,8 +1217,8 @@ public function refundStatus(Request $request)
     }
 }
 
-
-public function getOrderDetails(Request $request)
+//payslipwwwwwwwwwwww
+public function getpayslip($id)
 {
     try {
         $user = Auth::user();
@@ -1227,25 +1227,29 @@ public function getOrderDetails(Request $request)
                 'isSuccess' => false,
                 'message' => 'User not authenticated.',
             ];
-            $this->logAPICalls('getOrderDetails', '', $request->all(), $response);
+            $this->logAPICalls('getOrderDetails', '', ['order_id' => $id], $response);
             return response()->json($response, 401);
         }
 
-        // Validate input
-      
+        // Load the order with related product (with farmer) and consumer
+        $order = Order::with(['product.account', 'account'])->find($id);
 
-        $orderId = $request->input('order_id');
+        if (!$order) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Order not found.',
+            ];
+            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
+            return response()->json($response, 404);
+        }
 
-        // Load the order with product (and its farmer) + account (consumer)
-        $order = Order::with(['product.account', 'account'])->find($orderId);
-
-        // Ownership check for farmers
+        // If user is farmer, ensure they own the product
         if ($user->role_id == 2 && $order->product->account_id !== $user->id) {
             $response = [
                 'isSuccess' => false,
                 'message' => 'Access denied. This order does not belong to your products.',
             ];
-            $this->logAPICalls('getOrderDetails', $user->id, $request->all(), $response);
+            $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
             return response()->json($response, 403);
         }
 
@@ -1270,7 +1274,7 @@ public function getOrderDetails(Request $request)
             'data' => $details,
         ];
 
-        $this->logAPICalls('getOrderDetails', $user->id, $request->all(), $response);
+        $this->logAPICalls('getOrderDetails', $user->id, ['order_id' => $id], $response);
         return response()->json($response, 200);
 
     } catch (Throwable $e) {
@@ -1281,6 +1285,7 @@ public function getOrderDetails(Request $request)
         ], 500);
     }
 }
+
 
 
 
