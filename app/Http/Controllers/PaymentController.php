@@ -273,55 +273,59 @@ class PaymentController extends Controller
     }
 
     public function checkPayoutEligibility(Request $request)
-    {
-        if (!Auth::check()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Authentication required. Please log in.',
-            ], 401);
-        }
-    
-        $accountId = Auth::id();
-    
-        // Get all payout records for this account
-        $payouts = Payout::where('account_id', $accountId)->get();
-        $paidOutOrderIds = [];
-    
-        // Collect all order IDs that have been paid out
-        foreach ($payouts as $payout) {
-            if ($payout->order_ids) {
-                $orderIds = json_decode($payout->order_ids, true);
-                if (is_array($orderIds)) {
-                    $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
-                }
+{
+    if (!Auth::check()) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Authentication required. Please log in.',
+        ], 401);
+    }
+
+    $accountId = Auth::id();
+
+    // Get all payout records for this account
+    $payouts = Payout::where('account_id', $accountId)->get();
+    $paidOutOrderIds = [];
+
+    // Collect all order IDs that have been paid out
+    foreach ($payouts as $payout) {
+        if ($payout->order_ids) {
+            $orderIds = json_decode($payout->order_ids, true);
+            if (is_array($orderIds)) {
+                $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
             }
         }
-    
-        // Remove duplicates
-        $paidOutOrderIds = array_unique($paidOutOrderIds);
-    
-        // Fetch orders that are not in the paid-out list
-        $orders = Order::whereHas('product', function ($query) use ($accountId) {
-            $query->where('account_id', $accountId);
-        })
-        ->where(function ($query) {
-            $query->where(function ($q) {
-                $q->where('payment_method', 'COD')
-                  ->where('status', 'Order Delivered');
-            })->orWhere('payment_method', 'E-Wallet');
-        })
-        ->whereNotIn('id', $paidOutOrderIds) // Exclude orders that have been paid out
-        ->get();
-    
-        $totalSales = $orders->sum('total_amount');
-        $eligible = $totalSales >= 500;
-    
-        return response()->json([
-            'isSuccess' => true,
-            'eligible' => $eligible,
-            'totalSales' => number_format($totalSales, 2, '.', ''),
-        ]);
     }
+
+    // Remove duplicates
+    $paidOutOrderIds = array_unique($paidOutOrderIds);
+
+    // Fetch orders that are not in the paid-out list
+    $orders = Order::whereHas('product', function ($query) use ($accountId) {
+        $query->where('account_id', $accountId);
+    })
+    ->where(function ($query) {
+        $query->where(function ($q) {
+            $q->where('payment_method', 'COD')
+              ->where('status', 'Order Delivered');
+        })->orWhere('payment_method', 'E-Wallet');
+    })
+    ->whereNotIn('id', $paidOutOrderIds)
+    ->get();
+
+    // Calculate total sales, only including COD orders
+    $totalSales = $orders->reduce(function ($carry, $order) {
+        return $carry + ($order->payment_method === 'COD' ? (float)$order->total_amount : 0);
+    }, 0);
+
+    $eligible = $totalSales >= 500;
+
+    return response()->json([
+        'isSuccess' => true,
+        'eligible' => $eligible,
+        'totalSales' => number_format($totalSales, 2, '.', ''),
+    ]);
+}
 
     public function getAvailableSlots(Request $request)
     {
@@ -443,105 +447,108 @@ class PaymentController extends Controller
     }
 
     public function requestPayout(Request $request)
-    {
-        $validated = $request->validate([
-            'date' => 'required|date|after:today',
-            'time_slot' => 'required|string|in:10:00-11:00,11:00-12:00,12:00-13:00,13:00-14:00,14:00-15:00,15:00-16:00,16:00-17:00',
-            'total_sales' => 'required|numeric|min:500',
-            'validation_code' => 'required|string',
-        ]);
+{
+    $validated = $request->validate([
+        'date' => 'required|date|after:today',
+        'time_slot' => 'required|string|in:10:00-11:00,11:00-12:00,12:00-13:00,13:00-14:00,14:00-15:00,15:00-16:00,16:00-17:00',
+        'total_sales' => 'required|numeric|min:500',
+        'validation_code' => 'required|string',
+    ]);
 
-        $accountId = Auth::id();
-        $date = $validated['date'];
-        $timeSlot = $validated['time_slot'];
+    $accountId = Auth::id();
+    $date = $validated['date'];
+    $timeSlot = $validated['time_slot'];
 
-        // Check if the date is a weekday
-        $dayOfWeek = Carbon::parse($date)->dayOfWeek;
-        if ($dayOfWeek == 0 || $dayOfWeek == 6) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Payouts can only be scheduled on weekdays.',
-            ], 400);
-        }
+    // Check if the date is a weekday
+    $dayOfWeek = Carbon::parse($date)->dayOfWeek;
+    if ($dayOfWeek == 0 || $dayOfWeek == 6) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Payouts can only be scheduled on weekdays.',
+        ], 400);
+    }
 
-        // Check slot availability
-        $existingPayouts = Payout::where('scheduled_date', $date)
-            ->where('time_slot', $timeSlot)
-            ->count();
+    // Check slot availability
+    $existingPayouts = Payout::where('scheduled_date', $date)
+        ->where('time_slot', $timeSlot)
+        ->count();
 
-        if ($existingPayouts >= 10) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Selected time slot is fully booked.',
-            ], 400);
-        }
+    if ($existingPayouts >= 10) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Selected time slot is fully booked.',
+        ], 400);
+    }
 
-        // Calculate queue number
-        $queueNumber = $existingPayouts + 1;
+    // Calculate queue number
+    $queueNumber = $existingPayouts + 1;
 
-        // Fetch the orders that will be paid out
-        $payouts = Payout::where('account_id', $accountId)->get();
-        $paidOutOrderIds = [];
+    // Fetch the orders that will be paid out
+    $payouts = Payout::where('account_id', $accountId)->get();
+    $paidOutOrderIds = [];
 
-        foreach ($payouts as $payout) {
-            if ($payout->order_ids) {
-                $orderIds = json_decode($payout->order_ids, true);
-                if (is_array($orderIds)) {
-                    $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
-                }
+    foreach ($payouts as $payout) {
+        if ($payout->order_ids) {
+            $orderIds = json_decode($payout->order_ids, true);
+            if (is_array($orderIds)) {
+                $paidOutOrderIds = array_merge($paidOutOrderIds, $orderIds);
             }
         }
-
-        $paidOutOrderIds = array_unique($paidOutOrderIds);
-
-        $orders = Order::whereHas('product', function ($query) use ($accountId) {
-            $query->where('account_id', $accountId);
-        })
-        ->where(function ($query) {
-            $query->where(function ($q) {
-                $q->where('payment_method', 'COD')
-                  ->where('status', 'Order Delivered');
-            })->orWhere('payment_method', 'E-Wallet');
-        })
-        ->whereNotIn('id', $paidOutOrderIds)
-        ->get();
-
-        if ($orders->isEmpty()) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'No eligible orders found for payout.',
-            ], 400);
-        }
-
-        // Calculate total sales to verify
-        $totalSales = $orders->sum('total_amount');
-        if (abs($totalSales - $validated['total_sales']) > 0.01) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Total sales mismatch.',
-            ], 400);
-        }
-
-        // Collect order IDs
-        $orderIds = $orders->pluck('id')->toArray();
-
-        // Create payout record with order_ids
-        $payout = Payout::create([
-            'account_id' => $accountId,
-            'amount' => $validated['total_sales'],
-            'scheduled_date' => $date,
-            'time_slot' => $timeSlot,
-            'queue_number' => $queueNumber,
-            'status' => 'Pending',
-            'validation_code' => $validated['validation_code'],
-            'order_ids' => json_encode($orderIds),
-        ]);
-
-        return response()->json([
-            'isSuccess' => true,
-            'payout' => $payout,
-        ]);
     }
+
+    $paidOutOrderIds = array_unique($paidOutOrderIds);
+
+    $orders = Order::whereHas('product', function ($query) use ($accountId) {
+        $query->where('account_id', $accountId);
+    })
+    ->where(function ($query) {
+        $query->where(function ($q) {
+            $q->where('payment_method', 'COD')
+              ->where('status', 'Order Delivered');
+        })->orWhere('payment_method', 'E-Wallet');
+    })
+    ->whereNotIn('id', $paidOutOrderIds)
+    ->get();
+
+    if ($orders->isEmpty()) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'No eligible orders found for payout.',
+        ], 400);
+    }
+
+    // Calculate total sales, only including COD orders
+    $totalSales = $orders->reduce(function ($carry, $order) {
+        return $carry + ($order->payment_method === 'COD' ? (float)$order->total_amount : 0);
+    }, 0);
+
+    if (abs($totalSales - $validated['total_sales']) > 0.01) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Total sales mismatch.',
+        ], 400);
+    }
+
+    // Collect order IDs
+    $orderIds = $orders->pluck('id')->toArray();
+
+    // Create payout record with order_ids
+    $payout = Payout::create([
+        'account_id' => $accountId,
+        'amount' => $validated['total_sales'],
+        'scheduled_date' => $date,
+        'time_slot' => $timeSlot,
+        'queue_number' => $queueNumber,
+        'status' => 'Pending',
+        'validation_code' => $validated['validation_code'],
+        'order_ids' => json_encode($orderIds),
+    ]);
+
+    return response()->json([
+        'isSuccess' => true,
+        'payout' => $payout,
+    ]);
+}
 
     public function exportPaymentHistoryToCSV(Request $request)
 {
