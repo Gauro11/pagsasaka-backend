@@ -802,6 +802,61 @@ class ProductController extends Controller
         }
     }
 
+    public function updateCartQuantity(Request $request, $id)
+{
+    $user = Auth::user();
+
+    if (!$user) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'User not authenticated',
+        ], 401);
+    }
+
+    $validated = $request->validate([
+        'quantity' => 'required|integer|min:1',
+    ]);
+
+    $cart = Cart::where('id', $id)
+        ->where('account_id', $user->id)
+        ->first();
+
+    if (!$cart) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Cart item not found',
+        ], 404);
+    }
+
+    $product = Product::find($cart->product_id);
+
+    if ($validated['quantity'] > $product->stocks) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Requested quantity exceeds available stock',
+        ], 400);
+    }
+
+    $cart->quantity = $validated['quantity'];
+    $cart->item_total = $validated['quantity'] * $product->price;
+    $cart->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Cart quantity updated successfully',
+        'data' => [
+            'cart_id' => $cart->id,
+            'account_id' => $cart->account_id,
+            'product_id' => $cart->product_id,
+            'quantity' => $cart->quantity,
+            'unit' => $cart->unit,
+            'price_per_unit' => $cart->price,
+            'item_total' => $cart->item_total,
+        ]
+    ]);
+    
+}
+
     public function getCartList()
     {
         $user = Auth::user();
