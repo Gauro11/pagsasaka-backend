@@ -228,7 +228,7 @@ class PaymentController extends Controller
         $farmerId = Auth::id();
 
         // Retrieve paid-out order IDs
-        $paidOutOrderIds = Payout::where('account_id', $farmerId)
+        $paidOutOrderId = Payout::where('account_id', $farmerId)
             ->whereNotNull('order_id')
             ->pluck('order_id')
             ->map(function ($orderId) {
@@ -246,7 +246,7 @@ class PaymentController extends Controller
         })
         ->where('payment_method', '!=', 'Paid') // Exclude orders with payment_method = Paid
         ->whereNotNull('payment_method')
-        ->whereNotIn('id', $paidOutOrderIds)
+        ->whereNotIn('id', $paidOutOrderId)
         ->with(['product'])
         ->get();
 
@@ -285,11 +285,11 @@ class PaymentController extends Controller
         $accountId = Auth::id();
 
         // Retrieve paid-out order IDs
-        $paidOutOrderIds = Payout::where('account_id', $accountId)
+        $paidOutOrderId = Payout::where('account_id', $accountId)
             ->whereNotNull('order_id')
             ->pluck('order_id')
-            ->map(function ($orderIds) {
-                return json_decode($orderIds, true);
+            ->map(function ($orderId) {
+                return json_decode($orderId, true);
             })
             ->flatten()
             ->filter()
@@ -303,7 +303,7 @@ class PaymentController extends Controller
         })
         ->where('payment_method', '!=', 'Paid')
         ->whereNotNull('payment_method')
-        ->whereNotIn('id', $paidOutOrderIds)
+        ->whereNotIn('id', $paidOutOrderId)
         ->get();
 
         // Calculate total sales (only COD amounts, as per your UI)
@@ -489,11 +489,11 @@ class PaymentController extends Controller
         $queueNumber = $existingPayouts + 1;
     
         // Fetch all paid-out order IDs previously included in payouts
-        $paidOutOrderIds = Payout::where('account_id', $accountId)
+        $paidOutOrderId = Payout::where('account_id', $accountId)
             ->whereNotNull('order_id')
             ->pluck('order_id')
-            ->map(function ($orderIds) {
-                return json_decode($orderIds, true);
+            ->map(function ($orderId) {
+                return json_decode($orderId, true);
             })
             ->flatten()
             ->filter()
@@ -507,7 +507,7 @@ class PaymentController extends Controller
         })
         ->whereIn('payment_method', ['COD', 'E-Wallet']) // Only fetch COD and E-Wallet orders
         ->whereNotNull('payment_method')
-        ->whereNotIn('id', $paidOutOrderIds)
+        ->whereNotIn('id', $paidOutOrderId)
         ->get();
     
         Log::info('Attempting to fetch orders for payout request', [
@@ -521,7 +521,7 @@ class PaymentController extends Controller
                     'created_at' => $order->created_at->toDateTimeString(),
                 ];
             })->toArray(),
-            'paid_out_order_id' => $paidOutOrderIds,
+            'paid_out_order_id' => $paidOutOrderId,
         ]);
     
         if ($orders->isEmpty()) {
@@ -543,13 +543,13 @@ class PaymentController extends Controller
             ], 400);
         }
     
-        $orderIds = $orders->pluck('id')->toArray();
+        $orderId = $orders->pluck('id')->toArray();
     
         Log::info('Capturing orders for payout request', [
             'account_id' => $accountId,
             'order_id' => $orderId,
             'total_sales' => $totalSales,
-            'order_count' => count($orderIds),
+            'order_count' => count($orderId),
         ]);
     
         // ✅ Save as JSON array string to `order_id` column
@@ -561,7 +561,7 @@ class PaymentController extends Controller
             'queue_number' => $queueNumber,
             'status' => 'Pending',
             'validation_code' => $validated['validation_code'],
-            'order_id' => json_encode($orderIds),
+            'order_id' => json_encode($orderId),
         ]);
     
         return response()->json([
@@ -583,11 +583,11 @@ class PaymentController extends Controller
         $farmerId = Auth::id();
 
         // Retrieve paid-out order IDs
-        $paidOutOrderIds = Payout::where('account_id', $farmerId)
+        $paidOutOrderId = Payout::where('account_id', $farmerId)
             ->whereNotNull('order_id')
             ->pluck('order_id')
-            ->map(function ($orderIds) {
-                return json_decode($orderIds, true);
+            ->map(function ($orderId) {
+                return json_decode($orderId, true);
             })
             ->flatten()
             ->filter()
@@ -601,7 +601,7 @@ class PaymentController extends Controller
         })
         ->where('payment_method', '!=', 'Paid')
         ->whereNotNull('payment_method')
-        ->whereNotIn('id', $paidOutOrderIds)
+        ->whereNotIn('id', $paidOutOrderId)
         ->with(['product'])
         ->get();
 
@@ -789,20 +789,20 @@ public function approvePayment(Request $request, $id)
         }
 
         // Decode the order_id JSON field
-        $orderIds = [];
+        $orderId = [];
 
         if (!empty($payout->order_id)) {
             $decoded = json_decode($payout->order_id, true);
 
             if (is_array($decoded)) {
-                $orderIds = $decoded;
+                $orderId = $decoded;
             } else {
                 Log::warning('Failed to decode order_id JSON', ['raw' => $payout->order_id]);
             }
         }
 
         // If orderIds are empty, still approve the payout
-        if (empty($orderIds)) {
+        if (empty($orderId)) {
             Log::warning('No valid orders found to update', ['payout_id' => $id]);
 
             $payout->status = 'Approved';
@@ -817,7 +817,7 @@ public function approvePayment(Request $request, $id)
         }
 
         // Find only COD or E-Wallet orders that are in the payout list
-        $eligibleOrders = Order::whereIn('id', $orderIds)
+        $eligibleOrders = Order::whereIn('id', $orderId)
             ->whereIn('payment_method', ['COD', 'E-Wallet'])
             ->pluck('id');
 
