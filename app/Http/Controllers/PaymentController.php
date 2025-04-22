@@ -229,10 +229,10 @@ class PaymentController extends Controller
 
         // Retrieve paid-out order IDs
         $paidOutOrderIds = Payout::where('account_id', $farmerId)
-            ->whereNotNull('order_ids')
-            ->pluck('order_ids')
-            ->map(function ($orderIds) {
-                return json_decode($orderIds, true);
+            ->whereNotNull('order_id')
+            ->pluck('order_id')
+            ->map(function ($orderId) {
+                return json_decode($orderId, true);
             })
             ->flatten()
             ->filter()
@@ -254,7 +254,7 @@ class PaymentController extends Controller
         Log::info('Fetched payment history for farmer', [
             'farmer_id' => $farmerId,
             'order_count' => $orders->count(),
-            'order_ids' => $orders->pluck('id')->toArray(),
+            'order_id' => $orders->pluck('id')->toArray(),
         ]);
 
         $transactions = $orders->map(function ($order) {
@@ -286,8 +286,8 @@ class PaymentController extends Controller
 
         // Retrieve paid-out order IDs
         $paidOutOrderIds = Payout::where('account_id', $accountId)
-            ->whereNotNull('order_ids')
-            ->pluck('order_ids')
+            ->whereNotNull('order_id')
+            ->pluck('order_id')
             ->map(function ($orderIds) {
                 return json_decode($orderIds, true);
             })
@@ -521,7 +521,7 @@ class PaymentController extends Controller
                     'created_at' => $order->created_at->toDateTimeString(),
                 ];
             })->toArray(),
-            'paid_out_order_ids' => $paidOutOrderIds,
+            'paid_out_order_id' => $paidOutOrderIds,
         ]);
     
         if ($orders->isEmpty()) {
@@ -547,7 +547,7 @@ class PaymentController extends Controller
     
         Log::info('Capturing orders for payout request', [
             'account_id' => $accountId,
-            'order_ids' => $orderIds,
+            'order_id' => $orderId,
             'total_sales' => $totalSales,
             'order_count' => count($orderIds),
         ]);
@@ -584,8 +584,8 @@ class PaymentController extends Controller
 
         // Retrieve paid-out order IDs
         $paidOutOrderIds = Payout::where('account_id', $farmerId)
-            ->whereNotNull('order_ids')
-            ->pluck('order_ids')
+            ->whereNotNull('order_id')
+            ->pluck('order_id')
             ->map(function ($orderIds) {
                 return json_decode($orderIds, true);
             })
@@ -823,7 +823,7 @@ public function approvePayment(Request $request, $id)
 
         Log::info('Eligible orders to mark as Paid', [
             'payout_id' => $id,
-            'eligible_order_ids' => $eligibleOrders
+            'eligible_order_id' => $eligibleOrders
         ]);
 
         // Update those orders' payment_method to "Paid"
