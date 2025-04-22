@@ -1557,6 +1557,22 @@ class ProductController extends Controller
     //     }
     // }
 
+
+    public function getMyProducts()
+{
+    $accountId = Auth::id();
+
+    // Fetch products for the logged-in farmer
+    $products = Product::where('account_id', $accountId)->get();
+
+    return response()->json([
+        'isSuccess' => true,
+        'total_products' => $products->count(),
+        'products' => $products
+    ]);
+}
+
+
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {
         try {

@@ -79,6 +79,7 @@ Route::middleware('auth:sanctum')->get('my-products', [ProductController::class,
 
 
 
+Route::middleware('auth:sanctum')->get('/product-ko', [ProductController::class, 'getMyProducts']);
 
 
 
