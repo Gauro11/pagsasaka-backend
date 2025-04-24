@@ -105,7 +105,41 @@ public function approveRiderEarnings($id)
     }
 }
 
+public function cancelOrderByRider(Request $request, $orderId)
+{
+    try {
+        // Assume the rider is authenticated
+        $riderId = auth()->id(); // or use token-based logic
 
+        // Find the order and validate it belongs to this rider
+        $order = Order::where('id', $orderId)
+            ->where('rider_id', $riderId)
+            ->first();
+
+        if (!$order) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Order not found or does not belong to the rider.',
+            ], 404);
+        }
+
+        // Update status to Cancelled
+        $order->status = 'Cancelled';
+        $order->save();
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Order successfully cancelled by rider.',
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to cancel order.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
     
 
 
