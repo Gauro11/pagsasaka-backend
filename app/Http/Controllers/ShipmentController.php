@@ -88,100 +88,94 @@ class ShipmentController extends Controller
     
     
 
-    public function updateOrderStatus(Request $request, $id)
-    {
-        try {
-            $user = Auth::user();
-            Log::info('User updating order status:', ['user' => $user]);
-    
-            if (!$user) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'User not authenticated',
-                ], 401);
-            }
-    
-            // ✅ Only Farmers (role_id = 2) can update order statuses
-            if ($user->role_id !== 2) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Access denied. Only Farmers can update order statuses.',
-                ], 403);
-            }
-    
-            // Find the order
-            $order = Order::find($id);
-    
-            if (!$order) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Order not found.',
-                ], 404);
-            }
-    
-            Log::info('Order status before update:', [
-                'order_id' => $order->id,
-                'current_status' => $order->status
-            ]);
-    
-            // Define valid status transitions
-            $statusFlow = [
-                'Order placed' => 'Waiting for courier',
-                'Waiting for courier' => 'In transit',
-                'In transit' => 'Order delivered',
-            ];
-    
-            // Check if the order can transition
-            if (!isset($statusFlow[$order->status])) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Order status cannot be changed further.',
-                ], 400);
-            }
-    
-            // **CHECK FOR DELIVERY PROOF WHEN MARKING AS "ORDER DELIVERED"**
-            if ($statusFlow[$order->status] === 'Order delivered') {
-                if (!$order->delivery_proof) { // ✅ Only allows update if proof exists
-                    return response()->json([
-                        'isSuccess' => false,
-                        'message' => 'Delivery proof is required to mark the order as delivered.',
-                    ], 400);
-                }
-            }
-    
-            // Update the order status
-            $order->status = $statusFlow[$order->status];
-            $order->save();
-    
-            Log::info('Order status updated successfully:', [
-                'order_id' => $order->id,
-                'new_status' => $order->status
-            ]);
-    
-            return response()->json([
-                'isSuccess' => true,
-                'message' => 'Order status updated successfully.',
-                'order' => [
-                    'id' => $order->id,
-                    'account_id' => $order->account_id,
-                    'product_id' => $order->product_id,
-                    'status' => $order->status,
-                    'ship_to' => $order->ship_to,
-                    'product_name' => $order->product ? $order->product->product_name : 'N/A',
-                    'delivery_proof' => $order->delivery_proof ?? null, // Include proof in response
-                    'created_at' => $order->created_at->format('F d Y'),
-                    'updated_at' => now()->format('F d Y'),
-                ],
-            ], 200);
-        } catch (Throwable $e) {
-            Log::error('Error updating order status:', ['error' => $e->getMessage()]);
+public function updateOrderStatus(Request $request, $id)
+{
+    try {
+        $user = Auth::user();
+        Log::info('User updating order status:', ['user' => $user]);
+
+        if (!$user) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'An error occurred while updating the order status.',
-                'error' => $e->getMessage(),
-            ], 500);
+                'message' => 'User not authenticated',
+            ], 401);
         }
+
+        // ✅ Only Farmers (role_id = 2) can update order statuses
+        if ($user->role_id !== 2) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Access denied. Only Farmers can update order statuses.',
+            ], 403);
+        }
+
+        // Find the order
+        $order = Order::find($id);
+
+        if (!$order) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Order not found.',
+            ], 404);
+        }
+
+        Log::info('Order status before update:', [
+            'order_id' => $order->id,
+            'current_status' => $order->status
+        ]);
+
+        // ✅ Allow only update to "In transit" from "Waiting for courier"
+        $statusFlow = [
+            'Order placed' => 'Waiting for courier',
+            'Waiting for courier' => 'In transit',
+        ];
+
+        // ❌ Removed 'In transit' => 'Order delivered'
+
+        // Check if the order can transition
+        if (!isset($statusFlow[$order->status])) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Order status cannot be changed further.',
+            ], 400);
+        }
+
+        // ✅ No delivery_proof check needed
+
+        // Update the order status
+        $order->status = $statusFlow[$order->status];
+        $order->save();
+
+        Log::info('Order status updated successfully:', [
+            'order_id' => $order->id,
+            'new_status' => $order->status
+        ]);
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Order status updated successfully.',
+            'order' => [
+                'id' => $order->id,
+                'account_id' => $order->account_id,
+                'product_id' => $order->product_id,
+                'status' => $order->status,
+                'ship_to' => $order->ship_to,
+                'product_name' => $order->product ? $order->product->product_name : 'N/A',
+                'delivery_proof' => $order->delivery_proof ?? null,
+                'created_at' => $order->created_at->format('F d Y'),
+                'updated_at' => now()->format('F d Y'),
+            ],
+        ], 200);
+    } catch (Throwable $e) {
+        Log::error('Error updating order status:', ['error' => $e->getMessage()]);
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred while updating the order status.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
     
     
 
@@ -522,24 +516,30 @@ class ShipmentController extends Controller
      
              // Update the order record
              $order->delivery_proof = $filePath;
+     
+             // ✅ Automatically change status from Intransit to Order Delivered
+             if ($order->status === 'In transit') {
+                 $order->status = 'Order delivered';
+             }
+     
              $order->save();
      
              $response = [
-                'isSuccess' => true,
-                'message' => 'Delivery proof uploaded successfully.',
-                'order' => [
-                    'id' => $order->id,
-                    'account_id' => $order->account_id,
-                    'product_id' => $order->product_id,
-                    'ship_to' => $order->ship_to,
-                    'quantity' => $order->quantity,
-                    'total_amount' => $order->total_amount,
-                    'status' => $order->status,
-                    'delivery_proof' => $filePath,
-                    'created_at' => $order->created_at->format('F d Y'),
-                    'updated_at' => now()->format('F d Y'),
-                ],
-            ];
+                 'isSuccess' => true,
+                 'message' => 'Delivery proof uploaded successfully.',
+                 'order' => [
+                     'id' => $order->id,
+                     'account_id' => $order->account_id,
+                     'product_id' => $order->product_id,
+                     'ship_to' => $order->ship_to,
+                     'quantity' => $order->quantity,
+                     'total_amount' => $order->total_amount,
+                     'status' => $order->status,
+                     'delivery_proof' => $filePath,
+                     'created_at' => $order->created_at->format('F d Y'),
+                     'updated_at' => now()->format('F d Y'),
+                 ],
+             ];
      
              // Log the API call
              $this->logAPICalls('uploadDeliveryProof', $order->id, $request->all(), $response);
@@ -559,6 +559,7 @@ class ShipmentController extends Controller
              return response()->json($response, 500);
          }
      }
+     
 
      public function getDeliveryProofByOrderId($id)
 {
