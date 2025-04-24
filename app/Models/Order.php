@@ -44,4 +44,9 @@ class Order extends Model
     {
         return $this->belongsTo(Product::class, 'product_id');
     }
+
+    public function cancellationReason()
+{
+    return $this->belongsTo(CancellationReason::class, 'cancellation_reason_id');
+}
 }

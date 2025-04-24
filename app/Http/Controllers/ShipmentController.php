@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Account;
 use App\Models\Rider;
 use App\Models\Refund;
+use Illuminate\Validation\ValidationException;
+use App\Models\CancellationReason;
+
+
 use Illuminate\Support\Facades\DB;
 
 class ShipmentController extends Controller
@@ -740,51 +744,66 @@ public function getCancelledOrders(Request $request)
 }
 
 
-    public function getCancellationReasons()
-{
-    $reasons = [
-        'Changed my mind',
-        'Found a better price',
-        'Order delayed',
-        'Item no longer needed',
-        'Wrong item ordered',
-        'Other (please specify)'
-    ];
 
-    return response()->json([
-        'isSuccess' => true,
-        'message' => 'Cancellation reasons retrieved successfully.',
-        'reasons' => $reasons
-    ], 200);
-}
+// public function addCancellationReason(Request $request)
+// {
+//     try {
+//         // Validate the request
+//         $validated = $request->validate([
+//             'reasons' => 'required|string|unique:cancellation_reasons,reasons',
+//         ]);
+
+//         // Create new cancellation reason
+//         $reason = CancellationReason::create([
+//             'reasons' => $validated['reasons'],
+//         ]);
+
+//         $response = [
+//             'isSuccess' => true,
+//             'message' => 'Cancellation reason successfully added.',
+//             'data' => $reason,
+//         ];
+
+//         Log::info('Cancellation reason added successfully', ['reason' => $reason]);
+
+//         return response()->json($response, 201);
+
+//     } catch (ValidationException $e) {
+//         $response = [
+//             'isSuccess' => false,
+//             'message' => 'Validation error. Please check your input.',
+//             'errors' => $e->errors(),
+//         ];
+
+//         Log::warning('Validation error on addCancellationReason', ['errors' => $e->errors()]);
+//         return response()->json($response, 422);
+
+//     } catch (Throwable $e) {
+//         $response = [
+//             'isSuccess' => false,
+//             'message' => 'Failed to add cancellation reason.',
+//             'error' => $e->getMessage(),
+//         ];
+
+//         Log::error('Error adding cancellation reason', ['error' => $e->getMessage()]);
+//         return response()->json($response, 500);
+//     }
+// }
+
+
 
 
 public function cancelOrder(Request $request, $id)
 {
     try {
-        $reasons = [
-            1 => 'Changed my mind',
-            2 => 'Found a better price',
-            3 => 'Order delayed',
-            4 => 'Item no longer needed',
-            5 => 'Wrong item ordered',
-            6 => 'Other (please specify)',
-        ];
-
+        // Validate the request data
         $validated = $request->validate([
-            'reason_id' => 'required|integer|in:' . implode(',', array_keys($reasons)),
+            'reason_id' => 'required|exists:cancellation_reasons,id', // Validate that the reason exists
         ]);
 
-        $user = Auth::user();
-        if (!$user) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'User not authenticated.',
-            ], 401);
-        }
+        // Find the order
+        $order = Order::find($id);
 
-        // Load order with related product
-        $order = Order::with('product')->find($id);
         if (!$order) {
             return response()->json([
                 'isSuccess' => false,
@@ -792,62 +811,57 @@ public function cancelOrder(Request $request, $id)
             ], 404);
         }
 
-        if (!in_array($order->status, ['Order placed', 'Waiting for courier'])) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Order cannot be cancelled at this stage.',
-            ], 400);
-        }
-
-        $reasonText = $reasons[$validated['reason_id']];
-        if ($validated['reason_id'] == 6 && !empty($validated['custom_reason'])) {
-            $reasonText .= ': ' . $validated['custom_reason'];
-        }
-
-        // Update order
+        // Update the order status and set the cancellation reason
         $order->status = 'Cancelled';
-        $order->cancellation_reason = $reasonText;
+        $order->cancellation_reason_id = $validated['reason_id'];
         $order->save();
 
-        $product = $order->product;
+        // Get the cancellation reason name for the response
+        $cancellationReason = $order->cancellationReason;
 
         return response()->json([
             'isSuccess' => true,
             'message' => 'Order cancelled successfully.',
             'order' => [
                 'id' => $order->id,
-                'account_id' => $order->account_id,
                 'status' => $order->status,
-                'cancellation_reason' => $order->cancellation_reason,
-                'ship_to' => $order->ship_to,
-                'quantity' => $order->quantity,
-                'total_amount' => $order->total_amount,
-                'created_at' => $order->created_at->format('F d Y'),
-                'updated_at' => now()->format('F d Y'),
-
-                // ✅ Additional product info
-                'product_id' => $product->id ?? null,
-                'product_name' => $product->product_name ?? 'N/A',
-                'product_img' => $product->product_img ?? null,
-                'unit' => $product->unit ?? 'N/A',
-                'price' => $product->price ?? 0,
-                'total' => $product ? ($product->price * $order->quantity) : 0,
-            ],
-            'user' => [
-                'id' => $user->id,
-                'name' => "{$user->first_name} {$user->last_name}",
-                'role_id' => $user->role_id,
-            ],
+                'reason' => $cancellationReason ? $cancellationReason->reasons : null,
+                'updated_at' => $order->updated_at->format('F d Y'),
+            ]
         ], 200);
-
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
+        Log::error('Error canceling order:', ['error' => $e->getMessage()]);
         return response()->json([
             'isSuccess' => false,
-            'message' => 'An error occurred while cancelling the order.',
+            'message' => 'An error occurred while canceling the order.',
             'error' => $e->getMessage(),
         ], 500);
     }
 }
+
+public function getCancellationReasons()
+{
+    try {
+        // Fetch all cancellation reasons
+        $reasons = CancellationReason::select('id', 'reasons')->get();
+
+        $response = [
+            'isSuccess' => true,
+            'data' => $reasons,
+        ];
+
+        return response()->json($response, 200);
+    } catch (Throwable $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => 'Failed to fetch cancellation reasons.',
+            'error' => $e->getMessage(),
+        ];
+
+        return response()->json($response, 500);
+    }
+}
+
 
 
     

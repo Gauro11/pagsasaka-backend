@@ -58,6 +58,54 @@ class RiderController extends Controller
     }
 }
 
+public function approveRiderEarnings($id)
+{
+    try {
+        // Find the rider
+        $rider = Rider::find($id);
+
+        // Validate that the rider exists and is of role_id 4
+        if (!$rider || $rider->role_id != 4) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Rider not found or not authorized.',
+            ], 404);
+        }
+
+        // Get all delivered COD orders for the rider
+        $orders = Order::where('rider_id', $rider->id)
+            ->where('status', 'Order delivered')
+            ->where('payment_method', 'COD')
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'No COD delivered orders found for this rider.',
+            ], 404);
+        }
+
+        // Update each order: reset rider_id to null
+        foreach ($orders as $order) {
+            $order->rider_id = null;
+            $order->save();
+        }
+
+        return response()->json([
+            'isSuccess' => true,
+            'message' => 'Rider earnings approved and rider ID cleared from delivered orders.',
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to approve rider earnings.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
     
 
 

@@ -71,6 +71,12 @@ Route::middleware('auth:sanctum')->get('delivered', [ShipmentController::class, 
 Route::middleware('auth:sanctum')->get('Cancelled', [ShipmentController::class, 'cancelledStatus']);
 Route::middleware('auth:sanctum')->get('Refund', [ShipmentController::class, 'refundStatus']);
 Route::middleware('auth:sanctum')->get('/orders/{order_number}', [ShipmentController::class, 'getOrderDetails']);
+Route::middleware('auth:sanctum')->post('add-cancellation-reason', [ShipmentController::class, 'addCancellationReason']);
+Route::middleware('auth:sanctum')->post('/cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
+Route::middleware('auth:sanctum')->get('/cancellation-reasons', [ShipmentController::class, 'getCancellationReasons']);
+
+
+
 
 
 
@@ -91,6 +97,7 @@ Route::post('rider/apply', [RiderController::class, 'applyRider']);
 Route::post('rider/approve/{id}', [RiderController::class, 'approveRider']);
 Route::get('riders/pending', [RiderController::class, 'getPendingRiders']);
 Route::post('ridersinvalidate/{id}', [RiderController::class, 'invalidateRider']);
+Route::post('rider/approve-earnings/{id}', [RiderController::class, 'approveRiderEarnings']);
 Route::middleware(['auth:sanctum'])->get('rider/earnings/{id}', [RiderController::class, 'getRiderEarningsSummary']);
 
 
