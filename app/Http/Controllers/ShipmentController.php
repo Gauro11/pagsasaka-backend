@@ -1456,7 +1456,12 @@ public function getOrderHistory(Request $request)
         $response = [
             'isSuccess' => true,
             'message' => 'Order history retrieved successfully.',
-            'orders' => $orders,
+            'orders' => $orders->items(), // Get the raw data without the 'data' key
+            'pagination' => [
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'total' => $orders->total(),
+            ],
         ];
 
         $this->logAPICalls('getOrderHistory', $user->id, $request->all(), [$response]);
@@ -1471,6 +1476,7 @@ public function getOrderHistory(Request $request)
         ], 500);
     }
 }
+
 
 
 
