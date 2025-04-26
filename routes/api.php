@@ -81,6 +81,7 @@ Route::middleware('auth:sanctum')->get('/orders/{order_number}', [ShipmentContro
 Route::middleware('auth:sanctum')->post('add-cancellation-reason', [ShipmentController::class, 'addCancellationReason']);
 // Route::middleware('auth:sanctum')->post('cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
 Route::middleware('auth:sanctum')->get('/cancellation-reasons', [ShipmentController::class, 'getCancellationReasons']);
+Route::middleware('auth:sanctum')->get('rider/order-history', [ShipmentController::class, 'getOrderHistory']);
 
 
 
@@ -108,6 +109,8 @@ Route::post('rider/approve-earnings/{id}', [RiderController::class, 'approveRide
 Route::get('allriders', [RiderController::class, 'getApprovedRiders']);
 
 Route::middleware(['auth:sanctum'])->post('cancel/orders/{orderId}', [RiderController::class, 'cancelOrderByRider']);
+// Route::middleware(['auth:sanctum'])->get('rider/order-history', [RiderController::class, 'getOrderHistory']);
+
 
 
 Route::get('/rider/earnings-summary/{id}', [RiderController::class, 'getRiderEarningsSummary']);

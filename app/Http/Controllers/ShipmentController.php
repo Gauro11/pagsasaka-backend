@@ -1410,6 +1410,64 @@ public function getOrderDetails(Request $request, $order_number)
 }
 
 
+public function getOrderHistory(Request $request)
+{
+    try {
+        $user = Auth::user();
+        if (!$user) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'User not authenticated',
+            ];
+            $this->logAPICalls('getOrderHistory', "", $request->all(), [$response]);
+            return response()->json($response, 500);
+        }
+
+        if ($user->role_id !== 4) {
+            $response = [
+                'isSuccess' => false,
+                'message' => 'Access denied. Only Riders can retrieve order history.',
+            ];
+            $this->logAPICalls('getOrderHistory', $user->id, $request->all(), [$response]);
+            return response()->json($response, 403);
+        }
+
+        // Only retrieve 'Order Delivered' and 'Cancelled' orders
+        $orders = \App\Models\Order::where('rider_id', $user->id)
+            ->whereIn('status', ['Order delivered', 'Cancelled'])
+            ->select('id', 'order_number', 'total_amount', 'status', 'created_at', 'updated_at')
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->get('paginate', 10));
+
+        $orders->getCollection()->transform(function ($order) {
+            return [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'total_amount' => $order->total_amount,
+                'status' => $order->status,
+                'created_at' => \Carbon\Carbon::parse($order->created_at)->format('F d Y'),
+                'updated_at' => \Carbon\Carbon::parse($order->updated_at)->format('F d Y'),
+            ];
+        });
+
+        $response = [
+            'isSuccess' => true,
+            'message' => 'Order history retrieved successfully.',
+            'orders' => $orders,
+        ];
+
+        $this->logAPICalls('getOrderHistory', $user->id, $request->all(), [$response]);
+
+        return response()->json($response, 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'An error occurred while retrieving order history.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
 
 
 
