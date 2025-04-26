@@ -1565,12 +1565,30 @@ class ProductController extends Controller
     // Fetch products for the logged-in farmer
     $products = Product::where('account_id', $accountId)->get();
 
+    // Get orders for farmer's products that are delivered
+    $orders = \App\Models\Order::whereHas('product', function ($query) use ($accountId) {
+        $query->where('account_id', $accountId);
+    })
+    ->where('status', 'Order Delivered')
+    ->get();
+
+    // Total quantity sold
+    $totalSold = $orders->sum('quantity');
+
+    // Total amount earned
+    $totalAmount = $orders->sum('total_amount');
+
     return response()->json([
         'isSuccess' => true,
         'total_products' => $products->count(),
-        'products' => $products
+        'total_sales_quantity' => $totalSold,
+        'total_sales_amount' => '₱' . number_format($totalAmount, 2),
+       // 'products' => $products
     ]);
 }
+
+    
+
 
 
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)

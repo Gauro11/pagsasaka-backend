@@ -140,6 +140,29 @@ public function cancelOrderByRider(Request $request, $orderId)
         ], 500);
     }
 }
+
+public function getApprovedRiders()
+{
+    try {
+        // Fetch all riders with status 'Approve'
+        $riders = Rider::where('status', 'Approve')
+            ->select('id', 'first_name', 'last_name', 'email', 'phone_number')
+            ->get();
+
+        return response()->json([
+            'isSuccess' => true,
+            'data' => $riders,
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch approved riders.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
     
 
 
