@@ -1582,7 +1582,7 @@ class ProductController extends Controller
         'isSuccess' => true,
         'total_products' => $products->count(),
         'total_sales_quantity' => $totalSold,
-        'total_sales_amount' => '₱' . number_format($totalAmount, 2),
+        'total_sales_amount' =>   number_format($totalAmount, 2),
         'products' => $products
     ]);
 }
