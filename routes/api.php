@@ -106,8 +106,14 @@ Route::get('riders/pending', [RiderController::class, 'getPendingRiders']);
 Route::post('ridersinvalidate/{id}', [RiderController::class, 'invalidateRider']);
 Route::post('rider/approve-earnings/{id}', [RiderController::class, 'approveRiderEarnings']);
 Route::get('allriders', [RiderController::class, 'getApprovedRiders']);
-Route::middleware(['auth:sanctum'])->get('rider/earnings/{id}', [RiderController::class, 'getRiderEarningsSummary']);
+
 Route::middleware(['auth:sanctum'])->post('cancel/orders/{orderId}', [RiderController::class, 'cancelOrderByRider']);
+
+
+Route::get('/rider/earnings-summary/{id}', [RiderController::class, 'getRiderEarningsSummary']);
+
+// Route::middleware('auth:sanctum')->get('/rider/earnings-summary', [RiderController::class, 'getRiderEarningsSummary']);
+
 
 
 

@@ -17,6 +17,7 @@ use App\Models\Rider;
 use App\Models\Refund;
 use Illuminate\Validation\ValidationException;
 use App\Models\CancellationReason;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 
 use Illuminate\Support\Facades\DB;
@@ -862,38 +863,44 @@ public function getCancelledOrders(Request $request)
 public function cancelOrder(Request $request, $id)
 {
     try {
-        // Find the order
-        $order = Order::find($id);
+        // Find the order by ID or fail
+        $order = Order::findOrFail($id);
 
-        if (!$order) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Order not found.',
-            ], 404);
-        }
-
-        // Update the order status
+        // Update the status to Cancelled
         $order->status = 'Cancelled';
         $order->save();
 
-        return response()->json([
+        $response = [
             'isSuccess' => true,
             'message' => 'Order cancelled successfully.',
             'order' => [
                 'id' => $order->id,
                 'status' => $order->status,
                 'updated_at' => $order->updated_at->format('F d Y'),
-            ]
-        ], 200);
+            ],
+        ];
+
+        // Log API call (optional, if you have this method)
+        $this->logAPICalls('cancelOrder', $order->id, $request->all(), $response);
+
+        return response()->json($response, 200);
+
+    } catch (ModelNotFoundException $e) {
+        $response = [
+            'isSuccess' => false,
+            'message' => 'Order not found.',
+        ];
+        return response()->json($response, 404);
     } catch (Throwable $e) {
-        Log::error('Error canceling order:', ['error' => $e->getMessage()]);
-        return response()->json([
+        $response = [
             'isSuccess' => false,
             'message' => 'An error occurred while canceling the order.',
             'error' => $e->getMessage(),
-        ], 500);
+        ];
+        return response()->json($response, 500);
     }
 }
+
 
 
 public function getCancellationReasons()

@@ -28,78 +28,95 @@ class AuthController extends Controller
 {
     
     public function login(Request $request)
-    {
-        try {
-            $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
-            ]);
-    
-            $user = Account::where('email', $request->email)
-                ->with('role')
-                ->first();
-    
-            $isRider = false;
-    
-            if (!$user) {
-                $user = Rider::where('email', $request->email)->first();
-                $isRider = true;
-    
-                if ($user && in_array($user->status, ['Pending', 'Invalid'])) {
-                    return response()->json([
-                        'isSuccess' => false,
-                        'message' => 'Your rider account is not allowed to log in. Current status: ' . $user->status,
-                    ], 403);
-                }
+{
+    try {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $user = Account::where('email', $request->email)
+            ->with('role')
+            ->first();
+
+        $isRider = false;
+
+        if (!$user) {
+            $user = Rider::where('email', $request->email)->first();
+            $isRider = true;
+
+            if ($user && in_array($user->status, ['Pending', 'Invalid'])) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Your rider account is not allowed to log in. Current status: ' . $user->status,
+                ], 403);
             }
-    
-            if ($user && Hash::check($request->password, $user->password)) {
-                $token = $user->createToken('auth-token')->plainTextToken;
-                $sessionCode = $this->insertSession($user->id);
-    
-                if (!$sessionCode) {
-                    return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
-                }
-    
-                // Unhide avatar and hide sensitive fields
-                $user->makeHidden([
-                    'password',
-                    'security_id',
-                    'security_answer',
-                    'is_archived',
-                    'created_at',
-                    'updated_at',
-                    'role'
-                ])->makeVisible(['avatar']);
-    
-                $response = [
-                    'isSuccess' => true,
-                    'message' => 'Logged in successfully',
-                    'token' => $token,
-                    'session_code' => $sessionCode,
-                    'user' => $user,
-                    'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
-                    'role_id' => $isRider ? 4 : ($user->role_id ?? null)
-                ];
-    
-                // Log API call (exclude sensitive input fields)
-                $this->logAPICalls('login', $request->email, $request->except('password', 'security_id', 'security_answer'), $response);
-    
-                return response()->json($response, 200);
-            }
-    
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Invalid credentials.',
-            ], 401);
-        } catch (Throwable $e) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Login failed.',
-                'error' => $e->getMessage(),
-            ], 500);
         }
+
+        if ($user && Hash::check($request->password, $user->password)) {
+            $token = $user->createToken('auth-token')->plainTextToken;
+            $sessionCode = $this->insertSession($user->id);
+
+            if (!$sessionCode) {
+                return response()->json(['isSuccess' => false, 'message' => 'Failed to create session.'], 500);
+            }
+
+            // Unhide avatar and hide sensitive fields
+            $user->makeHidden([
+                'password',
+                'security_id',
+                'security_answer',
+                'is_archived',
+                'created_at',
+                'updated_at',
+                'role'
+            ])->makeVisible(['avatar']);
+
+            $earnings = null;
+
+            if ($isRider) {
+                // Fetch Rider's earnings
+                $totalCodDelivered = \App\Models\Order::where('rider_id', $user->id)
+                    ->where('status', 'Order delivered')
+                    ->where('payment_method', 'COD')
+                    ->sum('total_amount');
+
+                $earnings = [
+                    'cod' => '₱' . number_format($totalCodDelivered, 2),
+                    'ewallet' => '₱0.00', // Hardcoded for now
+                ];
+            }
+
+            $response = [
+                'isSuccess' => true,
+                'message' => 'Logged in successfully',
+                'token' => $token,
+                'session_code' => $sessionCode,
+                'user' => $user,
+                'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
+                'role_id' => $isRider ? 4 : ($user->role_id ?? null),
+                'earnings' => $earnings // <--- Add earnings here if rider
+            ];
+
+            // Log API call (exclude sensitive input fields)
+            $this->logAPICalls('login', $request->email, $request->except('password', 'security_id', 'security_answer'), $response);
+
+            return response()->json($response, 200);
+        }
+
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Invalid credentials.',
+        ], 401);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Login failed.',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
     
 
     
