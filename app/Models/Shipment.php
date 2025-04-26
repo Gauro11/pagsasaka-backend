@@ -15,5 +15,10 @@ class Shipment extends Model
         'name', 
         'ship_to', 
         'status',
+        'cancellation_reason_id',
     ];
+
+    
+
+
 }

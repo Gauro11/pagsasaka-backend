@@ -862,11 +862,6 @@ public function getCancelledOrders(Request $request)
 public function cancelOrder(Request $request, $id)
 {
     try {
-        // Validate the request data
-        $validated = $request->validate([
-            'reason_id' => 'required|exists:cancellation_reasons,id', // Validate that the reason exists
-        ]);
-
         // Find the order
         $order = Order::find($id);
 
@@ -877,13 +872,9 @@ public function cancelOrder(Request $request, $id)
             ], 404);
         }
 
-        // Update the order status and set the cancellation reason
+        // Update the order status
         $order->status = 'Cancelled';
-        $order->cancellation_reason_id = $validated['reason_id'];
         $order->save();
-
-        // Get the cancellation reason name for the response
-        $cancellationReason = $order->cancellationReason;
 
         return response()->json([
             'isSuccess' => true,
@@ -891,7 +882,6 @@ public function cancelOrder(Request $request, $id)
             'order' => [
                 'id' => $order->id,
                 'status' => $order->status,
-                'reason' => $cancellationReason ? $cancellationReason->reasons : null,
                 'updated_at' => $order->updated_at->format('F d Y'),
             ]
         ], 200);
@@ -904,6 +894,7 @@ public function cancelOrder(Request $request, $id)
         ], 500);
     }
 }
+
 
 public function getCancellationReasons()
 {
