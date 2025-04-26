@@ -72,8 +72,6 @@ class AuthController extends Controller
                 'role'
             ])->makeVisible(['avatar']);
 
-            $earnings = null;
-
             if ($isRider) {
                 // Fetch Rider's earnings
                 $totalCodDelivered = \App\Models\Order::where('rider_id', $user->id)
@@ -81,10 +79,8 @@ class AuthController extends Controller
                     ->where('payment_method', 'COD')
                     ->sum('total_amount');
 
-                $earnings = [
-                    'cod' => '₱' . number_format($totalCodDelivered, 2),
-                    'ewallet' => '₱0.00', // Hardcoded for now
-                ];
+                // Add cod inside user
+                $user->cod = '₱' . number_format($totalCodDelivered, 2);
             }
 
             $response = [
@@ -95,7 +91,6 @@ class AuthController extends Controller
                 'user' => $user,
                 'role_name' => $isRider ? 'Rider' : ($user->role->role ?? 'No Role Assigned'),
                 'role_id' => $isRider ? 4 : ($user->role_id ?? null),
-                'earnings' => $earnings // <--- Add earnings here if rider
             ];
 
             // Log API call (exclude sensitive input fields)
@@ -116,6 +111,7 @@ class AuthController extends Controller
         ], 500);
     }
 }
+
 
     
 
