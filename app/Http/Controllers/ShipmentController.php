@@ -1433,9 +1433,10 @@ public function getOrderHistory(Request $request)
         }
 
         // Only retrieve 'Order Delivered' and 'Cancelled' orders
-        $orders = \App\Models\Order::where('rider_id', $user->id)
+        $orders = \App\Models\Order::with('product') // Eager load the product relationship
+            ->where('rider_id', $user->id)
             ->whereIn('status', ['Order delivered', 'Cancelled'])
-            ->select('id', 'order_number', 'total_amount', 'status', 'created_at', 'updated_at')
+            ->select('id', 'order_number', 'product_id', 'total_amount', 'status', 'created_at', 'updated_at')
             ->orderBy('created_at', 'desc')
             ->paginate($request->get('paginate', 10));
 
@@ -1443,6 +1444,8 @@ public function getOrderHistory(Request $request)
             return [
                 'id' => $order->id,
                 'order_number' => $order->order_number,
+                'product_id' => $order->product_id,
+                'product_name' => $order->product ? $order->product->product_name : 'N/A', // Fetch product name
                 'total_amount' => $order->total_amount,
                 'status' => $order->status,
                 'created_at' => \Carbon\Carbon::parse($order->created_at)->format('F d Y'),
@@ -1468,6 +1471,7 @@ public function getOrderHistory(Request $request)
         ], 500);
     }
 }
+
 
 
 
