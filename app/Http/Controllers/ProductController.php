@@ -1580,12 +1580,14 @@ class ProductController extends Controller
 
     return response()->json([
         'isSuccess' => true,
-        'total_products' => $products->count(),
-        'total_sales_quantity' => $totalSold,
-        'total_sales_amount' =>   number_format($totalAmount, 2),
-        'products' => $products
+        'products' => [
+            'total_products' => $products->count(),
+            'total_sales_quantity' => $totalSold,
+            'total_sales_amount' => number_format($totalAmount, 2),
+        ]
     ]);
 }
+
 
     
 
