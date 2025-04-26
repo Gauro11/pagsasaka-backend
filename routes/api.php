@@ -63,7 +63,7 @@ Route::middleware('auth:sanctum')->post('pickupOrder/{id}', [ShipmentController:
 Route::middleware('auth:sanctum')->post('uploadDeliveryProof/{id}', [ShipmentController::class, 'uploadDeliveryProof']);
 Route::middleware('auth:sanctum')->get('orders-in-transit', [ShipmentController::class, 'getInTransitOrders']);
 Route::middleware('auth:sanctum')->get('get-delivery-proof/{id}', [ShipmentController::class, 'getDeliveryProofByOrderId']);
-Route::middleware('auth:sanctum')->post('cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
+// Route::middleware('auth:sanctum')->post('cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
 Route::middleware('auth:sanctum')->get('cancellation-reasons', [ShipmentController::class, 'getCancellationReasons']);
 Route::middleware('auth:sanctum')->post('refund/{order_id}', [ShipmentController::class, 'requestRefundByOrderId']);
 Route::middleware('auth:sanctum')->post('refundapprove/{order_id}', [ShipmentController::class, 'approveRefundRequest']);
@@ -79,7 +79,7 @@ Route::middleware('auth:sanctum')->get('Cancelled', [ShipmentController::class, 
 Route::middleware('auth:sanctum')->get('Refund', [ShipmentController::class, 'refundStatus']);
 Route::middleware('auth:sanctum')->get('/orders/{order_number}', [ShipmentController::class, 'getOrderDetails']);
 Route::middleware('auth:sanctum')->post('add-cancellation-reason', [ShipmentController::class, 'addCancellationReason']);
-Route::middleware('auth:sanctum')->post('/cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
+// Route::middleware('auth:sanctum')->post('cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
 Route::middleware('auth:sanctum')->get('/cancellation-reasons', [ShipmentController::class, 'getCancellationReasons']);
 
 
@@ -192,6 +192,7 @@ Route::prefix('product')->middleware('auth:sanctum')->group(function () {
     Route::get('cart-item-details/{id}', [ProductController::class, 'getCartItemDetails']);
     Route::get('list-cart-status', [ProductController::class, 'getCartListStatus']);
     Route::post('checkout/item/{id}', [ProductController::class, 'checkoutItem']);
+    Route::post('cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
 });
 
 Route::post('list', [ProductController::class, 'getAllProductsList']);
