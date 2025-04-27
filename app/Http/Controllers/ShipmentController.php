@@ -929,59 +929,65 @@ class ShipmentController extends Controller
             'reason' => 'required|string|max:255',
             'solution' => 'required|string|in:Refund,Replace',
             'return_method' => 'required|string|in:Pick Up,Drop-off',
-            'product_refund_img' => 'required|image|max:2048',
+            'product_refund_img' => 'required|image|mimes:jpg,jpeg,png|max:2048',
         ];
-
+    
         // Conditionally add validation for "payment_method" based on the solution
         if ($request->input('solution') !== 'Replace') {
             $validationRules['payment_method'] = 'required|string';
         }
-
+    
         // Validate request data based on the above rules
         $validated = $request->validate($validationRules);
-
+    
         $order = Order::where('id', $order_id)
             ->where('account_id', Auth::id())
             ->first();
-
+    
         if (!$order) {
             return response()->json([
                 'message' => 'Order not found or you are not authorized.'
             ], 404);
         }
-
+    
         // Check if the order status is "Order delivered"
         if ($order->status !== 'Order delivered') {
             return response()->json([
                 'message' => 'Refund requests can only be made for orders that have been delivered.'
             ], 400);
         }
-
+    
         // Check if the order is already pending refund
         if ($order->status === 'Pending') {
             return response()->json([
                 'message' => 'A refund request for this order is already pending.'
             ], 400);
         }
-
+    
         // Handle image upload
         $imagePath = null;
         if ($request->hasFile('product_refund_img')) {
             $image = $request->file('product_refund_img');
             $accountId = Auth::id();
-
+    
             $directory = public_path('img/refunds');
             $fileName = 'Refund-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
-
+    
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
             }
-
+    
             $image->move($directory, $fileName);
             $imagePath = asset('img/refunds/' . $fileName);
         }
-
-        // Create the refund without setting the status field
+    
+        // Calculate refund amount based on the solution
+        $refundAmount = null;
+        if ($validated['solution'] !== 'Replace') {
+            $refundAmount = $order->total_amount;  // Set refund amount only for Refund (not Replace)
+        }
+    
+        // Prepare refund data (save only the necessary fields)
         $refundData = [
             'account_id' => Auth::id(),
             'order_id' => $order->id,
@@ -991,20 +997,20 @@ class ShipmentController extends Controller
             'return_method' => $validated['return_method'],
             'product_refund_img' => $imagePath,
         ];
-
+    
         // If the solution is "Refund" or "Return", include the refund amount and payment method
         if ($validated['solution'] !== 'Replace') {
-            $refundData['refund_amount'] = $order->total_amount;
+            $refundData['refund_amount'] = $refundAmount;
             $refundData['payment_method'] = $validated['payment_method'];
         }
-
-        // Create the refund
+    
+        // Create the refund (store the data with the refund amount)
         $refund = Refund::create($refundData);
-
+    
         // Update order status to "Pending"
         $order->status = 'Pending';
         $order->save();
-
+    
         // Prepare response
         $response = [
             'message' => 'Refund request submitted successfully!',
@@ -1020,14 +1026,15 @@ class ShipmentController extends Controller
                 'updated_at' => $refund->updated_at,
             ]
         ];
-
+    
         // Include the refund amount in the response if the solution is "Refund"
         if ($refund->solution === 'Refund') {
             $response['refund']['refund_amount'] = $refund->refund_amount;
         }
-
+    
         return response()->json($response, 200);
     }
+    
 
     public function approveRefund($refund_id)
     {
@@ -1096,7 +1103,7 @@ class ShipmentController extends Controller
                 ->leftJoin('products', 'orders.product_id', '=', 'products.id')
                 ->leftJoin('accounts as sellers', function($join) {
                     $join->on('products.account_id', '=', 'sellers.id')
-                         ->where('sellers.role_id', '=', 2); // ✅ Only join sellers
+                         ->where('sellers.role_id', '=', 2); // Only join sellers
                 })
                 ->where('orders.account_id', $user->id)
                 ->whereIn('orders.status', ['Refund', 'Replace'])
@@ -1110,9 +1117,9 @@ class ShipmentController extends Controller
                     'orders.order_number',
                     'refunds.reason as refund_reason',
                     'products.product_name',
-                    'products.product_img',
+                    'products.product_img', // Fetch product_img directly from the products table
                     'products.unit',
-                    DB::raw("CONCAT(sellers.first_name, ' ', COALESCE(sellers.middle_name, ''), ' ', sellers.last_name) as seller_name") // ✅ fix here
+                    DB::raw("CONCAT(sellers.first_name, ' ', COALESCE(sellers.middle_name, ''), ' ', sellers.last_name) as seller_name")
                 );
     
             $result = $query->paginate($perPage);
@@ -1125,11 +1132,22 @@ class ShipmentController extends Controller
             }
     
             $formattedOrders = $result->getCollection()->map(function ($order) {
+                // If product_img is stored as a string, remove the extra characters
+                $productImgUrls = $order->product_img ? json_decode($order->product_img) : [];
+    
+                // Ensure each image URL is properly formatted (remove extra quotes or characters if any)
+                if (is_array($productImgUrls)) {
+                    // Remove any leading or trailing unwanted characters (such as quotes or brackets)
+                    $productImgUrls = array_map(function ($image) {
+                        return preg_replace('/[^a-zA-Z0-9:\/\/\.\-\/:_?=&]/', '', $image); // Clean unwanted characters
+                    }, $productImgUrls);
+                }
+    
                 return [
                     'account_id' => $order->account_id,
                     'product_id' => $order->product_id,
                     'product_name' => $order->product_name,
-                    'product_img' => $order->product_img,
+                    'product_img' => $productImgUrls, // Array of image URLs
                     'unit' => $order->unit,
                     'seller_name' => trim($order->seller_name),
                     'quantity' => $order->quantity,
@@ -1177,9 +1195,9 @@ class ShipmentController extends Controller
                 ->leftJoin('products', 'orders.product_id', '=', 'products.id')
                 ->leftJoin('accounts as sellers', function($join) {
                     $join->on('products.account_id', '=', 'sellers.id')
-                         ->where('sellers.role_id', '=', 2); // ✅ Only sellers
+                         ->where('sellers.role_id', '=', 2); // Only join sellers
                 })
-                ->where('products.account_id', $user->id) // ✅ Only the seller's products
+                ->where('products.account_id', $user->id) // Only the seller's products
                 ->whereIn('orders.status', ['Refund', 'Replace'])
                 ->select(
                     'orders.account_id',
@@ -1191,9 +1209,9 @@ class ShipmentController extends Controller
                     'orders.order_number',
                     'refunds.reason as refund_reason',
                     'products.product_name',
-                    'products.product_img',
+                    'products.product_img', // Fetch product_img directly from the products table
                     'products.unit',
-                    DB::raw("CONCAT(sellers.first_name, ' ', COALESCE(sellers.middle_name, ''), ' ', sellers.last_name) as seller_name") // ✅ fix here
+                    DB::raw("CONCAT(sellers.first_name, ' ', COALESCE(sellers.middle_name, ''), ' ', sellers.last_name) as seller_name")
                 );
     
             $result = $query->paginate($perPage);
@@ -1206,13 +1224,24 @@ class ShipmentController extends Controller
             }
     
             $formattedOrders = $result->getCollection()->map(function ($order) {
+                // If product_img is stored as a string, remove the extra characters
+                $productImgUrls = $order->product_img ? json_decode($order->product_img) : [];
+    
+                // Ensure each image URL is properly formatted (remove extra quotes or characters if any)
+                if (is_array($productImgUrls)) {
+                    // Clean up unwanted characters such as backslashes and quotes
+                    $productImgUrls = array_map(function ($image) {
+                        return preg_replace('/[^a-zA-Z0-9:\/\/\.\-\/:_?=&]/', '', $image);
+                    }, $productImgUrls);
+                }
+    
                 return [
                     'account_id' => $order->account_id,
                     'product_id' => $order->product_id,
                     'product_name' => $order->product_name,
-                    'product_img' => $order->product_img,
+                    'product_img' => $productImgUrls, // Array of image URLs
                     'unit' => $order->unit,
-                    'seller_name' => trim(preg_replace('/\s+/', ' ', $order->seller_name)), // ✅ removes double spaces
+                    'seller_name' => trim(preg_replace('/\s+/', ' ', $order->seller_name)),
                     'quantity' => $order->quantity,
                     'total_amount' => number_format($order->total_amount, 2),
                     'status' => ucfirst($order->status),
@@ -1242,7 +1271,7 @@ class ShipmentController extends Controller
             ], 500);
         }
     }
-
+    
     //to pay
     public function getPlacedOrders(Request $request)
     {
