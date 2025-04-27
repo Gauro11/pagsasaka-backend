@@ -84,6 +84,7 @@ Route::middleware('auth:sanctum')->get('/cancellation-reasons', [ShipmentControl
 Route::middleware('auth:sanctum')->get('rider/order-history', [ShipmentController::class, 'getOrderHistory']);
 
 
+Route::middleware('auth:sanctum')->get('counts', [ShipmentController::class, 'getRiderAndFarmerCounts']);
 
 
 

@@ -1478,6 +1478,31 @@ public function getOrderHistory(Request $request)
 }
 
 
+public function getRiderAndFarmerCounts()
+{
+    try {
+        // Count the total number of approved riders
+        $totalRiders = Rider::where('status', 'Approve')->count();
+
+        // Count the total number of farmers in accounts table (role_id = 2)
+        $totalFarmers = Account::where('role_id', 2)->count();
+
+        return response()->json([
+            'isSuccess' => true,
+            'data' => [
+                'total_riders' => $totalRiders,
+                'total_farmers' => $totalFarmers,
+            ],
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch counts.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
 
 
 
