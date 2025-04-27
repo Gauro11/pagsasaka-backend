@@ -927,102 +927,115 @@ class ShipmentController extends Controller
             'solution' => 'required|string|in:Refund,Return',
             'return_method' => 'required|string',
             'payment_method' => 'required|string',
-            'product_refund_img' => 'required|image|max:2048', // 2MB max
+            'product_refund_img' => 'required|image|max:2048',
         ]);
-    
-        // Fetch the order by ID from URL
+
         $order = Order::where('id', $order_id)
-                      ->where('account_id', Auth::id())
-                      ->first();
-    
+            ->where('account_id', Auth::id())
+            ->first();
+
         if (!$order) {
             return response()->json([
                 'message' => 'Order not found or you are not authorized.'
             ], 404);
         }
-    
+
+        // Check if the order status is "Order delivered"
+        if ($order->status !== 'Order delivered') {
+            return response()->json([
+                'message' => 'Refund requests can only be made for orders that have been delivered.'
+            ], 400);
+        }
+
+        // Check if the order is already pending refund
+        if ($order->status === 'Pending') {
+            return response()->json([
+                'message' => 'A refund request for this order is already pending.'
+            ], 400);
+        }
+
         // Handle image upload
         $imagePath = null;
         if ($request->hasFile('product_refund_img')) {
             $image = $request->file('product_refund_img');
             $accountId = Auth::id();
-    
+
             $directory = public_path('img/refunds');
             $fileName = 'Refund-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
-    
+
             if (!file_exists($directory)) {
                 mkdir($directory, 0755, true);
             }
-    
+
             $image->move($directory, $fileName);
             $imagePath = asset('img/refunds/' . $fileName);
         }
-    
-        // Create the refund record
+
+        // Create the refund without setting the status field
         $refund = Refund::create([
             'account_id' => Auth::id(),
             'order_id' => $order->id,
-            'product_id' => $order->product_id,  // <-- pull product_id from order
+            'product_id' => $order->product_id,
             'reason' => $validated['reason'],
             'solution' => $validated['solution'],
-            'refund_amount' => $order->total_amount, // <-- pull product_price from order
+            'refund_amount' => $order->total_amount,
             'return_method' => $validated['return_method'],
             'payment_method' => $validated['payment_method'],
             'product_refund_img' => $imagePath,
         ]);
-    
+
+        // Update order status to "Pending"
+        $order->status = 'Pending';
+        $order->save();
+
         return response()->json([
             'message' => 'Refund request submitted successfully!',
-            'refund' => $refund
+            'refund' => [
+                'id' => $refund->id,
+                'order_id' => $refund->order_id,
+                'reason' => $refund->reason,
+                'solution' => $refund->solution,
+                'return_method' => $refund->return_method,
+                'payment_method' => $refund->payment_method,
+                'status' => $order->status,
+                'product_refund_img' => $refund->product_refund_img,
+                'created_at' => $refund->created_at,
+                'updated_at' => $refund->updated_at,
+            ]
         ], 200);
     }
 
-    public function approveRefundRequest($order_id)
+    public function approveRefund($refund_id)
     {
-        try {
-            $user = auth()->user();
-
-            // Only the seller with ID 2 can approve refund requests
-            if (!$user || $user->role_id != 2) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Unauthorized. Only the seller can approve refund requests.',
-                ], 403);
-            }
-
-            $order = Order::find($order_id);
-
-            if (!$order) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'Order not found.',
-                ], 404);
-            }
-
-            if ($order->status !== 'Pending') {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'This refund request is not pending.',
-                ], 400);
-            }
-
-            // Approve the refund
-            $order->status = 'Approved';
-            $order->status = 'Refund'; // Optional: update order status to 'Refund'
-            $order->save();
-
+        $refund = Refund::find($refund_id);
+    
+        if (!$refund) {
             return response()->json([
-                'isSuccess' => true,
-                'message' => 'Refund request approved successfully.',
-                'data' => $order,
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'isSuccess' => false,
-                'message' => 'Failed to approve refund request.',
-                'error' => $e->getMessage(),
-            ], 500);
+                'message' => 'Refund request not found.',
+            ], 404);
         }
+    
+        if ($refund->status === 'Approved') {
+            return response()->json([
+                'message' => 'Refund request already approved.',
+            ], 400);
+        }
+    
+        // Approve refund
+        $refund->status = 'Approved';
+        $refund->save();
+    
+        // Update the related Order status to "Refund"
+        $order = Order::find($refund->order_id);
+        if ($order) {
+            $order->status = 'Refund';
+            $order->save();
+        }
+    
+        return response()->json([
+            'message' => 'Refund request approved successfully.',
+            'refund' => $refund
+        ], 200);
     }
 
     //to pay
