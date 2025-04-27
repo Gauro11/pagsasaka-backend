@@ -10,19 +10,14 @@ class Refund extends Model
     use HasFactory;
 
     protected $fillable = [
-        'order_id', 'consumer_id', 'reason', 'status',
+        'account_id',
+        'product_id',
+        'order_id',
+        'reason',
+        'solution',
+        'refund_amount',
+        'return_method',
+        'payment_method',
+        'product_refund_img',
     ];
-
-    // Define the relationship with the Order model
-    public function order()
-    {
-        return $this->belongsTo(Order::class);
-    }
-
-    // Define the relationship with the Consumer (User) model
-    public function consumer()
-    {
-        return $this->belongsTo(User::class, 'consumer_id');
-    }
 }
-
