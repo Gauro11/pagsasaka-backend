@@ -65,6 +65,9 @@ Route::middleware('auth:sanctum')->get('orders-in-transit', [ShipmentController:
 Route::middleware('auth:sanctum')->get('get-delivery-proof/{id}', [ShipmentController::class, 'getDeliveryProofByOrderId']);
 // Route::middleware('auth:sanctum')->post('cancel-order/{id}', [ShipmentController::class, 'cancelOrder']);
 Route::middleware('auth:sanctum')->get('cancellation-reasons', [ShipmentController::class, 'getCancellationReasons']);
+Route::middleware('auth:sanctum')->get('refund-list', [ShipmentController::class, 'getRefundReplace']);
+Route::middleware('auth:sanctum')->get('refund-list-user', [ShipmentController::class, 'getUserRefundReplaceList']);
+Route::middleware('auth:sanctum')->get('refund-list-farmer', [ShipmentController::class, 'getSellerRefundReplaceList']);
 Route::middleware('auth:sanctum')->post('request-refund/{order_id}', [ShipmentController::class, 'RequestRefundByOrderId']);
 Route::middleware('auth:sanctum')->post('refund-approve/{refund_id}', [ShipmentController::class, 'approveRefund']);
 

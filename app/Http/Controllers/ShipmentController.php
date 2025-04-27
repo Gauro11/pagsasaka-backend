@@ -10,9 +10,11 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use App\Models\ApiLog;
 use Throwable;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Account;
+use App\Models\Product;
 use App\Models\Rider;
 use App\Models\Refund;
 use Illuminate\Validation\ValidationException;
@@ -922,13 +924,21 @@ class ShipmentController extends Controller
 
     public function RequestRefundByOrderId(Request $request, $order_id)
     {
-        $validated = $request->validate([
+        // Define the base validation rules
+        $validationRules = [
             'reason' => 'required|string|max:255',
-            'solution' => 'required|string|in:Refund,Return',
-            'return_method' => 'required|string',
-            'payment_method' => 'required|string',
+            'solution' => 'required|string|in:Refund,Replace',
+            'return_method' => 'required|string|in:Pick Up,Drop-off',
             'product_refund_img' => 'required|image|max:2048',
-        ]);
+        ];
+
+        // Conditionally add validation for "payment_method" based on the solution
+        if ($request->input('solution') !== 'Replace') {
+            $validationRules['payment_method'] = 'required|string';
+        }
+
+        // Validate request data based on the above rules
+        $validated = $request->validate($validationRules);
 
         $order = Order::where('id', $order_id)
             ->where('account_id', Auth::id())
@@ -972,23 +982,31 @@ class ShipmentController extends Controller
         }
 
         // Create the refund without setting the status field
-        $refund = Refund::create([
+        $refundData = [
             'account_id' => Auth::id(),
             'order_id' => $order->id,
             'product_id' => $order->product_id,
             'reason' => $validated['reason'],
             'solution' => $validated['solution'],
-            'refund_amount' => $order->total_amount,
             'return_method' => $validated['return_method'],
-            'payment_method' => $validated['payment_method'],
             'product_refund_img' => $imagePath,
-        ]);
+        ];
+
+        // If the solution is "Refund" or "Return", include the refund amount and payment method
+        if ($validated['solution'] !== 'Replace') {
+            $refundData['refund_amount'] = $order->total_amount;
+            $refundData['payment_method'] = $validated['payment_method'];
+        }
+
+        // Create the refund
+        $refund = Refund::create($refundData);
 
         // Update order status to "Pending"
         $order->status = 'Pending';
         $order->save();
 
-        return response()->json([
+        // Prepare response
+        $response = [
             'message' => 'Refund request submitted successfully!',
             'refund' => [
                 'id' => $refund->id,
@@ -996,46 +1014,218 @@ class ShipmentController extends Controller
                 'reason' => $refund->reason,
                 'solution' => $refund->solution,
                 'return_method' => $refund->return_method,
-                'payment_method' => $refund->payment_method,
                 'status' => $order->status,
                 'product_refund_img' => $refund->product_refund_img,
                 'created_at' => $refund->created_at,
                 'updated_at' => $refund->updated_at,
             ]
-        ], 200);
+        ];
+
+        // Include the refund amount in the response if the solution is "Refund"
+        if ($refund->solution === 'Refund') {
+            $response['refund']['refund_amount'] = $refund->refund_amount;
+        }
+
+        return response()->json($response, 200);
     }
 
     public function approveRefund($refund_id)
     {
         $refund = Refund::find($refund_id);
-    
+
         if (!$refund) {
             return response()->json([
                 'message' => 'Refund request not found.',
             ], 404);
         }
-    
+
         if ($refund->status === 'Approved') {
             return response()->json([
                 'message' => 'Refund request already approved.',
             ], 400);
         }
-    
+
         // Approve refund
         $refund->status = 'Approved';
         $refund->save();
-    
+
         // Update the related Order status to "Refund"
         $order = Order::find($refund->order_id);
         if ($order) {
             $order->status = 'Refund';
             $order->save();
         }
-    
+
         return response()->json([
             'message' => 'Refund request approved successfully.',
             'refund' => $refund
         ], 200);
+    }
+
+    public function getRefundReplace(Request $request)
+    {
+        // Fetch orders for the logged-in user with statuses Pending, Refund, or Replace
+        $orders = Order::where('account_id', Auth::id())
+            ->whereIn('status', ['Pending', 'Refund', 'Replace'])
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'message' => 'No orders found with the specified statuses.'
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Orders retrieved successfully.',
+            'orders' => $orders
+        ], 200);
+    }
+
+    public function getUserRefundReplaceList(Request $request)
+    {
+        try {
+            $user = auth()->user();
+
+            if ($user->role_id != 3) { // 3 = Consumer
+                return response()->json(['isSuccess' => false, 'message' => 'Unauthorized'], 403);
+            }
+
+            $perPage = 10;
+
+            $query = Order::leftJoin('refunds', 'orders.id', '=', 'refunds.order_id')
+                ->where('orders.account_id', $user->id)
+                ->whereIn('orders.status', ['Refund', 'Replace'])
+                ->select(
+                    'orders.id',
+                    'orders.account_id',
+                    'orders.product_id',
+                    'orders.quantity',
+                    'orders.total_amount',
+                    'orders.status',
+                    'orders.payment_method',
+                    'orders.order_number',
+                    'refunds.reason as refund_reason'
+                );
+
+            $result = $query->paginate($perPage);
+
+            if ($result->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No Refund and Replace orders found.',
+                ], 404);
+            }
+
+            $formattedOrders = $result->getCollection()->map(function ($order) {
+                return [
+                    'order_id' => $order->id,
+                    'account_id' => $order->account_id,
+                    'product_id' => $order->product_id,
+                    'quantity' => $order->quantity,
+                    'total_amount' => number_format($order->total_amount, 2),
+                    'status' => ucfirst($order->status), // Capitalize first letter
+                    'payment_method' => $order->payment_method,
+                    'order_number' => $order->order_number,
+                    'refund_reason' => $order->refund_reason,
+                ];
+            });
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Refund and Replace orders retrieved successfully.',
+                'orders' => $formattedOrders,
+                'pagination' => [
+                    'total' => $result->total(),
+                    'per_page' => $result->perPage(),
+                    'current_page' => $result->currentPage(),
+                    'last_page' => $result->lastPage(),
+                ],
+            ], 200);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve Refund and Replace orders.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getSellerRefundReplaceList(Request $request)
+    {
+        try {
+            $user = auth()->user();
+
+            if ($user->role_id != 2) { // 2 = Seller
+                return response()->json(['isSuccess' => false, 'message' => 'Unauthorized'], 403);
+            }
+
+            $productIds = Product::where('account_id', $user->id)->pluck('id');
+
+            if ($productIds->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No products found for this seller.',
+                ], 404);
+            }
+
+            $perPage = 10;
+
+            $query = Order::leftJoin('refunds', 'orders.id', '=', 'refunds.order_id')
+                ->whereIn('orders.product_id', $productIds)
+                ->whereIn('orders.status', ['Refund', 'Replace'])
+                ->select(
+                    'orders.id',
+                    'orders.account_id',
+                    'orders.product_id',
+                    'orders.quantity',
+                    'orders.total_amount',
+                    'orders.status',
+                    'orders.payment_method',
+                    'orders.order_number',
+                    'refunds.reason as refund_reason'
+                );
+
+            $result = $query->paginate($perPage);
+
+            if ($result->isEmpty()) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'No Refund and Replace orders found for your products.',
+                ], 404);
+            }
+
+            $formattedOrders = $result->getCollection()->map(function ($order) {
+                return [
+                    'order_id' => $order->id,
+                    'account_id' => $order->account_id,
+                    'product_id' => $order->product_id,
+                    'quantity' => $order->quantity,
+                    'total_amount' => number_format($order->total_amount, 2),
+                    'status' => ucfirst($order->status), // Capitalize first letter
+                    'payment_method' => $order->payment_method,
+                    'order_number' => $order->order_number,
+                    'refund_reason' => $order->refund_reason,
+                ];
+            });
+
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Refund and Replace orders retrieved successfully.',
+                'orders' => $formattedOrders,
+                'pagination' => [
+                    'total' => $result->total(),
+                    'per_page' => $result->perPage(),
+                    'current_page' => $result->currentPage(),
+                    'last_page' => $result->lastPage(),
+                ],
+            ], 200);
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Failed to retrieve seller Refund and Replace orders.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     //to pay
