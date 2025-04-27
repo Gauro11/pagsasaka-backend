@@ -1085,18 +1085,22 @@ class ShipmentController extends Controller
     {
         try {
             $user = auth()->user();
-
+    
             if ($user->role_id != 3) { // 3 = Consumer
                 return response()->json(['isSuccess' => false, 'message' => 'Unauthorized'], 403);
             }
-
+    
             $perPage = 10;
-
+    
             $query = Order::leftJoin('refunds', 'orders.id', '=', 'refunds.order_id')
+                ->leftJoin('products', 'orders.product_id', '=', 'products.id')
+                ->leftJoin('accounts as sellers', function($join) {
+                    $join->on('products.account_id', '=', 'sellers.id')
+                         ->where('sellers.role_id', '=', 2); // ✅ Only join sellers
+                })
                 ->where('orders.account_id', $user->id)
                 ->whereIn('orders.status', ['Refund', 'Replace'])
                 ->select(
-                    'orders.id',
                     'orders.account_id',
                     'orders.product_id',
                     'orders.quantity',
@@ -1104,32 +1108,39 @@ class ShipmentController extends Controller
                     'orders.status',
                     'orders.payment_method',
                     'orders.order_number',
-                    'refunds.reason as refund_reason'
+                    'refunds.reason as refund_reason',
+                    'products.product_name',
+                    'products.product_img',
+                    'products.unit',
+                    DB::raw("CONCAT(sellers.first_name, ' ', COALESCE(sellers.middle_name, ''), ' ', sellers.last_name) as seller_name") // ✅ fix here
                 );
-
+    
             $result = $query->paginate($perPage);
-
+    
             if ($result->isEmpty()) {
                 return response()->json([
                     'isSuccess' => false,
                     'message' => 'No Refund and Replace orders found.',
                 ], 404);
             }
-
+    
             $formattedOrders = $result->getCollection()->map(function ($order) {
                 return [
-                    'order_id' => $order->id,
                     'account_id' => $order->account_id,
                     'product_id' => $order->product_id,
+                    'product_name' => $order->product_name,
+                    'product_img' => $order->product_img,
+                    'unit' => $order->unit,
+                    'seller_name' => trim($order->seller_name),
                     'quantity' => $order->quantity,
                     'total_amount' => number_format($order->total_amount, 2),
-                    'status' => ucfirst($order->status), // Capitalize first letter
+                    'status' => ucfirst($order->status),
                     'payment_method' => $order->payment_method,
                     'order_number' => $order->order_number,
                     'refund_reason' => $order->refund_reason,
                 ];
             });
-
+    
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Refund and Replace orders retrieved successfully.',
@@ -1141,40 +1152,36 @@ class ShipmentController extends Controller
                     'last_page' => $result->lastPage(),
                 ],
             ], 200);
+    
         } catch (Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Failed to retrieve Refund and Replace orders.',
+                'message' => 'Failed to retrieve refund/replace orders.',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
-
+    
     public function getSellerRefundReplaceList(Request $request)
     {
         try {
             $user = auth()->user();
-
+    
             if ($user->role_id != 2) { // 2 = Seller
                 return response()->json(['isSuccess' => false, 'message' => 'Unauthorized'], 403);
             }
-
-            $productIds = Product::where('account_id', $user->id)->pluck('id');
-
-            if ($productIds->isEmpty()) {
-                return response()->json([
-                    'isSuccess' => false,
-                    'message' => 'No products found for this seller.',
-                ], 404);
-            }
-
+    
             $perPage = 10;
-
+    
             $query = Order::leftJoin('refunds', 'orders.id', '=', 'refunds.order_id')
-                ->whereIn('orders.product_id', $productIds)
+                ->leftJoin('products', 'orders.product_id', '=', 'products.id')
+                ->leftJoin('accounts as sellers', function($join) {
+                    $join->on('products.account_id', '=', 'sellers.id')
+                         ->where('sellers.role_id', '=', 2); // ✅ Only sellers
+                })
+                ->where('products.account_id', $user->id) // ✅ Only the seller's products
                 ->whereIn('orders.status', ['Refund', 'Replace'])
                 ->select(
-                    'orders.id',
                     'orders.account_id',
                     'orders.product_id',
                     'orders.quantity',
@@ -1182,32 +1189,39 @@ class ShipmentController extends Controller
                     'orders.status',
                     'orders.payment_method',
                     'orders.order_number',
-                    'refunds.reason as refund_reason'
+                    'refunds.reason as refund_reason',
+                    'products.product_name',
+                    'products.product_img',
+                    'products.unit',
+                    DB::raw("CONCAT(sellers.first_name, ' ', COALESCE(sellers.middle_name, ''), ' ', sellers.last_name) as seller_name") // ✅ fix here
                 );
-
+    
             $result = $query->paginate($perPage);
-
+    
             if ($result->isEmpty()) {
                 return response()->json([
                     'isSuccess' => false,
-                    'message' => 'No Refund and Replace orders found for your products.',
+                    'message' => 'No Refund and Replace orders found.',
                 ], 404);
             }
-
+    
             $formattedOrders = $result->getCollection()->map(function ($order) {
                 return [
-                    'order_id' => $order->id,
                     'account_id' => $order->account_id,
                     'product_id' => $order->product_id,
+                    'product_name' => $order->product_name,
+                    'product_img' => $order->product_img,
+                    'unit' => $order->unit,
+                    'seller_name' => trim(preg_replace('/\s+/', ' ', $order->seller_name)), // ✅ removes double spaces
                     'quantity' => $order->quantity,
                     'total_amount' => number_format($order->total_amount, 2),
-                    'status' => ucfirst($order->status), // Capitalize first letter
+                    'status' => ucfirst($order->status),
                     'payment_method' => $order->payment_method,
                     'order_number' => $order->order_number,
                     'refund_reason' => $order->refund_reason,
                 ];
             });
-
+    
             return response()->json([
                 'isSuccess' => true,
                 'message' => 'Refund and Replace orders retrieved successfully.',
@@ -1219,10 +1233,11 @@ class ShipmentController extends Controller
                     'last_page' => $result->lastPage(),
                 ],
             ], 200);
-        } catch (Throwable $e) {
+    
+        } catch (\Throwable $e) {
             return response()->json([
                 'isSuccess' => false,
-                'message' => 'Failed to retrieve seller Refund and Replace orders.',
+                'message' => 'Failed to retrieve Refund and Replace orders.',
                 'error' => $e->getMessage(),
             ], 500);
         }
