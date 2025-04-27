@@ -147,7 +147,15 @@ public function getApprovedRiders()
         // Fetch all riders with status 'Approve'
         $riders = Rider::where('status', 'Approve')
             ->select('id', 'first_name', 'last_name', 'email', 'phone_number')
-            ->get();
+            ->get()
+            ->map(function ($rider) {
+                // For each rider, calculate the total balance based on delivered orders
+                $rider->balance = Order::where('rider_id', $rider->id)
+                    ->where('status', 'Order delivered') // Only delivered orders
+                    ->sum('total_amount'); // Sum the total_amount column (or your equivalent column)
+                
+                return $rider;
+            });
 
         return response()->json([
             'isSuccess' => true,
@@ -162,6 +170,7 @@ public function getApprovedRiders()
         ], 500);
     }
 }
+
 
     
 
@@ -289,10 +298,12 @@ public function getApprovedRiders()
 
     
 
+  
+
     public function applyRider(Request $request)
     {
         try {
-            // Validate request input
+            // Validate request input first
             $validated = $request->validate([
                 'first_name'    => 'required|string|max:255',
                 'last_name'     => 'required|string|max:255',
@@ -302,6 +313,16 @@ public function getApprovedRiders()
                 'license'       => 'required|image|mimes:jpg,png,jpeg|max:2048',
                 'valid_id'      => 'required|image|mimes:jpg,png,jpeg|max:2048',
             ]);
+    
+            // 🔥 Check if email already exists in accounts table
+            $emailExistsInAccounts = Account::where('email', $validated['email'])->exists();
+    
+            if ($emailExistsInAccounts) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message'   => 'The email is already registered under an account. Please use a different email.',
+                ], 422);
+            }
     
             // Ensure directories exist
             $licenseDirectory = public_path('img/licenses');
@@ -366,7 +387,7 @@ public function getApprovedRiders()
                 Log::error("Failed to send rider application email to {$rider->email}. Error: " . $mailEx->getMessage());
             }
     
-            // Prepare response
+            // Prepare success response
             $response = [
                 'isSuccess' => true,
                 'message'   => 'Application submitted successfully. Waiting for approval.',
@@ -391,6 +412,7 @@ public function getApprovedRiders()
             return response()->json($response, 500);
         }
     }
+    
     
 
     

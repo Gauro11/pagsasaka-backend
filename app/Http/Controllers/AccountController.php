@@ -79,9 +79,9 @@ class AccountController extends Controller
     
 
 
-    public function register(Request $request)
+public function register(Request $request)
 {
-    DB::beginTransaction(); // Start a transaction
+    DB::beginTransaction();
 
     try {
         // Validate input
@@ -89,7 +89,18 @@ class AccountController extends Controller
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
-            'email' => 'required|email|unique:accounts,email',
+            'email' => [
+                'required',
+                'email',
+                function ($attribute, $value, $fail) {
+                    if (DB::table('accounts')->where('email', $value)->exists()) {
+                        $fail('The email has already been taken in accounts.');
+                    }
+                    if (DB::table('riders')->where('email', $value)->exists()) {
+                        $fail('The email has already been taken in riders.');
+                    }
+                },
+            ],
             'password' => 'required|string|min:8|confirmed',
             'role' => 'required|exists:roles,id',
             'security_question_id' => 'required|exists:questions,id',
@@ -111,7 +122,7 @@ class AccountController extends Controller
         // Generate OTP
         $otp = rand(100000, 999999);
 
-        // Create account
+        // Create the account in accounts table
         $user = Account::create([
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
@@ -125,9 +136,10 @@ class AccountController extends Controller
             'phone_number' => $request->phone_number,
             'delivery_address' => $request->delivery_address,
         ]);
+
         $user->load('role');
 
-        // Save OTP in the database
+        // Save OTP
         DB::table('otps')->insert([
             'email' => $user->email,
             'otp' => $otp,
@@ -138,24 +150,24 @@ class AccountController extends Controller
         // Send OTP via email
         $htmlContent = "<p>Your OTP is: <strong>$otp</strong></p>";
         $subject = "Your OTP Code";
-        $email = $user->email;
 
         try {
-            Mail::send([], [], function ($message) use ($email, $htmlContent, $subject) {
-                $message->to($email)
-                    ->subject($subject)
-                    ->setBody($htmlContent, 'text/html');
+            Mail::send([], [], function ($message) use ($user, $htmlContent, $subject) {
+                $message->to($user->email)
+                        ->subject($subject)
+                        ->setBody($htmlContent, 'text/html');
             });
         } catch (Throwable $e) {
-            Log::error('Error sending email in register method: ' . $e->getMessage(), [
-                'email' => $email,
-                'otp' => $otp,
+            Log::error('Error sending OTP email during registration.', [
+                'email' => $user->email,
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
 
         DB::commit();
 
+        // Success response
         $response = [
             'isSuccess' => true,
             'message' => 'Account registered successfully. An OTP has been sent to your email.',
@@ -177,10 +189,12 @@ class AccountController extends Controller
         $this->logAPICalls('register', $user->email, $request->except(['password', 'password_confirmation']), $response);
 
         return response()->json($response, 201);
+
     } catch (Throwable $e) {
         DB::rollBack();
 
-        Log::error('Error in register method: ' . $e->getMessage(), [
+        Log::error('Error during account registration.', [
+            'error' => $e->getMessage(),
             'request_data' => $request->all(),
         ]);
 
@@ -195,6 +209,7 @@ class AccountController extends Controller
         return response()->json($response, 500);
     }
 }
+
 
 
 
