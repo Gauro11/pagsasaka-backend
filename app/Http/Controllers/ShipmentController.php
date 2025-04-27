@@ -924,7 +924,9 @@ class ShipmentController extends Controller
 
     public function RequestRefundByOrderId(Request $request, $order_id)
     {
-        // Define the base validation rules
+        $user = Auth::user();
+    
+        // Define validation rules
         $validationRules = [
             'reason' => 'required|string|max:255',
             'solution' => 'required|string|in:Refund,Replace',
@@ -932,16 +934,14 @@ class ShipmentController extends Controller
             'product_refund_img' => 'required|image|mimes:jpg,jpeg,png|max:2048',
         ];
     
-        // Conditionally add validation for "payment_method" based on the solution
         if ($request->input('solution') !== 'Replace') {
             $validationRules['payment_method'] = 'required|string';
         }
     
-        // Validate request data based on the above rules
         $validated = $request->validate($validationRules);
     
         $order = Order::where('id', $order_id)
-            ->where('account_id', Auth::id())
+            ->where('account_id', $user->id) // Use $user->id instead of Auth::id()
             ->first();
     
         if (!$order) {
@@ -950,14 +950,12 @@ class ShipmentController extends Controller
             ], 404);
         }
     
-        // Check if the order status is "Order delivered"
         if ($order->status !== 'Order delivered') {
             return response()->json([
                 'message' => 'Refund requests can only be made for orders that have been delivered.'
             ], 400);
         }
     
-        // Check if the order is already pending refund
         if ($order->status === 'Pending') {
             return response()->json([
                 'message' => 'A refund request for this order is already pending.'
@@ -968,7 +966,7 @@ class ShipmentController extends Controller
         $imagePath = null;
         if ($request->hasFile('product_refund_img')) {
             $image = $request->file('product_refund_img');
-            $accountId = Auth::id();
+            $accountId = $user->id;
     
             $directory = public_path('img/refunds');
             $fileName = 'Refund-' . $accountId . '-' . now()->format('YmdHis') . '-' . uniqid() . '.' . $image->getClientOriginalExtension();
@@ -981,15 +979,15 @@ class ShipmentController extends Controller
             $imagePath = asset('img/refunds/' . $fileName);
         }
     
-        // Calculate refund amount based on the solution
+        // Calculate refund amount
         $refundAmount = null;
         if ($validated['solution'] !== 'Replace') {
-            $refundAmount = $order->total_amount;  // Set refund amount only for Refund (not Replace)
+            $refundAmount = $order->total_amount;
         }
     
-        // Prepare refund data (save only the necessary fields)
+        // Prepare refund data
         $refundData = [
-            'account_id' => Auth::id(),
+            'account_id' => $user->id,
             'order_id' => $order->id,
             'product_id' => $order->product_id,
             'reason' => $validated['reason'],
@@ -998,16 +996,15 @@ class ShipmentController extends Controller
             'product_refund_img' => $imagePath,
         ];
     
-        // If the solution is "Refund" or "Return", include the refund amount and payment method
         if ($validated['solution'] !== 'Replace') {
             $refundData['refund_amount'] = $refundAmount;
             $refundData['payment_method'] = $validated['payment_method'];
         }
     
-        // Create the refund (store the data with the refund amount)
+        // Create the refund
         $refund = Refund::create($refundData);
     
-        // Update order status to "Pending"
+        // Update order status
         $order->status = 'Pending';
         $order->save();
     
@@ -1027,7 +1024,6 @@ class ShipmentController extends Controller
             ]
         ];
     
-        // Include the refund amount in the response if the solution is "Refund"
         if ($refund->solution === 'Refund') {
             $response['refund']['refund_amount'] = $refund->refund_amount;
         }
@@ -1035,37 +1031,39 @@ class ShipmentController extends Controller
         return response()->json($response, 200);
     }
     
-
     public function approveRefund($refund_id)
     {
+        $user = Auth::user();
+    
         $refund = Refund::find($refund_id);
-
+    
         if (!$refund) {
             return response()->json([
                 'message' => 'Refund request not found.',
             ], 404);
         }
-
+    
         if ($refund->status === 'Approved') {
             return response()->json([
                 'message' => 'Refund request already approved.',
             ], 400);
         }
-
+    
         // Approve refund
         $refund->status = 'Approved';
         $refund->save();
-
-        // Update the related Order status to "Refund"
+    
+        // Update related order
         $order = Order::find($refund->order_id);
         if ($order) {
             $order->status = 'Refund';
             $order->save();
         }
-
+    
         return response()->json([
             'message' => 'Refund request approved successfully.',
-            'refund' => $refund
+            'refund' => $refund,
+            'approved_by' => $user->name, // Example: include user info in the response
         ], 200);
     }
 
