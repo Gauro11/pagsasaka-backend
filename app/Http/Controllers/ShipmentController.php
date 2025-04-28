@@ -1031,11 +1031,11 @@ class ShipmentController extends Controller
         return response()->json($response, 200);
     }
     
-    public function approveRefund($refund_id)
+    public function approveRefund($id)
     {
         $user = Auth::user();
     
-        $refund = Refund::find($refund_id);
+        $refund = Refund::find($id);
     
         if (!$refund) {
             return response()->json([
