@@ -1035,39 +1035,58 @@ class ShipmentController extends Controller
     
     public function approveRefund($id)
     {
-        $user = Auth::user();
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'User not authenticated.',
+                ], 401);
+            }
     
-        $refund = Refund::find($id);
+            // Find the order by ID
+            $order = Order::find($id);
     
-        if (!$refund) {
-            return response()->json([
-                'message' => 'Refund request not found.',
-            ], 404);
-        }
+            if (!$order) {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Order not found.',
+                ], 404);
+            }
     
-        if ($refund->status === 'Approved') {
-            return response()->json([
-                'message' => 'Refund request already approved.',
-            ], 400);
-        }
+            // Only allow refund if current status is "Pending"
+            if ($order->status !== 'Pending') {
+                return response()->json([
+                    'isSuccess' => false,
+                    'message' => 'Only orders with Pending status can be refunded.',
+                ], 400);
+            }
     
-        // Approve refund
-        $refund->status = 'Approved';
-        $refund->save();
-    
-        // Update related order
-        $order = Order::find($refund->order_id);
-        if ($order) {
+            // Approve refund by updating status to "Refund"
             $order->status = 'Refund';
             $order->save();
-        }
     
-        return response()->json([
-            'message' => 'Refund request approved successfully.',
-            'refund' => $refund,
-            'approved_by' => $user->name, // Example: include user info in the response
-        ], 200);
+            return response()->json([
+                'isSuccess' => true,
+                'message' => 'Order refund approved successfully.',
+                'order' => [
+                    'id' => $order->id,
+                    'status' => $order->status,
+                ],
+                'approved_by' => $user->name,
+            ], 200);
+    
+        } catch (Throwable $e) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'An error occurred while approving the refund.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
+    
+
+    
 
     public function getRefundReplace(Request $request)
     {
