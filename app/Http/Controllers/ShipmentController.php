@@ -931,7 +931,7 @@ class ShipmentController extends Controller
             'reason' => 'required|string|max:255',
             'solution' => 'required|string|in:Refund,Replace',
             'return_method' => 'required|string|in:Pick Up,Drop-off',
-            'product_refund_img' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+            'product_refund_img' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
         ];
     
         if ($request->input('solution') !== 'Replace') {
