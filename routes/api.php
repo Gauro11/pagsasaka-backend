@@ -83,6 +83,8 @@ Route::middleware('auth:sanctum')->post('add-cancellation-reason', [ShipmentCont
 Route::middleware('auth:sanctum')->get('/cancellation-reasons', [ShipmentController::class, 'getCancellationReasons']);
 Route::middleware('auth:sanctum')->get('rider/order-history', [ShipmentController::class, 'getOrderHistory']);
 Route::middleware('auth:sanctum')->get('consumer-orders', [ShipmentController::class, 'getConsumerOrders']);
+Route::middleware('auth:sanctum')->get('order-consumer', [ShipmentController::class, 'getBuyersForFarmerProduct']);
+
 
 
 Route::middleware('auth:sanctum')->get('counts', [ShipmentController::class, 'getRiderAndFarmerCounts']);
