@@ -1705,6 +1705,112 @@ class ShipmentController extends Controller
         }
     }
 
+public function getConsumerOrders(Request $request)
+{
+    try {
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Unauthorized access.',
+            ], 401);
+        }
+
+        // Fetch orders with product relationship
+        $orders = Order::where('account_id', $user->id)
+            ->with('product:id,product_name') // eager load product name
+            ->select('id', 'product_id', 'quantity', 'total_amount', 'status','payment_method', 'created_at')
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'order_id'     => $order->id,
+                    'product_id'   => $order->product_id,
+                    'product_name' => $order->product ? $order->product->product_name : null,
+                    'quantity'     => $order->quantity,
+                    'payment_method'     => $order->payment_method,
+                    'total_amount'        => $order->total_amount,
+                    'status'       => $order->status,
+                    'created_at'   => $order->created_at ? $order->created_at->format('F d Y') : null,
+                ];
+            });
+
+        return response()->json([
+            'isSuccess' => true,
+            'data' => $orders,
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch consumer orders.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
+public function getBuyersForFarmerProduct()
+{
+    try {
+        // Get the authenticated farmer (assuming role_id of 2 for farmer)
+        $user = auth()->user();
+
+        if (!$user || $user->role_id != 2) {
+            return response()->json([
+                'isSuccess' => false,
+                'message' => 'Unauthorized access. Only farmers can access this data.',
+            ], 401);
+        }
+
+        // Fetch all orders for products sold by this farmer
+        // Assuming the "product" belongs to the farmer (via a 'farmer_id' field in the products table)
+        $orders = Order::whereIn('product_id', function($query) use ($user) {
+            $query->select('id')
+                  ->from('products')
+                  ->where('account_id', $user->id); // Replace 'farmer_id' with the actual column
+        })
+        ->select('account_id', 'product_id', 'quantity', 'total_amount', 'status', 'ship_to','created_at')
+        ->get();
+
+        // Get the buyers (consumers) based on account_id from accounts table
+        $buyers = $orders->map(function ($order) {
+            $account = Account::find($order->account_id); // Fetch account based on account_id
+            $product = Product::find($order->product_id); // Fetch product based on product_id
+
+            return [
+                'account_id'    => $account->id,
+                'full_name'     => $account->first_name . ' ' . $account->last_name, // Combine first and last name into full name
+                'email'         => $account->email,
+                'product_id'    => $order->product_id,
+                'product_name'  => $product ? $product->product_name : 'Unknown', // Fetch product_name
+                'quantity'      => $order->quantity,
+                'total_amount'  => $order->total_amount,
+                'ship_to'       =>$order->ship_to,
+                'status'        => $order->status,
+                'created_at'    => $order->created_at ? $order->created_at->format('F d Y') : null,
+            ];
+        });
+
+        return response()->json([
+            'isSuccess' => true,
+            'data' => $buyers,
+        ], 200);
+
+    } catch (Throwable $e) {
+        return response()->json([
+            'isSuccess' => false,
+            'message' => 'Failed to fetch buyer details for the products.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
+
+
+
+
     public function logAPICalls(string $methodName, ?string $userId, array $param, array $resp)
     {
         try {
