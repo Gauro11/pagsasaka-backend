@@ -922,7 +922,7 @@ class ShipmentController extends Controller
         }
     }
 
-    public function RequestRefundByOrderId(Request $request, $order_id)
+    public function RequestRefundByOrderId(Request $request, $id)
     {
         $user = Auth::user();
     
@@ -940,7 +940,7 @@ class ShipmentController extends Controller
     
         $validated = $request->validate($validationRules);
     
-        $order = Order::where('id', $order_id)
+        $order = Order::where('id', $id)
             ->where('account_id', $user->id) // Use $user->id instead of Auth::id()
             ->first();
     
@@ -1031,11 +1031,11 @@ class ShipmentController extends Controller
         return response()->json($response, 200);
     }
     
-    public function approveRefund($refund_id)
+    public function approveRefund($id)
     {
         $user = Auth::user();
     
-        $refund = Refund::find($refund_id);
+        $refund = Refund::find($id);
     
         if (!$refund) {
             return response()->json([

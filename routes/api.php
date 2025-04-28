@@ -68,8 +68,8 @@ Route::middleware('auth:sanctum')->get('cancellation-reasons', [ShipmentControll
 Route::middleware('auth:sanctum')->get('refund-list', [ShipmentController::class, 'getRefundReplace']);
 Route::middleware('auth:sanctum')->get('refund-list-user', [ShipmentController::class, 'getUserRefundReplaceList']);
 Route::middleware('auth:sanctum')->get('refund-list-farmer', [ShipmentController::class, 'getSellerRefundReplaceList']);
-Route::middleware('auth:sanctum')->post('request-refund/{order_id}', [ShipmentController::class, 'RequestRefundByOrderId']);
-Route::middleware('auth:sanctum')->post('refund-approve/{refund_id}', [ShipmentController::class, 'approveRefund']);
+Route::middleware('auth:sanctum')->post('request-refund/{id}', [ShipmentController::class, 'RequestRefundByOrderId']);
+Route::middleware('auth:sanctum')->post('refund-approve/{id}', [ShipmentController::class, 'approveRefund']);
 
 Route::middleware('auth:sanctum')->get('my-placed-orders', [ShipmentController::class, 'getPlacedOrders']);
 Route::middleware('auth:sanctum')->get('toship-orders', [ShipmentController::class, 'getWaitingForCourierOrders']);
