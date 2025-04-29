@@ -244,6 +244,8 @@ class PaymentController extends Controller
         $orders = Order::whereHas('product', function ($query) use ($farmerId) {
             $query->where('account_id', $farmerId);
         })
+
+        ->where('status', 'Order delivered') // ✅ only Order Delivered
         ->where('payment_method', '!=', 'Paid') // Exclude orders with payment_method = Paid
         ->whereNotNull('payment_method')
         ->whereNotIn('id', $paidOutOrderId)
