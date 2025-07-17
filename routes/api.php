@@ -110,7 +110,7 @@ Route::post('rider/approve/{id}', [RiderController::class, 'approveRider']);
 Route::get('riders/pending', [RiderController::class, 'getPendingRiders']);
 Route::post('ridersinvalidate/{id}', [RiderController::class, 'invalidateRider']);
 Route::post('rider/approve-earnings/{id}', [RiderController::class, 'approveRiderEarnings']);
-Route::get('allriderss', [RiderController::class, 'getApprovedRiders']);
+Route::get('allriders', [RiderController::class, 'getApprovedRiders']);
 
 Route::middleware(['auth:sanctum'])->post('cancel/orders/{orderId}', [RiderController::class, 'cancelOrderByRider']);
 // Route::middleware(['auth:sanctum'])->get('rider/order-history', [RiderController::class, 'getOrderHistory']);
